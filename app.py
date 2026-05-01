@@ -4,10 +4,13 @@ import os
 
 app = Flask(__name__)
 
-# 🔐 Groq API key (set in Render environment variables)
+# 🔐 Load API key from Render environment variables
 API_KEY = os.environ.get("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")
 
-# 🧠 Simple memory
+# 🧪 DEBUG: check if key is loading
+print("🔥 GROQ KEY LOADED:", API_KEY)
+
+# 🧠 Chat memory
 chat_history = [
     {"role": "system", "content": "You are a helpful, friendly AI assistant 🙂"}
 ]
@@ -100,10 +103,10 @@ def ai():
 
         data = response.json()
 
-        # 🧠 SAFE CHECK (fixes 'choices' error)
+        # 🧠 SAFE CHECK (prevents 'choices' crash)
         if "choices" not in data:
-            print("GROQ ERROR:", data)
-            return jsonify({"response": "⚠️ API Error: " + str(data)})
+            print("❌ GROQ ERROR RESPONSE:", data)
+            return jsonify({"response": "⚠️ API ERROR: " + str(data)})
 
         reply = data["choices"][0]["message"]["content"]
 
