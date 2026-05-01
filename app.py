@@ -8,7 +8,7 @@ app = Flask(__name__)
 API_KEY = os.environ.get("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")
 
 # 🧪 DEBUG: check if key is loading
-print("🔥 GROQ KEY LOADED:", API_KEY)
+print("🔥 GROQ KEY LOADED:", GROQ_API_KEY)
 
 # 🧠 Chat memory
 chat_history = [
