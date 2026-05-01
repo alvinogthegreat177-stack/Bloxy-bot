@@ -4,168 +4,76 @@ import os
 
 app = Flask(__name__)
 
-# 🔐 API KEY (Render Environment Variable)
+# 🔐 Groq API Key (set this in Render environment variables)
 API_KEY = os.environ.get("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")
 
-# 🧠 CHAT STORAGE
-chats = {
-    "🤖 Bloxy-bot Chat 1": [
-        {"role": "system", "content": "You are a helpful, friendly AI assistant 🙂"}
-    ]
-}
+# 🧠 Simple chat memory
+chat_history = [
+    {"role": "system", "content": "You are a helpful, friendly AI assistant 🙂"}
+]
 
+# 🌐 Frontend UI
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
 <title>Bloxy-bot</title>
-
 <style>
-body { margin:0; font-family: Arial; display:flex; }
+body { font-family: Arial; margin: 0; display: flex; flex-direction: column; height: 100vh; }
 
-/* SIDEBAR */
-#sidebar {
-    width: 240px;
-    background: #202123;
-    color: white;
-    height: 100vh;
-    padding: 10px;
-    transition: 0.3s;
-}
+#chat { flex: 1; padding: 10px; overflow-y: auto; background: #f5f5f5; }
 
-.hidden {
-    width: 0;
-    padding: 0;
-    overflow: hidden;
-}
+.msg { padding: 10px; margin: 5px; border-radius: 8px; max-width: 60%; }
 
-.chat-item {
-    padding: 10px;
-    border-radius: 6px;
-    cursor: pointer;
-}
+.user { background: #cfe9ff; margin-left: auto; }
+.ai { background: white; }
 
-.chat-item:hover {
-    background:#2a2b32;
-}
+#inputArea { display: flex; padding: 10px; }
 
-/* MAIN */
-#main {
-    flex:1;
-    display:flex;
-    flex-direction:column;
-}
+#msg { flex: 1; padding: 10px; }
 
-#chat {
-    flex:1;
-    overflow-y:auto;
-    padding:20px;
-    background:#f7f7f7;
-}
-
-.msg {
-    max-width:60%;
-    padding:10px;
-    margin:8px;
-    border-radius:10px;
-}
-
-.user { background:#d1e7ff; margin-left:auto; }
-.ai { background:white; }
-
-#inputArea {
-    display:flex;
-    padding:10px;
-    background:white;
-}
-
-#msg {
-    flex:1;
-    padding:10px;
-}
-
-button {
-    padding:10px;
-    margin-left:5px;
-}
+button { padding: 10px; margin-left: 5px; }
 </style>
 </head>
 
 <body>
 
-<div id="sidebar">
-    <button onclick="newChat()">+ New Chat</button>
-    <div id="chatList"></div>
-</div>
-
-<div id="main">
-
 <div id="chat"></div>
 
 <div id="inputArea">
-    <input id="msg" placeholder="Type message...">
+    <input id="msg" placeholder="Type message..." />
     <button onclick="send()">Send</button>
 </div>
 
-</div>
-
 <script>
-
-let currentChat = "";
-
-async function loadChats() {
-    const res = await fetch("/chats");
-    const data = await res.json();
-
-    let list = document.getElementById("chatList");
-    list.innerHTML = "";
-
-    data.chats.forEach(c => {
-        list.innerHTML += `<div class="chat-item" onclick="switchChat('${c}')">${c}</div>`;
-    });
-
-    if (!currentChat && data.chats.length > 0) {
-        currentChat = data.chats[0];
-    }
-}
-
-function switchChat(name) {
-    currentChat = name;
-    document.getElementById("chat").innerHTML = "";
-}
-
-async function newChat() {
-    await fetch("/new_chat", {method:"POST"});
-    loadChats();
-}
 
 async function send() {
     let msg = document.getElementById("msg").value;
     if (!msg) return;
 
-    let chat = document.getElementById("chat");
-
-    chat.innerHTML += `<div class='msg user'>${msg}</div>`;
+    document.getElementById("chat").innerHTML +=
+        "<div class='msg user'>" + msg + "</div>";
 
     const res = await fetch("/ai", {
-        method:"POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({message: msg, chat: currentChat})
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({message: msg})
     });
 
     const data = await res.json();
 
-    chat.innerHTML += `<div class='msg ai'>${data.response}</div>`;
+    document.getElementById("chat").innerHTML +=
+        "<div class='msg ai'>" + data.response + "</div>";
 
     document.getElementById("msg").value = "";
-    chat.scrollTop = chat.scrollHeight;
+
+    document.getElementById("chat").scrollTop =
+        document.getElementById("chat").scrollHeight;
 }
 
 document.addEventListener("keydown", function(e){
-    if(e.key === "Enter") send();
+    if (e.key === "Enter") send();
 });
-
-loadChats();
 
 </script>
 
@@ -177,23 +85,13 @@ loadChats();
 def home():
     return render_template_string(HTML)
 
-@app.route("/chats")
-def get_chats():
-    return jsonify({"chats": list(chats.keys())})
-
-@app.route("/new_chat", methods=["POST"])
-def new_chat():
-    name = f"🤖 Bloxy-bot Chat {len(chats)+1}"
-    chats[name] = chats[list(chats.keys())[0]][:1]
-    return jsonify({"name": name})
-
 @app.route("/ai", methods=["POST"])
 def ai():
-    data = request.json
-    user_message = data["message"]
-    chat_name = data["chat"]
+    global chat_history
 
-    chats[chat_name].append({"role": "user", "content": user_message})
+    user_message = request.json["message"]
+
+    chat_history.append({"role": "user", "content": user_message})
 
     try:
         response = requests.post(
@@ -203,17 +101,18 @@ def ai():
                 "Content-Type": "application/json"
             },
             json={
-                "model": "llama-3.3-70b-versatile",
-                "messages": chats[chat_name][-10:]
+                "model": "llama3-70b-8192",
+                "messages": chat_history[-10:]
             }
         )
 
         result = response.json()
+
         reply = result["choices"][0]["message"]["content"]
 
-    except Exception:
-        reply = "⚠️ AI error. Check API key or try again."
+    except Exception as e:
+        reply = f"⚠️ Error: {str(e)}"
 
-    chats[chat_name].append({"role": "assistant", "content": reply})
+    chat_history.append({"role": "assistant", "content": reply})
 
     return jsonify({"response": reply})
