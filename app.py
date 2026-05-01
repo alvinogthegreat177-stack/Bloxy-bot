@@ -4,16 +4,16 @@ import os
 
 app = Flask(__name__)
 
-# 🔐 Load API key from Render environment variables
-API_KEY = os.environ.get("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")
+# 🔐 API KEY (Render environment variable)
+API_KEY = os.environ.get("GROQ_API_KEY")
 
-# 🧪 DEBUG: check if key is loading
-print("🔥 GROQ KEY LOADED:", GROQ_API_KEY)
-
-# 🧠 Chat memory
-chat_history = [
-    {"role": "system", "content": "You are a helpful, friendly AI assistant 🙂"}
+# 🧠 Simple memory
+messages = [
+    {"role": "system", "content": "You are Bloxy-bot, a helpful and friendly AI assistant 🙂"}
 ]
+
+# 🧪 Debug (KEEP FOR NOW)
+print("🔥 GROQ KEY LOADED:", "FOUND" if API_KEY else "MISSING")
 
 # 🌐 UI
 HTML = """
@@ -23,12 +23,12 @@ HTML = """
 <title>Bloxy-bot</title>
 <style>
 body { font-family: Arial; margin:0; display:flex; flex-direction:column; height:100vh; }
-#chat { flex:1; padding:10px; overflow-y:auto; background:#f5f5f5; }
-.msg { padding:10px; margin:6px; border-radius:8px; max-width:60%; }
+#chat { flex:1; overflow-y:auto; padding:15px; background:#f5f5f5; }
+.msg { padding:10px; margin:6px; border-radius:10px; max-width:60%; }
 .user { background:#cfe9ff; margin-left:auto; }
 .ai { background:white; }
-#inputArea { display:flex; padding:10px; }
-#msg { flex:1; padding:10px; }
+#input { display:flex; padding:10px; background:#fff; }
+#msg { flex:1; padding:10px; border:1px solid #ccc; border-radius:5px; }
 button { padding:10px; margin-left:5px; }
 </style>
 </head>
@@ -37,13 +37,12 @@ button { padding:10px; margin-left:5px; }
 
 <div id="chat"></div>
 
-<div id="inputArea">
+<div id="input">
 <input id="msg" placeholder="Type message..." />
 <button onclick="send()">Send</button>
 </div>
 
 <script>
-
 async function send() {
     let msg = document.getElementById("msg").value;
     if (!msg) return;
@@ -70,7 +69,6 @@ async function send() {
 document.addEventListener("keydown", e => {
     if (e.key === "Enter") send();
 });
-
 </script>
 
 </body>
@@ -83,10 +81,13 @@ def home():
 
 @app.route("/ai", methods=["POST"])
 def ai():
-    global chat_history
+    global messages
+
+    if not API_KEY:
+        return jsonify({"response": "⚠️ Missing API key. Check Render environment variables."})
 
     user_message = request.json["message"]
-    chat_history.append({"role": "user", "content": user_message})
+    messages.append({"role": "user", "content": user_message})
 
     try:
         response = requests.post(
@@ -97,22 +98,22 @@ def ai():
             },
             json={
                 "model": "llama3-8b-8192",
-                "messages": chat_history[-10:]
+                "messages": messages[-10:]
             }
         )
 
         data = response.json()
 
-        # 🧠 SAFE CHECK (prevents 'choices' crash)
+        # 🛡 FIX: prevent crash
         if "choices" not in data:
-            print("❌ GROQ ERROR RESPONSE:", data)
+            print("❌ GROQ ERROR:", data)
             return jsonify({"response": "⚠️ API ERROR: " + str(data)})
 
         reply = data["choices"][0]["message"]["content"]
 
     except Exception as e:
-        reply = f"⚠️ Request error: {str(e)}"
+        reply = f"⚠️ Error: {str(e)}"
 
-    chat_history.append({"role": "assistant", "content": reply})
+    messages.append({"role": "assistant", "content": reply})
 
     return jsonify({"response": reply})
