@@ -4,36 +4,130 @@ import os
 
 app = Flask(__name__)
 
-# 🔐 API KEY from Render environment
+# 🔐 API KEY (Render environment variable)
 API_KEY = os.environ.get("GROQ_API_KEY")
 
-# 🧠 Chat memory
-messages = [
-    {"role": "system", "content": "You are Bloxy-bot, a helpful, friendly AI assistant 🙂"}
-]
-
-# 🧪 Debug check
 print("🔥 GROQ KEY LOADED:", "FOUND" if API_KEY else "MISSING")
 
-# 🌐 UI
+# 🧠 System prompt (THIS FIXES LONG/UGLY ANSWERS)
+SYSTEM_PROMPT = {
+    "role": "system",
+    "content": """
+You are Bloxy-bot, a modern ChatGPT-style assistant.
+
+Rules:
+- Be short, clear, and direct
+- No long paragraphs
+- No websites unless necessary
+- No knowledge cutoff talk
+- Answer like a real chat assistant
+- Use light emojis only
+"""
+}
+
+# 🧠 Memory per chat
+chats = {
+    "🤖 New dialogue": [SYSTEM_PROMPT]
+}
+
+# 🌐 UI (ChatGPT-style dark + sidebar)
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
 <title>Bloxy-bot</title>
 <style>
-body { margin:0; font-family:Arial; display:flex; flex-direction:column; height:100vh; }
-#chat { flex:1; overflow-y:auto; padding:15px; background:#f5f5f5; }
-.msg { padding:10px; margin:6px; border-radius:10px; max-width:60%; }
-.user { background:#cfe9ff; margin-left:auto; }
-.ai { background:white; }
-#input { display:flex; padding:10px; background:white; }
-#msg { flex:1; padding:10px; border:1px solid #ccc; border-radius:6px; }
-button { padding:10px; margin-left:5px; }
+body {
+    margin:0;
+    font-family:Arial;
+    display:flex;
+    height:100vh;
+    background:#0f0f0f;
+    color:white;
+}
+
+/* SIDEBAR */
+#sidebar {
+    width:260px;
+    background:#1a1a1a;
+    padding:10px;
+    overflow-y:auto;
+}
+
+.chat-item {
+    padding:10px;
+    border-radius:8px;
+    cursor:pointer;
+}
+.chat-item:hover {
+    background:#2a2a2a;
+}
+
+/* MAIN */
+#main {
+    flex:1;
+    display:flex;
+    flex-direction:column;
+}
+
+/* CHAT */
+#chat {
+    flex:1;
+    padding:15px;
+    overflow-y:auto;
+}
+
+.msg {
+    padding:12px;
+    margin:8px;
+    border-radius:12px;
+    max-width:70%;
+}
+
+.user {
+    background:#2b6fff;
+    margin-left:auto;
+}
+
+.ai {
+    background:#2a2a2a;
+}
+
+/* INPUT */
+#input {
+    display:flex;
+    padding:10px;
+    background:#1a1a1a;
+}
+
+#msg {
+    flex:1;
+    padding:10px;
+    border-radius:8px;
+    border:none;
+    outline:none;
+}
+
+button {
+    margin-left:8px;
+    padding:10px;
+    border-radius:8px;
+    border:none;
+    background:#2b6fff;
+    color:white;
+    cursor:pointer;
+}
 </style>
 </head>
 
 <body>
+
+<div id="sidebar">
+    <button onclick="newChat()">+ New Chat</button>
+    <div id="chatList"></div>
+</div>
+
+<div id="main">
 
 <div id="chat"></div>
 
@@ -42,7 +136,37 @@ button { padding:10px; margin-left:5px; }
 <button onclick="send()">Send</button>
 </div>
 
+</div>
+
 <script>
+
+let currentChat = "🤖 Chat 1";
+
+async function loadChats() {
+    const res = await fetch("/chats");
+    const data = await res.json();
+
+    let list = document.getElementById("chatList");
+    list.innerHTML = "";
+
+    data.chats.forEach(c => {
+        list.innerHTML += `
+        <div class="chat-item" onclick="switchChat('${c}')">
+            ${c}
+        </div>`;
+    });
+}
+
+function switchChat(name) {
+    currentChat = name;
+    document.getElementById("chat").innerHTML = "";
+}
+
+async function newChat() {
+    await fetch("/new_chat", {method:"POST"});
+    loadChats();
+}
+
 async function send() {
     let msg = document.getElementById("msg").value;
     if (!msg) return;
@@ -51,9 +175,9 @@ async function send() {
         "<div class='msg user'>" + msg + "</div>";
 
     const res = await fetch("/ai", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({message: msg})
+        method:"POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({message: msg, chat: currentChat})
     });
 
     const data = await res.json();
@@ -69,6 +193,9 @@ async function send() {
 document.addEventListener("keydown", e => {
     if (e.key === "Enter") send();
 });
+
+loadChats();
+
 </script>
 
 </body>
@@ -79,41 +206,46 @@ document.addEventListener("keydown", e => {
 def home():
     return render_template_string(HTML)
 
+@app.route("/chats")
+def get_chats():
+    return jsonify({"chats": list(chats.keys())})
+
+@app.route("/new_chat", methods=["POST"])
+def new_chat():
+    name = f"🤖 Chat {len(chats)+1}"
+    chats[name] = [SYSTEM_PROMPT]
+    return jsonify({"ok": True})
+
 @app.route("/ai", methods=["POST"])
 def ai():
-    global messages
-
     if not API_KEY:
-        return jsonify({"response": "⚠️ Missing API key in Render environment variables."})
+        return jsonify({"response": "⚠️ Missing API key in Render environment"})
 
-    user_message = request.json["message"]
-    messages.append({"role": "user", "content": user_message})
+    data = request.json
+    msg = data["message"]
+    chat = data["chat"]
 
-    try:
-        response = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "llama-3.3-70b-versatile",
-                "messages": messages[-10:]
-            }
-        )
+    chats[chat].append({"role": "user", "content": msg})
 
-        data = response.json()
+    response = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "llama-3.3-70b-versatile",
+            "messages": chats[chat][-10:]
+        }
+    )
 
-        # 🛡 Safety check
-        if "choices" not in data:
-            print("❌ GROQ ERROR:", data)
-            return jsonify({"response": "⚠️ API ERROR: " + str(data)})
+    res = response.json()
 
-        reply = data["choices"][0]["message"]["content"]
+    if "choices" not in res:
+        return jsonify({"response": "⚠️ API Error: " + str(res)})
 
-    except Exception as e:
-        reply = f"⚠️ Error: {str(e)}"
+    reply = res["choices"][0]["message"]["content"]
 
-    messages.append({"role": "assistant", "content": reply})
+    chats[chat].append({"role": "assistant", "content": reply})
 
     return jsonify({"response": reply})
