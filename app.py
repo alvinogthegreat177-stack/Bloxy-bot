@@ -1,201 +1,133 @@
 from flask import Flask, request, jsonify, render_template_string
-import requests
 import os
+import requests
+from tavily import TavilyClient
 
 app = Flask(__name__)
 
-# 🔐 API KEY (Render environment variable)
-API_KEY = os.environ.get("GROQ_API_KEY")
+# 🔐 KEYS (Render environment variables)
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
 
-print("🔥 GROQ KEY LOADED:", "FOUND" if API_KEY else "MISSING")
+# 🧠 AI + Search clients
+tavily = TavilyClient(api_key=TAVILY_API_KEY)
 
-# 🧠 System prompt (THIS FIXES LONG/UGLY ANSWERS)
+# 🧠 CHAT MEMORY
+chats = {}
+
 SYSTEM_PROMPT = {
     "role": "system",
-    "content": """
-You are Bloxy-bot, a modern ChatGPT-style assistant.
-
-Rules:
-- Be short, clear, and direct
-- No long paragraphs
-- No websites unless necessary
-- No knowledge cutoff talk
-- Answer like a real chat assistant
-- Use light emojis only
-"""
+    "content": "You are Bloxy-bot. Be clear, helpful, and use provided web data when available."
 }
 
-# 🧠 Memory per chat
-chats = {
-    "🤖 New dialogue": [SYSTEM_PROMPT]
-}
+# 🌐 WIKIPEDIA FALLBACK
+def wikipedia_search(query):
+    try:
+        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query.replace(' ', '_')}"
+        r = requests.get(url)
+        data = r.json()
+        return data.get("extract", "")
+    except:
+        return ""
 
-# 🌐 UI (ChatGPT-style dark + sidebar)
+# 🌐 TAVILY SEARCH (LIVE WEB)
+def web_search(query):
+    try:
+        res = tavily.search(query=query, search_depth="basic", max_results=3)
+        results = [r.get("content", "") for r in res.get("results", [])]
+        return "\n".join(results)
+    except:
+        return ""
+
+# 🧠 GROQ CALL
+def ask_groq(messages):
+    res = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "llama-3.3-70b-versatile",
+            "messages": messages
+        }
+    )
+    return res.json()
+
+# 🎨 UI (ChatGPT-style)
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
 <title>Bloxy-bot</title>
 <style>
-body {
-    margin:0;
-    font-family:Arial;
-    display:flex;
-    height:100vh;
-    background:#0f0f0f;
-    color:white;
-}
-
-/* SIDEBAR */
-#sidebar {
-    width:260px;
-    background:#1a1a1a;
-    padding:10px;
-    overflow-y:auto;
-}
-
-.chat-item {
-    padding:10px;
-    border-radius:8px;
-    cursor:pointer;
-}
-.chat-item:hover {
-    background:#2a2a2a;
-}
-
-/* MAIN */
-#main {
-    flex:1;
-    display:flex;
-    flex-direction:column;
-}
-
-/* CHAT */
-#chat {
-    flex:1;
-    padding:15px;
-    overflow-y:auto;
-}
-
-.msg {
-    padding:12px;
-    margin:8px;
-    border-radius:12px;
-    max-width:70%;
-}
-
-.user {
-    background:#2b6fff;
-    margin-left:auto;
-}
-
-.ai {
-    background:#2a2a2a;
-}
-
-/* INPUT */
-#input {
-    display:flex;
-    padding:10px;
-    background:#1a1a1a;
-}
-
-#msg {
-    flex:1;
-    padding:10px;
-    border-radius:8px;
-    border:none;
-    outline:none;
-}
-
-button {
-    margin-left:8px;
-    padding:10px;
-    border-radius:8px;
-    border:none;
-    background:#2b6fff;
-    color:white;
-    cursor:pointer;
-}
+body{margin:0;font-family:Arial;display:flex;height:100vh}
+#sidebar{width:250px;background:#111;color:white;padding:10px}
+.chat-item{padding:10px;cursor:pointer}
+.chat-item:hover{background:#333}
+#main{flex:1;display:flex;flex-direction:column}
+#chat{flex:1;overflow-y:auto;padding:10px;background:#f4f4f4}
+.msg{padding:10px;margin:5px;border-radius:8px;max-width:70%}
+.user{background:#4a90e2;color:white;margin-left:auto}
+.ai{background:white}
+#input{display:flex;padding:10px}
+input{flex:1;padding:10px}
+button{margin-left:10px}
 </style>
 </head>
-
 <body>
 
 <div id="sidebar">
-    <button onclick="newChat()">+ New Chat</button>
-    <div id="chatList"></div>
+<button onclick="newChat()">+ New Chat</button>
+<div id="list"></div>
 </div>
 
 <div id="main">
-
 <div id="chat"></div>
-
 <div id="input">
-<input id="msg" placeholder="Type message..." />
+<input id="msg" placeholder="Type..." />
 <button onclick="send()">Send</button>
 </div>
-
 </div>
 
 <script>
+let current="Chat 1";
 
-let currentChat = "🤖 Chat 1";
-
-async function loadChats() {
-    const res = await fetch("/chats");
-    const data = await res.json();
-
-    let list = document.getElementById("chatList");
-    list.innerHTML = "";
-
-    data.chats.forEach(c => {
-        list.innerHTML += `
-        <div class="chat-item" onclick="switchChat('${c}')">
-            ${c}
-        </div>`;
-    });
+async function load(){
+ let r=await fetch("/chats");
+ let d=await r.json();
+ let list=document.getElementById("list");
+ list.innerHTML="";
+ d.chats.forEach(c=>{
+   list.innerHTML+=`<div class='chat-item' onclick="switchChat('${c}')">${c}</div>`;
+ });
 }
 
-function switchChat(name) {
-    currentChat = name;
-    document.getElementById("chat").innerHTML = "";
+function switchChat(c){current=c;document.getElementById("chat").innerHTML=""}
+
+async function newChat(){
+ await fetch("/new_chat",{method:"POST"});
+ load();
 }
 
-async function newChat() {
-    await fetch("/new_chat", {method:"POST"});
-    loadChats();
+async function send(){
+ let m=document.getElementById("msg").value;
+ if(!m)return;
+
+ document.getElementById("chat").innerHTML+=`<div class='msg user'>${m}</div>`;
+
+ let r=await fetch("/ai",{
+ method:"POST",
+ headers:{"Content-Type":"application/json"},
+ body:JSON.stringify({message:m,chat:current})
+ });
+
+ let d=await r.json();
+ document.getElementById("chat").innerHTML+=`<div class='msg ai'>${d.response}</div>`;
+ document.getElementById("msg").value="";
 }
 
-async function send() {
-    let msg = document.getElementById("msg").value;
-    if (!msg) return;
-
-    document.getElementById("chat").innerHTML +=
-        "<div class='msg user'>" + msg + "</div>";
-
-    const res = await fetch("/ai", {
-        method:"POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({message: msg, chat: currentChat})
-    });
-
-    const data = await res.json();
-
-    document.getElementById("chat").innerHTML +=
-        "<div class='msg ai'>" + data.response + "</div>";
-
-    document.getElementById("msg").value = "";
-    document.getElementById("chat").scrollTop =
-        document.getElementById("chat").scrollHeight;
-}
-
-document.addEventListener("keydown", e => {
-    if (e.key === "Enter") send();
-});
-
-loadChats();
-
+load();
 </script>
 
 </body>
@@ -212,40 +144,49 @@ def get_chats():
 
 @app.route("/new_chat", methods=["POST"])
 def new_chat():
-    name = f"🤖 Chat {len(chats)+1}"
+    name = f"Chat {len(chats)+1}"
     chats[name] = [SYSTEM_PROMPT]
     return jsonify({"ok": True})
 
 @app.route("/ai", methods=["POST"])
 def ai():
-    if not API_KEY:
-        return jsonify({"response": "⚠️ Missing API key in Render environment"})
-
     data = request.json
     msg = data["message"]
     chat = data["chat"]
 
-    chats[chat].append({"role": "user", "content": msg})
+    if chat not in chats:
+        chats[chat] = [SYSTEM_PROMPT]
 
-    response = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {API_KEY}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": "llama-3.3-70b-versatile",
-            "messages": chats[chat][-10:]
-        }
-    )
+    # 🌐 STEP 1: TRY LIVE WEB (TAVILY)
+    web_info = web_search(msg)
 
-    res = response.json()
+    # 🌐 STEP 2: IF EMPTY → USE WIKIPEDIA
+    if not web_info:
+        web_info = wikipedia_search(msg)
 
-    if "choices" not in res:
-        return jsonify({"response": "⚠️ API Error: " + str(res)})
+    # 🧠 STEP 3: BUILD PROMPT
+    final_msg = f"""
+User question: {msg}
 
-    reply = res["choices"][0]["message"]["content"]
+Web data:
+{web_info}
+"""
+
+    chats[chat].append({"role": "user", "content": final_msg})
+
+    # 🧠 STEP 4: CALL GROQ
+    response = ask_groq(chats[chat][-10:])
+
+    try:
+        reply = response["choices"][0]["message"]["content"]
+    except:
+        reply = str(response)
 
     chats[chat].append({"role": "assistant", "content": reply})
 
     return jsonify({"response": reply})
+
+if __name__ == "__main__":
+    app.run()
+
+   
