@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify, render_template_string
-
-
-API_KEY = "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"
+import requests
+import os
 
 app = Flask(__name__)
+
+# 🔐 API KEY (Render Environment Variable)
+API_KEY = os.environ.get("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")
 
 # 🧠 CHAT STORAGE
 chats = {
@@ -37,26 +39,14 @@ body { margin:0; font-family: Arial; display:flex; }
     overflow: hidden;
 }
 
-/* CHAT ITEM */
 .chat-item {
     padding: 10px;
     border-radius: 6px;
-    display:flex;
-    justify-content: space-between;
-    align-items:center;
+    cursor: pointer;
 }
 
 .chat-item:hover {
     background:#2a2b32;
-}
-
-.menu {
-    display:none;
-    cursor:pointer;
-}
-
-.chat-item:hover .menu {
-    display:block;
 }
 
 /* MAIN */
@@ -83,7 +73,6 @@ body { margin:0; font-family: Arial; display:flex; }
 .user { background:#d1e7ff; margin-left:auto; }
 .ai { background:white; }
 
-/* INPUT */
 #inputArea {
     display:flex;
     padding:10px;
@@ -99,13 +88,6 @@ button {
     padding:10px;
     margin-left:5px;
 }
-
-/* TOP BAR */
-#topbar {
-    background:#eee;
-    padding:10px;
-}
-
 </style>
 </head>
 
@@ -118,10 +100,6 @@ button {
 
 <div id="main">
 
-<div id="topbar">
-    <button onclick="toggleSidebar()">☰</button>
-</div>
-
 <div id="chat"></div>
 
 <div id="inputArea">
@@ -133,7 +111,7 @@ button {
 
 <script>
 
-let currentChat = Object.keys({})[0];
+let currentChat = "";
 
 async function loadChats() {
     const res = await fetch("/chats");
@@ -143,36 +121,11 @@ async function loadChats() {
     list.innerHTML = "";
 
     data.chats.forEach(c => {
-        list.innerHTML += `
-        <div class="chat-item">
-            <span onclick="switchChat('${c}')">${c}</span>
-            <span class="menu" onclick="openMenu('${c}')">⋮</span>
-        </div>`;
+        list.innerHTML += `<div class="chat-item" onclick="switchChat('${c}')">${c}</div>`;
     });
 
     if (!currentChat && data.chats.length > 0) {
         currentChat = data.chats[0];
-    }
-}
-
-function openMenu(name) {
-    let action = prompt("Type: rename or delete");
-
-    if (action === "rename") {
-        let newName = prompt("New name:");
-        fetch("/rename", {
-            method:"POST",
-            headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({old:name,new:newName})
-        }).then(loadChats);
-    }
-
-    if (action === "delete") {
-        fetch("/delete", {
-            method:"POST",
-            headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({name:name})
-        }).then(loadChats);
     }
 }
 
@@ -182,12 +135,8 @@ function switchChat(name) {
 }
 
 async function newChat() {
-    await fetch("/new_chat",{method:"POST"});
+    await fetch("/new_chat", {method:"POST"});
     loadChats();
-}
-
-function toggleSidebar() {
-    document.getElementById("sidebar").classList.toggle("hidden");
 }
 
 async function send() {
@@ -213,7 +162,7 @@ async function send() {
 }
 
 document.addEventListener("keydown", function(e){
-    if(e.key==="Enter") send();
+    if(e.key === "Enter") send();
 });
 
 loadChats();
@@ -238,43 +187,33 @@ def new_chat():
     chats[name] = chats[list(chats.keys())[0]][:1]
     return jsonify({"name": name})
 
-@app.route("/rename", methods=["POST"])
-def rename():
-    data = request.json
-    chats[data["new"]] = chats.pop(data["old"])
-    return jsonify({"ok": True})
-
-@app.route("/delete", methods=["POST"])
-def delete():
-    name = request.json["name"]
-    if len(chats) > 1:
-        chats.pop(name)
-    return jsonify({"ok": True})
-
 @app.route("/ai", methods=["POST"])
 def ai():
-    data_req = request.json
-    user_message = data_req["message"]
-    chat_name = data_req["chat"]
+    data = request.json
+    user_message = data["message"]
+    chat_name = data["chat"]
 
-    chats[chat_name].append({"role":"user","content":user_message})
+    chats[chat_name].append({"role": "user", "content": user_message})
 
-    response = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {API_KEY}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model":"llama-3.3-70b-versatile",
-            "messages": chats[chat_name][-10:]
-        }
-    )
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": chats[chat_name][-10:]
+            }
+        )
 
-    reply = response.json()["choices"][0]["message"]["content"]
+        result = response.json()
+        reply = result["choices"][0]["message"]["content"]
 
-    chats[chat_name].append({"role":"assistant","content":reply})
+    except Exception:
+        reply = "⚠️ AI error. Check API key or try again."
+
+    chats[chat_name].append({"role": "assistant", "content": reply})
 
     return jsonify({"response": reply})
-
-
