@@ -1,10 +1,6 @@
-!pip install flask requests pyngrok
 
-from flask import Flask, request, jsonify, render_template_string
-import requests
-from pyngrok import ngrok
 
-ngrok.set_auth_token("3D7aPveG9ffvQfFixHJ9RmouWaI_6CG8DAdGaQpVWnF7AbBDi")
+
 API_KEY = "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"
 
 app = Flask(__name__)
@@ -281,7 +277,4 @@ def ai():
 
     return jsonify({"response": reply})
 
-public_url = ngrok.connect(5000)
-print("🔥 Live here:", public_url)
 
-app.run(port=5000)
