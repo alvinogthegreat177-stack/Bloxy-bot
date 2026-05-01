@@ -4,15 +4,15 @@ import os
 
 app = Flask(__name__)
 
-# 🔐 API KEY (Render environment variable)
+# 🔐 API KEY from Render environment
 API_KEY = os.environ.get("GROQ_API_KEY")
 
-# 🧠 Simple memory
+# 🧠 Chat memory
 messages = [
-    {"role": "system", "content": "You are Bloxy-bot, a helpful and friendly AI assistant 🙂"}
+    {"role": "system", "content": "You are Bloxy-bot, a helpful, friendly AI assistant 🙂"}
 ]
 
-# 🧪 Debug (KEEP FOR NOW)
+# 🧪 Debug check
 print("🔥 GROQ KEY LOADED:", "FOUND" if API_KEY else "MISSING")
 
 # 🌐 UI
@@ -22,13 +22,13 @@ HTML = """
 <head>
 <title>Bloxy-bot</title>
 <style>
-body { font-family: Arial; margin:0; display:flex; flex-direction:column; height:100vh; }
+body { margin:0; font-family:Arial; display:flex; flex-direction:column; height:100vh; }
 #chat { flex:1; overflow-y:auto; padding:15px; background:#f5f5f5; }
 .msg { padding:10px; margin:6px; border-radius:10px; max-width:60%; }
 .user { background:#cfe9ff; margin-left:auto; }
 .ai { background:white; }
-#input { display:flex; padding:10px; background:#fff; }
-#msg { flex:1; padding:10px; border:1px solid #ccc; border-radius:5px; }
+#input { display:flex; padding:10px; background:white; }
+#msg { flex:1; padding:10px; border:1px solid #ccc; border-radius:6px; }
 button { padding:10px; margin-left:5px; }
 </style>
 </head>
@@ -84,7 +84,7 @@ def ai():
     global messages
 
     if not API_KEY:
-        return jsonify({"response": "⚠️ Missing API key. Check Render environment variables."})
+        return jsonify({"response": "⚠️ Missing API key in Render environment variables."})
 
     user_message = request.json["message"]
     messages.append({"role": "user", "content": user_message})
@@ -97,14 +97,14 @@ def ai():
                 "Content-Type": "application/json"
             },
             json={
-                "model": "llama3-8b-8192",
+                "model": "llama-3.3-70b-versatile",
                 "messages": messages[-10:]
             }
         )
 
         data = response.json()
 
-        # 🛡 FIX: prevent crash
+        # 🛡 Safety check
         if "choices" not in data:
             print("❌ GROQ ERROR:", data)
             return jsonify({"response": "⚠️ API ERROR: " + str(data)})
