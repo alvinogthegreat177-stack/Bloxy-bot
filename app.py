@@ -1,192 +1,104 @@
-from flask import Flask, request, jsonify, render_template_string
-import os
-import requests
-from tavily import TavilyClient
+# 🧠 IMPROVED SYSTEM CORE
 
-app = Flask(__name__)
+import sqlite3
+import time
 
-# 🔐 KEYS (Render environment variables)
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
+# 📀 DATABASE (persistent memory)
+conn = sqlite3.connect("memory.db", check_same_thread=False)
+cur = conn.cursor()
 
-# 🧠 AI + Search clients
-tavily = TavilyClient(api_key=TAVILY_API_KEY)
+cur.execute("""
+CREATE TABLE IF NOT EXISTS chats (
+    chat TEXT,
+    role TEXT,
+    content TEXT
+)
+""")
+conn.commit()
 
-# 🧠 CHAT MEMORY
-chats = {}
 
+def save_msg(chat, role, content):
+    cur.execute("INSERT INTO chats VALUES (?,?,?)", (chat, role, content))
+    conn.commit()
+
+
+def load_msgs(chat):
+    cur.execute("SELECT role, content FROM chats WHERE chat=?", (chat,))
+    return [{"role": r, "content": c} for r, c in cur.fetchall()]
+
+
+# ⚡ SIMPLE CACHE (reduces API calls)
+CACHE = {}
+
+def cached_search(query):
+    if query in CACHE:
+        return CACHE[query]
+
+    data = web_search(query)
+    if not data:
+        data = wikipedia_search(query)
+
+    CACHE[query] = data
+    return data
+
+
+# 🧠 SMART ROUTER (better detection)
+def smart_context(msg):
+    m = msg.lower()
+
+    if any(x in m for x in ["score", "league", "match", "today"]):
+        return cached_search(msg)
+
+    if any(x in m for x in ["what is", "who is", "define"]):
+        return wikipedia_search(msg)
+
+    return cached_search(msg)
+
+
+# 🧠 CLEAN RESPONSE STYLE
 SYSTEM_PROMPT = {
     "role": "system",
-    "content": "You are Bloxy-bot. Be clear, helpful, and use provided web data when available."
-}
+    "content": """
+You are Bloxy-bot.
 
-# 🌐 WIKIPEDIA FALLBACK
-def wikipedia_search(query):
-    try:
-        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query.replace(' ', '_')}"
-        r = requests.get(url)
-        data = r.json()
-        return data.get("extract", "")
-    except:
-        return ""
-
-# 🌐 TAVILY SEARCH (LIVE WEB)
-def web_search(query):
-    try:
-        res = tavily.search(query=query, search_depth="basic", max_results=3)
-        results = [r.get("content", "") for r in res.get("results", [])]
-        return "\n".join(results)
-    except:
-        return ""
-
-# 🧠 GROQ CALL
-def ask_groq(messages):
-    res = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": "llama-3.3-70b-versatile",
-            "messages": messages
-        }
-    )
-    return res.json()
-
-# 🎨 UI (ChatGPT-style)
-HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-<title>Bloxy-bot</title>
-<style>
-body{margin:0;font-family:Arial;display:flex;height:100vh}
-#sidebar{width:250px;background:#111;color:white;padding:10px}
-.chat-item{padding:10px;cursor:pointer}
-.chat-item:hover{background:#333}
-#main{flex:1;display:flex;flex-direction:column}
-#chat{flex:1;overflow-y:auto;padding:10px;background:#f4f4f4}
-.msg{padding:10px;margin:5px;border-radius:8px;max-width:70%}
-.user{background:#4a90e2;color:white;margin-left:auto}
-.ai{background:white}
-#input{display:flex;padding:10px}
-input{flex:1;padding:10px}
-button{margin-left:10px}
-</style>
-</head>
-<body>
-
-<div id="sidebar">
-<button onclick="newChat()">+ New Chat</button>
-<div id="list"></div>
-</div>
-
-<div id="main">
-<div id="chat"></div>
-<div id="input">
-<input id="msg" placeholder="Type..." />
-<button onclick="send()">Send</button>
-</div>
-</div>
-
-<script>
-let current="Chat 1";
-
-async function load(){
- let r=await fetch("/chats");
- let d=await r.json();
- let list=document.getElementById("list");
- list.innerHTML="";
- d.chats.forEach(c=>{
-   list.innerHTML+=`<div class='chat-item' onclick="switchChat('${c}')">${c}</div>`;
- });
-}
-
-function switchChat(c){current=c;document.getElementById("chat").innerHTML=""}
-
-async function newChat(){
- await fetch("/new_chat",{method:"POST"});
- load();
-}
-
-async function send(){
- let m=document.getElementById("msg").value;
- if(!m)return;
-
- document.getElementById("chat").innerHTML+=`<div class='msg user'>${m}</div>`;
-
- let r=await fetch("/ai",{
- method:"POST",
- headers:{"Content-Type":"application/json"},
- body:JSON.stringify({message:m,chat:current})
- });
-
- let d=await r.json();
- document.getElementById("chat").innerHTML+=`<div class='msg ai'>${d.response}</div>`;
- document.getElementById("msg").value="";
-}
-
-load();
-</script>
-
-</body>
-</html>
+Rules:
+- Be clear and structured
+- Avoid long paragraphs
+- Use bullet points when useful
+- If info is provided, USE it
+- Do not say "I don't have access"
 """
+}
 
-@app.route("/")
-def home():
-    return render_template_string(HTML)
 
-@app.route("/chats")
-def get_chats():
-    return jsonify({"chats": list(chats.keys())})
-
-@app.route("/new_chat", methods=["POST"])
-def new_chat():
-    name = f"Chat {len(chats)+1}"
-    chats[name] = [SYSTEM_PROMPT]
-    return jsonify({"ok": True})
-
+# 🚀 FINAL AI FLOW
 @app.route("/ai", methods=["POST"])
 def ai():
+
     data = request.json
     msg = data["message"]
     chat = data["chat"]
 
-    if chat not in chats:
-        chats[chat] = [SYSTEM_PROMPT]
+    history = load_msgs(chat)
 
-    # 🌐 STEP 1: TRY LIVE WEB (TAVILY)
-    web_info = web_search(msg)
+    # 🌐 Get context
+    context = smart_context(msg)
 
-    # 🌐 STEP 2: IF EMPTY → USE WIKIPEDIA
-    if not web_info:
-        web_info = wikipedia_search(msg)
+    final_input = f"""
+User question:
+{msg}
 
-    # 🧠 STEP 3: BUILD PROMPT
-    final_msg = f"""
-User question: {msg}
-
-Web data:
-{web_info}
+Relevant info:
+{context}
 """
 
-    chats[chat].append({"role": "user", "content": final_msg})
+    history.append({"role": "user", "content": final_input})
 
-    # 🧠 STEP 4: CALL GROQ
-    response = ask_groq(chats[chat][-10:])
+    reply = ask_groq([SYSTEM_PROMPT] + history[-10:])
 
-    try:
-        reply = response["choices"][0]["message"]["content"]
-    except:
-        reply = str(response)
-
-    chats[chat].append({"role": "assistant", "content": reply})
+    # 💾 SAVE MEMORY
+    save_msg(chat, "user", msg)
+    save_msg(chat, "assistant", reply)
 
     return jsonify({"response": reply})
 
-if __name__ == "__main__":
-    app.run()
-
-   
