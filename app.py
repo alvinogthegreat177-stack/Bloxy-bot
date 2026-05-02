@@ -15,10 +15,10 @@ cur.execute("CREATE TABLE IF NOT EXISTS chats (id TEXT PRIMARY KEY, title TEXT)"
 cur.execute("CREATE TABLE IF NOT EXISTS messages (chat_id TEXT, role TEXT, content TEXT)")
 conn.commit()
 
-# 🤖 SYSTEM PROMPT
+# 🤖 SYSTEM
 SYSTEM = {
     "role": "system",
-    "content": "You are Bloxy-bot 🤖. Answer clearly using structured formatting."
+    "content": "You are Bloxy-bot 🤖. Be clear, structured, and helpful."
 }
 
 # 📖 DICTIONARY
@@ -42,11 +42,13 @@ def wikipedia(query):
 # 🌐 TAVILY
 def tavily(query):
     try:
-        r = requests.post("https://api.tavily.com/search",
-            json={"api_key": TAVILY_API_KEY, "query": query})
+        r = requests.post(
+            "https://api.tavily.com/search",
+            json={"api_key": TAVILY_API_KEY, "query": query}
+        )
         results = r.json().get("results", [])
         if results:
-            return "\n".join([i["content"] for i in results[:3]])
+            return "\\n".join([i["content"] for i in results[:3]])
     except:
         return None
 
@@ -63,7 +65,7 @@ def groq(messages):
 def smart_answer(query, history):
     d = dictionary_lookup(query)
     if d:
-        return f"📖 Definition:\n{d}"
+        return f"📖 Definition:\\n{d}"
 
     w = wikipedia(query.replace(" ", "_"))
     if w:
@@ -73,7 +75,7 @@ def smart_answer(query, history):
     if t:
         return f"🌐 {t}"
 
-    return groq([SYSTEM] + history + [{"role":"user","content":query}])
+    return groq([SYSTEM] + history + [{"role": "user", "content": query}])
 
 # 🎨 UI
 HTML = """
@@ -83,15 +85,14 @@ HTML = """
 <title>Bloxy-bot 🤖</title>
 <style>
 body{margin:0;display:flex;height:100vh;background:#0d0d0d;color:white;font-family:Arial}
-#sidebar{width:250px;background:#111;overflow-y:auto;padding:10px}
+#sidebar{width:250px;background:#111;padding:10px;overflow-y:auto}
 #chat{flex:1;padding:20px;overflow-y:auto}
-.msg{max-width:70%;padding:12px;margin:6px;border-radius:10px}
+.msg{max-width:70%;padding:12px;margin:6px;border-radius:10px;white-space:pre-wrap}
 .user{background:#2563eb;margin-left:auto}
 .ai{background:#1f1f1f}
 #input{display:flex;padding:10px;background:#111}
 input{flex:1;padding:10px;background:#222;color:white;border:none}
-button{margin-left:10px}
-#loading{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:black;align-items:center;justify-content:center}
+button{margin-left:10px;background:#2563eb;color:white;border:none;padding:10px}
 </style>
 </head>
 
@@ -111,45 +112,42 @@ button{margin-left:10px}
 </div>
 </div>
 
-<div id="loading">Processing your request... 🤖</div>
-
 <script>
 
 let current=null;
 const chat=document.getElementById("chat");
-const loading=document.getElementById("loading");
 
+/* ADD MESSAGE */
 function add(role,text){
 let d=document.createElement("div");
 d.className="msg "+role;
 d.textContent=text;
 chat.appendChild(d);
 chat.scrollTop=chat.scrollHeight;
+return d;
 }
 
-function stream(text){
-let d=document.createElement("div");
-d.className="msg ai";
-chat.appendChild(d);
-
+/* STREAM */
+function streamTo(el,text){
 let i=0;
 let t=setInterval(()=>{
-d.textContent=text.slice(0,i++);
+el.textContent=text.slice(0,i++);
 if(i>text.length) clearInterval(t);
 },8);
 }
 
+/* LOAD CHATS */
 async function load(){
 let r=await fetch("/chats");
 let d=await r.json();
 let list=document.getElementById("list");
 list.innerHTML="";
-
 d.chats.forEach(c=>{
 list.innerHTML+=`<div onclick="switchChat('${c.id}')">${c.title}</div>`;
 });
 }
 
+/* SWITCH */
 async function switchChat(id){
 current=id;
 chat.innerHTML="";
@@ -158,6 +156,7 @@ let d=await r.json();
 d.messages.forEach(m=>add(m.role,m.content));
 }
 
+/* NEW CHAT */
 async function newChat(){
 let r=await fetch("/new",{method:"POST"});
 let d=await r.json();
@@ -166,22 +165,30 @@ chat.innerHTML="";
 load();
 }
 
+/* SEND */
 async function send(){
 let input=document.getElementById("msg");
 let msg=input.value;
 if(!msg) return;
 
 input.value="";
-add("user",msg);
-loading.style.display="flex";
 
-let r=await fetch("/ai",{method:"POST",
+add("user",msg);
+
+/* INLINE PROCESSING MESSAGE */
+let aiMsg = add("ai","Bloxy-bot is thinking... 🤖");
+
+let r=await fetch("/ai",{
+method:"POST",
 headers:{"Content-Type":"application/json"},
-body:JSON.stringify({message:msg,chat:current})});
+body:JSON.stringify({message:msg,chat:current})
+});
 
 let d=await r.json();
-loading.style.display="none";
-stream(d.response);
+
+/* REPLACE WITH STREAM */
+aiMsg.textContent="";
+streamTo(aiMsg,d.response);
 }
 
 document.getElementById("msg").addEventListener("keypress",e=>{
@@ -191,6 +198,7 @@ if(e.key==="Enter"){e.preventDefault();send();}
 load();
 
 </script>
+
 </body>
 </html>
 """
