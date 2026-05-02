@@ -1,15 +1,14 @@
 # ================================
-# 🚨 CRITICAL (WebSocket fix)
+# IMPORTS (NO EVENTLET)
 # ================================
-import eventlet
-eventlet.monkey_patch()
-
 from flask import Flask, request, jsonify, render_template_string
 from flask_socketio import SocketIO, emit
 import sqlite3, os, requests, uuid
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+# ✅ THREADING MODE (stable)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 # ================================
 # KEYS
@@ -31,14 +30,14 @@ conn.commit()
 # SYSTEM PROMPT
 # ================================
 SYSTEM = {
-"role":"system",
-"content":"""
+    "role": "system",
+    "content": """
 You are Bloxy-bot 🤖.
 
 Rules:
-- Always use structured answers
-- Lists must be vertical
-- Be concise and accurate
+- Always answer clearly
+- Use vertical formatting for lists
+- Be accurate and helpful
 """
 }
 
@@ -48,51 +47,69 @@ Rules:
 
 def dictionary(q):
     try:
-        if not any(x in q.lower() for x in ["define","meaning"]):
+        if not any(x in q.lower() for x in ["define","meaning","what is"]):
             return None
-        w = q.split()[-1]
-        r = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{w}")
+        word = q.split()[-1]
+        r = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}")
         return r.json()[0]["meanings"][0]["definitions"][0]["definition"]
-    except: return None
+    except:
+        return None
 
 def wiki(q):
     try:
         r = requests.get(f"https://en.wikipedia.org/api/rest_v1/page/summary/{q}")
-        return r.json().get("extract")
-    except: return None
+        if r.status_code == 200:
+            return r.json().get("extract")
+    except:
+        return None
 
 def tavily(q):
     try:
-        r = requests.post("https://api.tavily.com/search",
-            json={"api_key":TAVILY_API_KEY,"query":q})
-        return " ".join([x["content"] for x in r.json()["results"][:3]])
-    except: return None
+        r = requests.post(
+            "https://api.tavily.com/search",
+            json={"api_key": TAVILY_API_KEY, "query": q}
+        )
+        results = r.json().get("results", [])
+        return " ".join([x["content"] for x in results[:3]])
+    except:
+        return None
 
-def groq(msgs):
-    r = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={"Authorization":f"Bearer {GROQ_API_KEY}"},
-        json={"model":"llama-3.3-70b-versatile","messages":msgs}
-    )
-    return r.json()["choices"][0]["message"]["content"]
+def groq(messages):
+    try:
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": messages,
+                "temperature": 0.4
+            }
+        )
+        return r.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        return f"❌ AI error: {str(e)}"
 
 # ================================
 # MEMORY
 # ================================
 
 def save(cid, role, content):
-    cur.execute("INSERT INTO messages VALUES (?,?,?)",(cid,role,content))
+    cur.execute("INSERT INTO messages VALUES (?,?,?)", (cid, role, content))
     conn.commit()
 
 def recent(cid):
-    cur.execute("SELECT role,content FROM messages WHERE chat_id=? ORDER BY rowid DESC LIMIT 10",(cid,))
-    return [{"role":r,"content":c} for r,c in reversed(cur.fetchall())]
+    cur.execute(
+        "SELECT role,content FROM messages WHERE chat_id=? ORDER BY rowid DESC LIMIT 10",
+        (cid,)
+    )
+    return [{"role": r, "content": c} for r, c in reversed(cur.fetchall())]
 
 def summary(cid):
-    cur.execute("SELECT content FROM messages WHERE chat_id=?",(cid,))
+    cur.execute("SELECT content FROM messages WHERE chat_id=?", (cid,))
     msgs = cur.fetchall()
-    if len(msgs)<20: return None
-    text=" ".join([m[0] for m in msgs[-40:]])
+    if len(msgs) < 20:
+        return None
+    text = " ".join([m[0] for m in msgs[-40:]])
     return f"Summary: {text[:700]}"
 
 # ================================
@@ -101,26 +118,33 @@ def summary(cid):
 
 def smart(q, cid):
 
-    d=dictionary(q)
-    if d: return f"📖 Definition:\n{d}"
+    d = dictionary(q)
+    if d:
+        return f"📖 Definition:\n{d}"
 
-    w=wiki(q.replace(" ","_"))
-    if w: return f"📚 {w[:400]}..."
+    w = wiki(q.replace(" ", "_"))
+    if w:
+        return f"📚 {w[:400]}..."
 
-    t=tavily(q)
+    t = tavily(q)
     if t:
-        return groq([SYSTEM,{"role":"user","content":f"Summarize:\n{t}"}])
+        return groq([
+            SYSTEM,
+            {"role": "user", "content": f"Summarize clearly:\n\n{t}"}
+        ])
 
-    msgs=[SYSTEM]
-    s=summary(cid)
-    if s: msgs.append({"role":"system","content":s})
-    msgs+=recent(cid)
-    msgs.append({"role":"user","content":q})
+    msgs = [SYSTEM]
+    s = summary(cid)
+    if s:
+        msgs.append({"role": "system", "content": s})
+
+    msgs += recent(cid)
+    msgs.append({"role": "user", "content": q})
 
     return groq(msgs)
 
 # ================================
-# WEBSOCKET STREAM
+# WEBSOCKET STREAMING
 # ================================
 
 @socketio.on("send")
@@ -130,31 +154,35 @@ def handle(data):
 
     reply = smart(q, cid)
 
-    save(cid,"user",q)
+    save(cid, "user", q)
 
-    buffer=""
+    buffer = ""
     for word in reply.split():
-        buffer += word+" "
+        buffer += word + " "
         emit("stream", {"data": buffer})
-        eventlet.sleep(0.03)
+        socketio.sleep(0.03)
 
-    save(cid,"assistant",reply)
+    save(cid, "assistant", reply)
 
 # ================================
 # ROUTES
 # ================================
 
 @app.route("/new", methods=["POST"])
-def new():
-    cid=str(uuid.uuid4())
-    cur.execute("INSERT INTO chats VALUES (?,?)",(cid,"New Chat"))
+def new_chat():
+    cid = str(uuid.uuid4())
+    cur.execute("INSERT INTO chats VALUES (?,?)", (cid, "New Chat"))
     conn.commit()
-    return jsonify({"id":cid})
+    return jsonify({"id": cid})
 
 @app.route("/chats")
 def chats():
     cur.execute("SELECT * FROM chats")
     return jsonify(cur.fetchall())
+
+# ================================
+# UI
+# ================================
 
 @app.route("/")
 def home():
@@ -166,19 +194,30 @@ def home():
 <style>
 body{margin:0;display:flex;height:100vh;background:#0d0d0d;color:white;font-family:sans-serif}
 
-/* sidebar */
-#sidebar{width:260px;background:#111;display:flex;flex-direction:column;resize:horizontal;overflow:auto}
+/* Sidebar */
+#sidebar{
+width:260px;background:#111;display:flex;flex-direction:column;
+resize:horizontal;overflow:auto
+}
 .chat{padding:10px;border-bottom:1px solid #222;cursor:pointer}
 .chat:hover{background:#222}
 
-/* main */
+/* Main */
 #main{flex:1;display:flex;flex-direction:column}
 #chat{flex:1;padding:20px;overflow:auto}
 
-.msg{padding:10px;margin:6px;border-radius:10px;max-width:70%}
+/* Messages */
+.msg{
+padding:12px;margin:6px;border-radius:10px;
+max-width:70%;white-space:pre-wrap;
+animation:fade 0.3s ease;
+}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+
 .user{background:#2563eb;margin-left:auto}
 .ai{background:#1f1f1f}
 
+/* Input */
 #input{display:flex;padding:10px;background:#111}
 input{flex:1;padding:10px;background:#222;color:white;border:none}
 button{margin-left:10px;padding:10px;background:#2563eb;border:none;color:white}
@@ -188,41 +227,46 @@ button{margin-left:10px;padding:10px;background:#2563eb;border:none;color:white}
 <body>
 
 <div id="sidebar">
-<button onclick="newChat()">+ New</button>
+<button onclick="newChat()">+ New Chat</button>
 <div id="list"></div>
 </div>
 
 <div id="main">
 <div id="chat"></div>
+
 <div id="input">
-<input id="msg"><button onclick="send()">Send</button>
+<input id="msg" placeholder="Ask anything...">
+<button onclick="send()">Send</button>
 </div>
 </div>
 
 <script>
-const socket=io();
-let current=null;
-let ai=null;
+const socket = io();
+let current = null;
+let aiMsg = null;
 
 function add(role,text){
 let d=document.createElement("div");
 d.className="msg "+role;
 d.textContent=text;
 chat.appendChild(d);
+chat.scrollTop=chat.scrollHeight;
 return d;
 }
 
 socket.on("stream",d=>{
-if(ai){ai.textContent=d.data;}
-chat.scrollTop=chat.scrollHeight;
+if(aiMsg){aiMsg.textContent=d.data;}
 });
 
 function send(){
 let m=msg.value;
 if(!m)return;
+
 msg.value="";
 add("user",m);
-ai=add("ai","...");
+
+aiMsg=add("ai","Processing your request... ⏳");
+
 socket.emit("send",{msg:m,chat:current});
 }
 
@@ -230,23 +274,32 @@ async function newChat(){
 let r=await fetch("/new",{method:"POST"});
 let d=await r.json();
 current=d.id;
-load();
+chat.innerHTML="";
+loadChats();
 }
 
-async function load(){
+async function loadChats(){
 let r=await fetch("/chats");
 let data=await r.json();
+
 list.innerHTML="";
 data.forEach(c=>{
 let d=document.createElement("div");
 d.className="chat";
 d.textContent=c[1];
-d.onclick=()=>{current=c[0];chat.innerHTML="";}
+d.onclick=()=>{
+current=c[0];
+chat.innerHTML="";
+};
 list.appendChild(d);
 });
 }
 
-load();
+document.getElementById("msg").addEventListener("keypress",e=>{
+if(e.key==="Enter") send();
+});
+
+loadChats();
 </script>
 
 </body>
@@ -256,5 +309,5 @@ load();
 # ================================
 # RUN
 # ================================
-if __name__=="__main__":
+if __name__ == "__main__":
     socketio.run(app)
