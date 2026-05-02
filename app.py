@@ -3,6 +3,7 @@ import sqlite3, uuid, os, requests
 
 app = Flask(__name__)
 
+# 🔐 KEY
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 # 💾 DB
@@ -18,7 +19,7 @@ SYSTEM = {
     "content": "Be structured, clear, and concise."
 }
 
-# 🧠 AI
+# 🤖 AI
 def ask(messages):
     r = requests.post(
         "https://api.groq.com/openai/v1/chat/completions",
@@ -31,7 +32,7 @@ def ask(messages):
     )
     return r.json()["choices"][0]["message"]["content"]
 
-# 🎨 UI
+# 🎨 UI (ChatGPT-style)
 HTML = """
 <!DOCTYPE html>
 <html>
@@ -63,26 +64,22 @@ width:60px;
 
 .chat-item{
 padding:10px;
+border-radius:8px;
+cursor:pointer;
 display:flex;
 justify-content:space-between;
 align-items:center;
-border-radius:8px;
-cursor:pointer;
 }
 
 .chat-item:hover{background:#222;}
 .active{background:#333;}
 
-.actions{
-display:flex;
-gap:5px;
-font-size:12px;
-opacity:0.7;
-}
-
 .actions span{
+margin-left:8px;
 cursor:pointer;
+opacity:0.6;
 }
+.actions span:hover{opacity:1;}
 
 /* MAIN */
 #main{
@@ -91,19 +88,31 @@ display:flex;
 flex-direction:column;
 }
 
+/* CHAT */
 #chat{
 flex:1;
 padding:20px;
 overflow-y:auto;
+scroll-behavior:smooth;
 }
 
-/* MSG */
+/* MESSAGE */
 .msg{
 max-width:70%;
 padding:12px;
 margin:6px;
 border-radius:10px;
 white-space:pre-wrap;
+opacity:0;
+transform:translateY(10px);
+animation:fadeIn 0.25s forwards;
+}
+
+@keyframes fadeIn{
+to{
+opacity:1;
+transform:translateY(0);
+}
 }
 
 .user{background:#2563eb;margin-left:auto;}
@@ -122,19 +131,25 @@ padding:10px;
 background:#222;
 color:white;
 border:none;
+outline:none;
 }
 
 button{
 margin-left:10px;
+background:#2563eb;
+color:white;
+border:none;
+padding:10px;
+cursor:pointer;
 }
 
 /* TOGGLE */
 #toggle{
-cursor:pointer;
 padding:8px;
 margin-bottom:10px;
 background:#222;
 border-radius:6px;
+cursor:pointer;
 text-align:center;
 }
 </style>
@@ -144,11 +159,8 @@ text-align:center;
 <body>
 
 <div id="sidebar">
-
-<div id="toggle" onclick="toggleSidebar()">☰</div>
-
-<button onclick="newChat()">+ New</button>
-
+<div id="toggle" onclick="toggle()">☰</div>
+<button onclick="newChat()">+ New Chat</button>
 <div id="list"></div>
 </div>
 
@@ -167,8 +179,8 @@ text-align:center;
 
 let current=null;
 
-/* SIDEBAR TOGGLE */
-function toggleSidebar(){
+/* TOGGLE SIDEBAR */
+function toggle(){
 document.getElementById("sidebar").classList.toggle("collapsed");
 }
 
@@ -194,7 +206,7 @@ list.innerHTML+=`
 });
 }
 
-/* SWITCH CHAT (FIXED - NO LOSS) */
+/* SWITCH CHAT (SAFE) */
 async function switchChat(id){
 current=id;
 
@@ -218,12 +230,32 @@ document.getElementById("chat").innerHTML="";
 load();
 }
 
-/* ADD MESSAGE */
+/* MESSAGE ADD (SMOOTH) */
 function add(role,text){
 let div=document.createElement("div");
 div.className="msg "+(role==="user"?"user":"ai");
 div.textContent=text;
 document.getElementById("chat").appendChild(div);
+document.getElementById("chat").scrollTop=999999;
+}
+
+/* STREAMING AI (TRUE CHAT FEEL) */
+function stream(text){
+let div=document.createElement("div");
+div.className="msg ai";
+document.getElementById("chat").appendChild(div);
+
+let i=0;
+let interval=setInterval(()=>{
+div.textContent=text.slice(0,i);
+i++;
+
+document.getElementById("chat").scrollTop=999999;
+
+if(i>text.length){
+clearInterval(interval);
+}
+},6);
 }
 
 /* SEND */
@@ -243,7 +275,8 @@ body:JSON.stringify({message:m,chat:current})
 });
 
 let d=await r.json();
-add("ai",d.response);
+
+stream(d.response);
 }
 
 /* ENTER */
@@ -254,17 +287,17 @@ send();
 }
 });
 
-/* RENAME INLINE */
+/* RENAME */
 function rename(id){
-let name=prompt("New name:");
+let n=prompt("New name:");
 fetch("/rename",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
-body:JSON.stringify({id,name})
+body:JSON.stringify({id,name:n})
 }).then(load);
 }
 
-/* DELETE INLINE */
+/* DELETE */
 function del(id){
 fetch("/delete",{
 method:"POST",
@@ -281,7 +314,7 @@ load();
 </html>
 """
 
-# ROUTES
+# 🌐 ROUTES
 @app.route("/")
 def home():
     return render_template_string(HTML)
