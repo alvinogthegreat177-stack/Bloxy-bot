@@ -3,35 +3,26 @@ import os
 import requests
 import sqlite3
 import uuid
+import time
 
 app = Flask(__name__)
 
-# 🔐 KEYS (set these in Render env vars)
+# 🔐 KEY
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
 
-# 🧠 SAFE TAVILY
-tavily = None
-if TAVILY_API_KEY:
-    try:
-        from tavily import TavilyClient
-        tavily = TavilyClient(api_key=TAVILY_API_KEY)
-    except:
-        tavily = None
-
-# 💾 DB (persistent chats)
+# 💾 DB
 conn = sqlite3.connect("memory.db", check_same_thread=False)
 cur = conn.cursor()
 
 cur.execute("""
-CREATE TABLE IF NOT EXISTS chats(
+CREATE TABLE IF NOT EXISTS chats (
     id TEXT PRIMARY KEY,
     title TEXT
 )
 """)
 
 cur.execute("""
-CREATE TABLE IF NOT EXISTS messages(
+CREATE TABLE IF NOT EXISTS messages (
     chat_id TEXT,
     role TEXT,
     content TEXT
@@ -39,91 +30,155 @@ CREATE TABLE IF NOT EXISTS messages(
 """)
 conn.commit()
 
-# 🧠 SYSTEM PROMPT (clean formatting)
+# 🧠 SYSTEM
 SYSTEM = {
     "role": "system",
     "content": """
-You are Bloxy-bot.
+You are Bloxy-bot 🤖
 
 RULES:
-- Answer directly
-- NEVER say you lack access
-- Use provided info
-
-FORMAT:
-- Use vertical lists
-- Each item on a new line
-- Keep answers clean and readable
+- Be clear and structured
+- Use vertical lists when needed
+- Keep responses clean and readable
+- Use emojis lightly (⚽🤖📊💡)
 """
 }
 
-# 🌐 SEARCH
-def web_search(query):
-    if not tavily:
-        return ""
-    try:
-        res = tavily.search(query=query, search_depth="basic", max_results=3)
-        return "\n".join([r.get("content","") for r in res.get("results",[])])
-    except:
-        return ""
-
-def wiki(query):
-    try:
-        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query.replace(' ','_')}"
-        return requests.get(url).json().get("extract","")
-    except:
-        return ""
-
 # 🧠 GROQ
 def ask_groq(messages):
-    try:
-        r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type":"application/json"
-            },
-            json={
-                "model":"llama-3.3-70b-versatile",
-                "messages":messages,
-                "temperature":0.3
-            }
-        )
-        return r.json()["choices"][0]["message"]["content"]
-    except Exception as e:
-        return f"⚠️ Error: {e}"
+    r = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "llama-3.3-70b-versatile",
+            "messages": messages,
+            "temperature": 0.3
+        }
+    )
+    return r.json()["choices"][0]["message"]["content"]
 
-# 🧠 TITLE GENERATOR
-def make_title(msg):
-    try:
-        return ask_groq([
-            {"role":"user","content":f"Make a short 3 word title: {msg}"}
-        ]).strip()
-    except:
-        return "New Chat"
-
-# 🎨 UI
+# 🎨 UI (CHATGPT STYLE)
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
 <title>Bloxy-bot</title>
+
 <style>
-body{margin:0;font-family:Arial;display:flex;height:100vh}
-#sidebar{width:250px;background:#111;color:white;padding:10px}
-.chat-item{padding:10px;cursor:pointer}
-.chat-item:hover{background:#333}
-.active{background:#444}
-#main{flex:1;display:flex;flex-direction:column}
-#chat{flex:1;overflow-y:auto;padding:10px;background:#f4f4f4}
-.msg{padding:10px;margin:5px;border-radius:8px;max-width:70%}
-.user{background:#4a90e2;color:white;margin-left:auto}
-.ai{background:white}
-#input{display:flex;padding:10px}
-input{flex:1;padding:10px}
-button{margin-left:10px}
+body{
+margin:0;
+display:flex;
+height:100vh;
+font-family:Arial;
+background:#0f0f0f;
+color:white;
+}
+
+/* SIDEBAR */
+#sidebar{
+width:260px;
+background:#111;
+padding:10px;
+overflow-y:auto;
+}
+
+.chat-item{
+padding:10px;
+border-radius:8px;
+cursor:pointer;
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+
+.chat-item:hover{background:#222;}
+.active{background:#333;}
+
+.menu{
+cursor:pointer;
+padding:0 5px;
+}
+
+/* MAIN */
+#main{
+flex:1;
+display:flex;
+flex-direction:column;
+}
+
+/* CHAT */
+#chat{
+flex:1;
+padding:20px;
+overflow-y:auto;
+scroll-behavior:smooth;
+}
+
+/* MESSAGE */
+.msg{
+max-width:70%;
+padding:12px;
+margin:8px 0;
+border-radius:10px;
+animation:fade 0.2s ease-in;
+white-space:pre-wrap;
+}
+
+@keyframes fade{
+from{opacity:0;transform:translateY(8px);}
+to{opacity:1;transform:translateY(0);}
+}
+
+.user{
+background:#2563eb;
+margin-left:auto;
+}
+
+.ai{
+background:#1f1f1f;
+}
+
+/* INPUT */
+#input{
+display:flex;
+padding:10px;
+background:#111;
+}
+
+input{
+flex:1;
+padding:12px;
+border:none;
+border-radius:8px;
+background:#222;
+color:white;
+outline:none;
+}
+
+button{
+margin-left:10px;
+padding:12px;
+background:#2563eb;
+color:white;
+border:none;
+border-radius:8px;
+cursor:pointer;
+}
+
+button:hover{background:#1d4ed8;}
+
+/* typing */
+.typing{
+opacity:0.6;
+font-style:italic;
+}
 </style>
+
 </head>
+
 <body>
 
 <div id="sidebar">
@@ -132,109 +187,161 @@ button{margin-left:10px}
 </div>
 
 <div id="main">
+
 <div id="chat"></div>
+
 <div id="input">
-<input id="msg" placeholder="Type..." />
+<input id="msg" placeholder="Message..." />
 <button onclick="send()">Send</button>
 </div>
+
 </div>
 
 <script>
+
 let current=null;
 
-// LOAD CHATS
+/* LOAD */
 async function load(){
- let r=await fetch("/chats");
- let d=await r.json();
- let list=document.getElementById("list");
- list.innerHTML="";
+let r=await fetch("/chats");
+let d=await r.json();
 
- d.chats.forEach(c=>{
-   list.innerHTML+=`
-   <div class='chat-item ${c.id===current?"active":""}'
-   onclick="switchChat('${c.id}')">${c.title}</div>`;
- });
+let list=document.getElementById("list");
+list.innerHTML="";
 
- if(!current && d.chats.length>0){
-    current=d.chats[0].id;
- }
+d.chats.forEach(c=>{
+list.innerHTML+=`
+<div class='chat-item ${c.id===current?"active":""}'>
+<span onclick="switchChat('${c.id}')">${c.title}</span>
+<span class="menu" onclick="menu('${c.id}')">⋮</span>
+</div>`;
+});
 }
 
-// SWITCH CHAT
+/* SWITCH */
 async function switchChat(id){
- current=id;
- let r=await fetch("/history?chat="+id);
- let d=await r.json();
+current=id;
+let r=await fetch("/history?chat="+id);
+let d=await r.json();
 
- let chat=document.getElementById("chat");
- chat.innerHTML="";
+let chat=document.getElementById("chat");
+chat.innerHTML="";
 
- d.messages.forEach(m=>{
-   chat.innerHTML+=`<div class='msg ${m.role==="user"?"user":"ai"}'>${m.content}</div>`;
- });
+d.messages.forEach(m=>{
+add(m.role,m.content,false);
+});
 }
 
-// NEW CHAT (FIXED)
+/* NEW */
 async function newChat(){
- let r=await fetch("/new_chat",{method:"POST"});
- let d=await r.json();
- current=d.id;
- load();
- document.getElementById("chat").innerHTML="";
+let r=await fetch("/new_chat",{method:"POST"});
+let d=await r.json();
+current=d.id;
+document.getElementById("chat").innerHTML="";
+load();
 }
 
-// SEND MESSAGE (FIXED)
+/* MENU (INLINE) */
+function menu(id){
+let a=prompt("rename / delete");
+
+if(a==="rename"){
+let n=prompt("New name:");
+fetch("/rename",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({id,name:n})
+}).then(load);
+}
+
+if(a==="delete"){
+fetch("/delete",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({id})
+}).then(load);
+}
+}
+
+/* ADD MESSAGE */
+function add(role,text){
+let div=document.createElement("div");
+div.className="msg "+(role==="user"?"user":"ai");
+div.textContent=text;
+
+document.getElementById("chat").appendChild(div);
+document.getElementById("chat").scrollTop=999999;
+}
+
+/* STREAMING EFFECT */
+function stream(text){
+let i=0;
+let div=document.createElement("div");
+div.className="msg ai";
+document.getElementById("chat").appendChild(div);
+
+let interval=setInterval(()=>{
+div.textContent=text.slice(0,i);
+i++;
+document.getElementById("chat").scrollTop=999999;
+
+if(i>text.length){
+clearInterval(interval);
+}
+},10);
+}
+
+/* SEND */
 async function send(){
- let input=document.getElementById("msg");
- let m=input.value;
- if(!m)return;
+let input=document.getElementById("msg");
+let m=input.value;
+if(!m)return;
 
- input.value=""; // ✅ clear immediately
+input.value="";
 
- let chat=document.getElementById("chat");
- chat.innerHTML+=`<div class='msg user'>${m}</div>`;
+add("user",m);
 
- let r=await fetch("/ai",{
- method:"POST",
- headers:{"Content-Type":"application/json"},
- body:JSON.stringify({message:m,chat:current})
- });
+let r=await fetch("/ai",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({message:m,chat:current})
+});
 
- let d=await r.json();
- chat.innerHTML+=`<div class='msg ai'>${d.response}</div>`;
- chat.scrollTop=chat.scrollHeight;
+let d=await r.json();
 
- load();
+stream(d.response);
 }
 
-// ENTER KEY FIX
-document.getElementById("msg").addEventListener("keypress", function(e){
- if(e.key==="Enter"){
-  e.preventDefault();
-  send();
- }
+/* ENTER */
+document.getElementById("msg").addEventListener("keypress",e=>{
+if(e.key==="Enter"){
+e.preventDefault();
+send();
+}
 });
 
 load();
+
 </script>
 
 </body>
 </html>
 """
 
+# 🌐 ROUTES
 @app.route("/")
 def home():
     return render_template_string(HTML)
 
 @app.route("/chats")
-def chats_list():
+def chats():
     cur.execute("SELECT id,title FROM chats")
     return jsonify({"chats":[{"id":i,"title":t} for i,t in cur.fetchall()]})
 
 @app.route("/new_chat", methods=["POST"])
 def new_chat():
     cid=str(uuid.uuid4())
-    cur.execute("INSERT INTO chats VALUES (?,?)",(cid,"New Chat"))
+    cur.execute("INSERT INTO chats VALUES (?,?)",(cid,"New Chat 🤖"))
     conn.commit()
     return jsonify({"id":cid})
 
@@ -244,36 +351,36 @@ def history():
     cur.execute("SELECT role,content FROM messages WHERE chat_id=?",(cid,))
     return jsonify({"messages":[{"role":r,"content":c} for r,c in cur.fetchall()]})
 
+@app.route("/rename", methods=["POST"])
+def rename():
+    d=request.json
+    cur.execute("UPDATE chats SET title=? WHERE id=?",(d["name"],d["id"]))
+    conn.commit()
+    return jsonify({"ok":True})
+
+@app.route("/delete", methods=["POST"])
+def delete():
+    cid=request.json["id"]
+    cur.execute("DELETE FROM chats WHERE id=?",(cid,))
+    cur.execute("DELETE FROM messages WHERE chat_id=?",(cid,))
+    conn.commit()
+    return jsonify({"ok":True})
+
 @app.route("/ai", methods=["POST"])
 def ai():
-    data=request.json
-    msg=data["message"]
-    cid=data["chat"]
-
-    # 🌐 get context
-    context=web_search(msg)
-    if not context:
-        context=wiki(msg)
-
-    prompt=f"User: {msg}\n\nInfo:\n{context}"
+    d=request.json
+    msg=d["message"]
+    cid=d["chat"]
 
     cur.execute("SELECT role,content FROM messages WHERE chat_id=?",(cid,))
     history=[{"role":r,"content":c} for r,c in cur.fetchall()]
 
-    reply=ask_groq([SYSTEM]+history[-10:]+[{"role":"user","content":prompt}])
+    reply=ask_groq([SYSTEM]+history[-10:]+[
+        {"role":"user","content":msg}
+    ])
 
-    # 💾 save
     cur.execute("INSERT INTO messages VALUES (?,?,?)",(cid,"user",msg))
     cur.execute("INSERT INTO messages VALUES (?,?,?)",(cid,"assistant",reply))
-
-    # 🧠 AUTO TITLE (FIRST MESSAGE)
-    cur.execute("SELECT COUNT(*) FROM messages WHERE chat_id=?",(cid,))
-    count=cur.fetchone()[0]
-
-    if count<=2:
-        title=make_title(msg)
-        cur.execute("UPDATE chats SET title=? WHERE id=?",(title,cid))
-
     conn.commit()
 
     return jsonify({"response":reply})
