@@ -1,57 +1,28 @@
 from flask import Flask, request, jsonify, render_template_string
-import os
-import requests
-import sqlite3
-import uuid
-import time
+import sqlite3, uuid, os, requests
 
 app = Flask(__name__)
 
-# 🔐 KEY
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 # 💾 DB
 conn = sqlite3.connect("memory.db", check_same_thread=False)
 cur = conn.cursor()
 
-cur.execute("""
-CREATE TABLE IF NOT EXISTS chats (
-    id TEXT PRIMARY KEY,
-    title TEXT
-)
-""")
-
-cur.execute("""
-CREATE TABLE IF NOT EXISTS messages (
-    chat_id TEXT,
-    role TEXT,
-    content TEXT
-)
-""")
+cur.execute("CREATE TABLE IF NOT EXISTS chats (id TEXT, title TEXT)")
+cur.execute("CREATE TABLE IF NOT EXISTS messages (chat_id TEXT, role TEXT, content TEXT)")
 conn.commit()
 
-# 🧠 SYSTEM
 SYSTEM = {
     "role": "system",
-    "content": """
-You are Bloxy-bot 🤖
-
-RULES:
-- Be clear and structured
-- Use vertical lists when needed
-- Keep responses clean and readable
-- Use emojis lightly (⚽🤖📊💡)
-"""
+    "content": "Be structured, clear, and concise."
 }
 
-# 🧠 GROQ
-def ask_groq(messages):
+# 🧠 AI
+def ask(messages):
     r = requests.post(
         "https://api.groq.com/openai/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json"
-        },
+        headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
         json={
             "model": "llama-3.3-70b-versatile",
             "messages": messages,
@@ -60,12 +31,12 @@ def ask_groq(messages):
     )
     return r.json()["choices"][0]["message"]["content"]
 
-# 🎨 UI (CHATGPT STYLE)
+# 🎨 UI
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>Bloxy-bot</title>
+<title>AI Chat</title>
 
 <style>
 body{
@@ -73,7 +44,7 @@ margin:0;
 display:flex;
 height:100vh;
 font-family:Arial;
-background:#0f0f0f;
+background:#0d0d0d;
 color:white;
 }
 
@@ -81,25 +52,36 @@ color:white;
 #sidebar{
 width:260px;
 background:#111;
-padding:10px;
 overflow-y:auto;
+transition:0.3s;
+padding:10px;
+}
+
+#sidebar.collapsed{
+width:60px;
 }
 
 .chat-item{
 padding:10px;
-border-radius:8px;
-cursor:pointer;
 display:flex;
 justify-content:space-between;
 align-items:center;
+border-radius:8px;
+cursor:pointer;
 }
 
 .chat-item:hover{background:#222;}
 .active{background:#333;}
 
-.menu{
+.actions{
+display:flex;
+gap:5px;
+font-size:12px;
+opacity:0.7;
+}
+
+.actions span{
 cursor:pointer;
-padding:0 5px;
 }
 
 /* MAIN */
@@ -109,37 +91,23 @@ display:flex;
 flex-direction:column;
 }
 
-/* CHAT */
 #chat{
 flex:1;
 padding:20px;
 overflow-y:auto;
-scroll-behavior:smooth;
 }
 
-/* MESSAGE */
+/* MSG */
 .msg{
 max-width:70%;
 padding:12px;
-margin:8px 0;
+margin:6px;
 border-radius:10px;
-animation:fade 0.2s ease-in;
 white-space:pre-wrap;
 }
 
-@keyframes fade{
-from{opacity:0;transform:translateY(8px);}
-to{opacity:1;transform:translateY(0);}
-}
-
-.user{
-background:#2563eb;
-margin-left:auto;
-}
-
-.ai{
-background:#1f1f1f;
-}
+.user{background:#2563eb;margin-left:auto;}
+.ai{background:#1f1f1f;}
 
 /* INPUT */
 #input{
@@ -150,30 +118,24 @@ background:#111;
 
 input{
 flex:1;
-padding:12px;
-border:none;
-border-radius:8px;
+padding:10px;
 background:#222;
 color:white;
-outline:none;
+border:none;
 }
 
 button{
 margin-left:10px;
-padding:12px;
-background:#2563eb;
-color:white;
-border:none;
-border-radius:8px;
-cursor:pointer;
 }
 
-button:hover{background:#1d4ed8;}
-
-/* typing */
-.typing{
-opacity:0.6;
-font-style:italic;
+/* TOGGLE */
+#toggle{
+cursor:pointer;
+padding:8px;
+margin-bottom:10px;
+background:#222;
+border-radius:6px;
+text-align:center;
 }
 </style>
 
@@ -182,7 +144,11 @@ font-style:italic;
 <body>
 
 <div id="sidebar">
-<button onclick="newChat()">+ New Chat</button>
+
+<div id="toggle" onclick="toggleSidebar()">☰</div>
+
+<button onclick="newChat()">+ New</button>
+
 <div id="list"></div>
 </div>
 
@@ -201,7 +167,12 @@ font-style:italic;
 
 let current=null;
 
-/* LOAD */
+/* SIDEBAR TOGGLE */
+function toggleSidebar(){
+document.getElementById("sidebar").classList.toggle("collapsed");
+}
+
+/* LOAD CHATS */
 async function load(){
 let r=await fetch("/chats");
 let d=await r.json();
@@ -211,16 +182,22 @@ list.innerHTML="";
 
 d.chats.forEach(c=>{
 list.innerHTML+=`
-<div class='chat-item ${c.id===current?"active":""}'>
+<div class="chat-item ${c.id===current?"active":""}">
 <span onclick="switchChat('${c.id}')">${c.title}</span>
-<span class="menu" onclick="menu('${c.id}')">⋮</span>
+
+<div class="actions">
+<span onclick="rename('${c.id}')">✏️</span>
+<span onclick="del('${c.id}')">🗑️</span>
+</div>
+
 </div>`;
 });
 }
 
-/* SWITCH */
+/* SWITCH CHAT (FIXED - NO LOSS) */
 async function switchChat(id){
 current=id;
+
 let r=await fetch("/history?chat="+id);
 let d=await r.json();
 
@@ -228,11 +205,11 @@ let chat=document.getElementById("chat");
 chat.innerHTML="";
 
 d.messages.forEach(m=>{
-add(m.role,m.content,false);
+add(m.role,m.content);
 });
 }
 
-/* NEW */
+/* NEW CHAT */
 async function newChat(){
 let r=await fetch("/new_chat",{method:"POST"});
 let d=await r.json();
@@ -241,54 +218,12 @@ document.getElementById("chat").innerHTML="";
 load();
 }
 
-/* MENU (INLINE) */
-function menu(id){
-let a=prompt("rename / delete");
-
-if(a==="rename"){
-let n=prompt("New name:");
-fetch("/rename",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({id,name:n})
-}).then(load);
-}
-
-if(a==="delete"){
-fetch("/delete",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({id})
-}).then(load);
-}
-}
-
 /* ADD MESSAGE */
 function add(role,text){
 let div=document.createElement("div");
 div.className="msg "+(role==="user"?"user":"ai");
 div.textContent=text;
-
 document.getElementById("chat").appendChild(div);
-document.getElementById("chat").scrollTop=999999;
-}
-
-/* STREAMING EFFECT */
-function stream(text){
-let i=0;
-let div=document.createElement("div");
-div.className="msg ai";
-document.getElementById("chat").appendChild(div);
-
-let interval=setInterval(()=>{
-div.textContent=text.slice(0,i);
-i++;
-document.getElementById("chat").scrollTop=999999;
-
-if(i>text.length){
-clearInterval(interval);
-}
-},10);
 }
 
 /* SEND */
@@ -308,8 +243,7 @@ body:JSON.stringify({message:m,chat:current})
 });
 
 let d=await r.json();
-
-stream(d.response);
+add("ai",d.response);
 }
 
 /* ENTER */
@@ -320,6 +254,25 @@ send();
 }
 });
 
+/* RENAME INLINE */
+function rename(id){
+let name=prompt("New name:");
+fetch("/rename",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({id,name})
+}).then(load);
+}
+
+/* DELETE INLINE */
+function del(id){
+fetch("/delete",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({id})
+}).then(load);
+}
+
 load();
 
 </script>
@@ -328,7 +281,7 @@ load();
 </html>
 """
 
-# 🌐 ROUTES
+# ROUTES
 @app.route("/")
 def home():
     return render_template_string(HTML)
@@ -341,7 +294,7 @@ def chats():
 @app.route("/new_chat", methods=["POST"])
 def new_chat():
     cid=str(uuid.uuid4())
-    cur.execute("INSERT INTO chats VALUES (?,?)",(cid,"New Chat 🤖"))
+    cur.execute("INSERT INTO chats VALUES (?,?)",(cid,"New Chat"))
     conn.commit()
     return jsonify({"id":cid})
 
@@ -375,7 +328,7 @@ def ai():
     cur.execute("SELECT role,content FROM messages WHERE chat_id=?",(cid,))
     history=[{"role":r,"content":c} for r,c in cur.fetchall()]
 
-    reply=ask_groq([SYSTEM]+history[-10:]+[
+    reply=ask([SYSTEM]+history[-10:]+[
         {"role":"user","content":msg}
     ])
 
