@@ -1,3 +1,5 @@
+import eventlet
+eventlet.monkey_patch()
 from flask import Flask, request, jsonify, render_template_string
 import sqlite3, os, requests
 
