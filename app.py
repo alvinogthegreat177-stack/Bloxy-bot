@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, render_template_string
-import sqlite3, uuid, os, requests
+import sqlite3, os, requests
 
 app = Flask(__name__)
 
@@ -7,37 +7,35 @@ app = Flask(__name__)
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
 
-# 💾 DB
+# 💾 DATABASE
 conn = sqlite3.connect("bloxy.db", check_same_thread=False)
 cur = conn.cursor()
 
-cur.execute("CREATE TABLE IF NOT EXISTS chats (id TEXT PRIMARY KEY, title TEXT)")
 cur.execute("CREATE TABLE IF NOT EXISTS messages (chat_id TEXT, role TEXT, content TEXT)")
 conn.commit()
 
-# 🤖 SYSTEM
+# 🤖 SYSTEM PROMPT
 SYSTEM = {
-    "role": "system",
-    "content": """
+"role": "system",
+"content": """
 You are Bloxy-bot 🤖.
 
-Rules:
-- Always respond in structured format
-- Use vertical lists
-- Never dump raw web pages
-- Be clean and readable
+RULES:
+- Use clear structured answers
+- Use vertical formatting for lists
+- Never hallucinate facts when using web tools
+- Be concise and accurate
 """
 }
 
-# 📖 DICTIONARY (SAFE)
+# 📖 DICTIONARY
 def dictionary_lookup(query):
-    if not any(x in query.lower() for x in ["define","meaning","what is"]):
-        return None
     try:
+        if not any(x in query.lower() for x in ["define","meaning","what is"]):
+            return None
         word = query.split()[-1]
         r = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}")
-        if r.status_code == 200:
-            return r.json()[0]["meanings"][0]["definitions"][0]["definition"]
+        return r.json()[0]["meanings"][0]["definitions"][0]["definition"]
     except:
         return None
 
@@ -58,7 +56,7 @@ def tavily(query):
             json={"api_key": TAVILY_API_KEY, "query": query}
         )
         results = r.json().get("results", [])
-        return " ".join([r["content"] for r in results[:3]]) if results else None
+        return " ".join([x["content"] for x in results[:3]]) if results else None
     except:
         return None
 
@@ -74,183 +72,91 @@ def groq(messages):
                 "temperature": 0.4
             }
         )
-
-        data = r.json()
-        return data["choices"][0]["message"]["content"]
-
+        return r.json()["choices"][0]["message"]["content"]
     except Exception as e:
         return f"❌ AI error: {str(e)}"
 
-# 🧠 ROUTER (FIXED LOGIC)
-def smart_answer(query, history):
+# 🧠 MEMORY SYSTEM
+
+def save_message(chat_id, role, content):
+    cur.execute("INSERT INTO messages VALUES (?,?,?)", (chat_id, role, content))
+    conn.commit()
+
+def get_recent(chat_id):
+    cur.execute(
+        "SELECT role,content FROM messages WHERE chat_id=? ORDER BY rowid DESC LIMIT 12",
+        (chat_id,)
+    )
+    return [{"role":r,"content":c} for r,c in reversed(cur.fetchall())]
+
+def get_summary(chat_id):
+    cur.execute("SELECT content FROM messages WHERE chat_id=?", (chat_id,))
+    msgs = cur.fetchall()
+
+    if len(msgs) < 20:
+        return None
+
+    text = " ".join([m[0] for m in msgs[-40:]])
+    return f"Memory summary of chat: {text[:800]}"
+
+# 🧠 SMART ROUTER
+def smart_answer(query, chat_id):
 
     q = query.lower().strip()
 
-    if q in ["hi","hello","hey"]:
-        return "Hello 👋\n\nHow can I help you today?"
-
+    # 📖 Dictionary
     d = dictionary_lookup(query)
     if d:
         return f"📖 Definition:\n{d}"
 
+    # 📚 Wikipedia
     w = wikipedia(query.replace(" ","_"))
     if w:
         return f"📚 {w[:500]}..."
 
+    # 🌐 Tavily
     t = tavily(query)
     if t:
         return groq([
             SYSTEM,
-            {"role":"user","content":f"Summarize clearly in bullet points:\n\n{t}"}
+            {"role":"user","content":f"Summarize clearly:\n\n{t}"}
         ])
 
-    return groq([SYSTEM] + history + [{"role":"user","content":query}])
+    # 🧠 MEMORY BUILD
+    recent = get_recent(chat_id)
+    summary = get_summary(chat_id)
 
+    messages = [SYSTEM]
 
-# 🎨 UI (UNCHANGED STRUCTURE)
-HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-<title>Bloxy-bot 🤖</title>
-<style>
-body{margin:0;display:flex;height:100vh;background:#0d0d0d;color:white;font-family:Arial}
+    if summary:
+        messages.append({"role":"system","content":summary})
 
-#sidebar{width:260px;background:#111;display:flex;flex-direction:column}
-#top{padding:15px;font-weight:bold}
-.chat{padding:10px;cursor:pointer}
-.chat:hover{background:#222}
+    messages += recent
+    messages.append({"role":"user","content":query})
 
-#main{flex:1;display:flex;flex-direction:column}
-#header{padding:15px;border-bottom:1px solid #222;font-weight:bold}
-#chat{flex:1;padding:20px;overflow-y:auto}
+    return groq(messages)
 
-.msg{max-width:70%;padding:12px;margin:6px;border-radius:10px;white-space:pre-wrap}
-.user{background:#2563eb;margin-left:auto}
-.ai{background:#1f1f1f}
-
-#input{display:flex;padding:10px;background:#111}
-input{flex:1;padding:10px;background:#222;color:white;border:none}
-button{margin-left:10px;padding:10px;background:#2563eb;color:white;border:none}
-
-#footer{text-align:center;font-size:12px;color:#777;padding:5px}
-</style>
-</head>
-
-<body>
-
-<div id="sidebar">
-<div id="top">Bloxy-bot 🤖</div>
-<div id="list"></div>
-</div>
-
-<div id="main">
-
-<div id="header">Bloxy-bot 🤖</div>
-<div id="chat"></div>
-
-<div id="input">
-<input id="msg" placeholder="Ask Bloxy-bot...">
-<button onclick="send()">Send</button>
-</div>
-
-<div id="footer">
-Bloxy-bot can make mistakes. Double-check just in case.
-</div>
-
-</div>
-
-<script>
-
-let current=null;
-const chat=document.getElementById("chat");
-
-function add(role,text){
-let d=document.createElement("div");
-d.className="msg "+role;
-d.textContent=text;
-chat.appendChild(d);
-chat.scrollTop=chat.scrollHeight;
-return d;
-}
-
-function stream(el,text){
-let i=0;
-let t=setInterval(()=>{
-el.textContent=text.slice(0,i++);
-if(i>text.length) clearInterval(t);
-},8);
-}
-
-/* 🔥 FIXED SEND FUNCTION */
-async function send(){
-let input=document.getElementById("msg");
-let msg=input.value;
-if(!msg) return;
-
-input.value="";
-
-add("user",msg);
-
-// loading bubble
-let ai=add("ai","Thinking... 🤖");
-
-try{
-let r=await fetch("/ai",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({message:msg,chat:current})
-});
-
-let d=await r.json();
-
-/* 🔥 SAFETY FIX */
-if(!d.response){
-ai.textContent="⚠️ No response received.";
-return;
-}
-
-ai.textContent="";
-stream(ai,d.response);
-
-}catch(e){
-ai.textContent="❌ Connection error.";
-}
-}
-
-document.getElementById("msg").addEventListener("keypress",e=>{
-if(e.key==="Enter"){e.preventDefault();send();}
-});
-
-</script>
-
-</body>
-</html>
-"""
-
-# 🌐 ROUTES
-@app.route("/")
-def home():
-    return render_template_string(HTML)
-
+# 🌐 AI ENDPOINT
 @app.route("/ai", methods=["POST"])
 def ai():
     try:
-        data=request.json
-        msg=data["message"]
+        data = request.json
+        msg = data["message"]
+        chat_id = data["chat"]
 
-        cur.execute("SELECT role,content FROM messages")
-        history=[{"role":r,"content":c} for r,c in cur.fetchall()]
-
-        reply=smart_answer(msg, history[-10:])
+        reply = smart_answer(msg, chat_id)
 
         if not reply:
-            reply="⚠️ Empty response."
+            reply = "⚠️ No response generated."
 
-        return jsonify({"response":str(reply)})
+        save_message(chat_id, "user", msg)
+        save_message(chat_id, "assistant", reply)
+
+        return jsonify({"response": str(reply)})
 
     except Exception as e:
-        return jsonify({"response":f"❌ Server error: {str(e)}"})
+        return jsonify({"response": f"❌ Error: {str(e)}"})
 
+# 🚀 RUN
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
