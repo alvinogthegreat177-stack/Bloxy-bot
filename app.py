@@ -1,16 +1,24 @@
 import os
 import requests
-
+from flask import Flask, render_template_string
 from flask_socketio import SocketIO
 
-# (keep your existing app + socketio setup from v1)
-# ONLY ADD AI LAYER BELOW
+# =====================================================
+# SAFE INIT
+# =====================================================
+app = Flask(__name__)
+app.config["SECRET_KEY"] = "bloxy_v2"
 
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+
+# =====================================================
+# OPTIONAL KEYS
+# =====================================================
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
 
 # =====================================================
-# AI SOURCES
+# AI FUNCTIONS (SAFE)
 # =====================================================
 
 def groq_ai(msg):
@@ -23,7 +31,7 @@ def groq_ai(msg):
             json={
                 "model": "llama-3.3-70b-versatile",
                 "messages": [
-                    {"role": "system", "content": "You are Bloxy-bot. Be helpful and structured."},
+                    {"role": "system", "content": "You are Bloxy-bot."},
                     {"role": "user", "content": msg}
                 ]
             }
@@ -33,7 +41,7 @@ def groq_ai(msg):
         return None
 
 
-def tavily_search(msg):
+def tavily(msg):
     if not TAVILY_API_KEY:
         return None
     try:
@@ -42,16 +50,16 @@ def tavily_search(msg):
             json={
                 "api_key": TAVILY_API_KEY,
                 "query": msg,
-                "max_results": 3
+                "max_results": 2
             }
         )
-        results = r.json().get("results", [])
-        return " ".join([i["content"] for i in results])
+        data = r.json().get("results", [])
+        return " ".join([x["content"] for x in data])
     except:
         return None
 
 
-def wikipedia(msg):
+def wiki(msg):
     try:
         r = requests.get(
             f"https://en.wikipedia.org/api/rest_v1/page/summary/{msg}"
@@ -60,58 +68,106 @@ def wikipedia(msg):
     except:
         return None
 
-
-def dictionary(msg):
-    try:
-        r = requests.get(
-            f"https://api.dictionaryapi.dev/api/v2/entries/en/{msg}"
-        )
-        return r.json()[0]["meanings"][0]["definitions"][0]["definition"]
-    except:
-        return None
-
 # =====================================================
-# SMART ENGINE (NEW BRAIN SYSTEM)
+# AI ENGINE (SAFE ROUTING)
 # =====================================================
 
 def ai_engine(msg):
 
-    # 1. Web first
-    web = tavily_search(msg)
+    web = tavily(msg)
     if web:
-        return "🌐 Web Result:\n" + web
+        return "🌐 Web:\n" + web
 
-    # 2. Groq AI
     ai = groq_ai(msg)
     if ai:
         return ai
 
-    # 3. Wikipedia
-    wiki = wikipedia(msg)
-    if wiki:
-        return "📚 Wikipedia:\n" + wiki
+    w = wiki(msg)
+    if w:
+        return "📚 Wikipedia:\n" + w
 
-    # 4. Dictionary (only short inputs)
-    if len(msg.split()) == 1:
-        d = dictionary(msg)
-        if d:
-            return "📖 Definition:\n" + d
-
-    return "I couldn't find a result."
+    return f"You said: {msg}"
 
 # =====================================================
-# SOCKET UPDATE (REPLACE YOUR v1 HANDLER ONLY)
+# SOCKET HANDLER
 # =====================================================
 
 @socketio.on("msg")
 def handle(data):
-    text = data.get("text","")
+    msg = data.get("text", "")
 
-    reply = ai_engine(text)
+    reply = ai_engine(msg)
 
     buffer = ""
-
     for w in reply.split():
         buffer += w + " "
         socketio.emit("reply", {"text": buffer})
         socketio.sleep(0.02)
+
+# =====================================================
+# SIMPLE UI (SAFE TEST UI)
+# =====================================================
+
+@app.route("/")
+def home():
+    return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+<style>
+body{margin:0;background:#0b0f19;color:white;font-family:sans-serif;display:flex;height:100vh}
+#chat{flex:1;padding:10px;overflow:auto}
+.msg{margin:5px;padding:8px;border-radius:6px}
+.user{background:#2563eb;margin-left:auto}
+.bot{background:#1f1f1f}
+#input{display:flex;padding:10px;background:#111}
+input{flex:1;padding:10px}
+button{padding:10px}
+</style>
+</head>
+
+<body>
+
+<div id="chat"></div>
+
+<div id="input">
+<input id="msg">
+<button onclick="send()">Send</button>
+</div>
+
+<script>
+const socket = io();
+
+socket.on("reply", d=>{
+    add("bot", d.text);
+});
+
+function add(t,x){
+let d=document.createElement("div");
+d.className="msg "+t;
+d.textContent=x;
+chat.appendChild(d);
+}
+
+function send(){
+let m=msg.value;
+if(!m)return;
+msg.value="";
+add("user",m);
+socket.emit("msg",{text:m});
+}
+</script>
+
+</body>
+</html>
+""")
+
+# =====================================================
+# RUN SAFE
+# =====================================================
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    socketio.run(app, host="0.0.0.0", port=port)
