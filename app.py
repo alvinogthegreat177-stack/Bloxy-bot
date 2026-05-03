@@ -1,224 +1,273 @@
-
-
-from flask import Flask, request, jsonify, render_template_string
-from flask_cors import CORS
-from groq import Groq
-from tavily import TavilyClient
-import wikipedia
-import requests
+# ================================
+# CORE IMPORTS
+# ================================
+from flask import Flask, request, jsonify, render_template_string, session
+from flask_socketio import SocketIO, emit
+from werkzeug.security import generate_password_hash, check_password_hash
+import sqlite3, os, requests, uuid
 
 app = Flask(__name__)
-CORS(app)
+app.secret_key = "bloxy_secret_key"
 
-# 🔑 API KEYS
-groq = Groq(api_key="YOUR_GROQ_API_KEY")
-tavily = TavilyClient(api_key="YOUR_TAVILY_API_KEY")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
-# --------------------------
-# 🧠 GROQ (MAIN BRAIN)
-# --------------------------
-def groq_ai(message):
-    res = groq.chat.completions.create(
-        model="llama3-70b-8192",
-        messages=[
-            {"role": "system", "content": "You are Bloxy-bot, a smart AI assistant."},
-            {"role": "user", "content": message}
-        ]
+# ================================
+# DATABASE
+# ================================
+conn = sqlite3.connect("bloxy.db", check_same_thread=False)
+cur = conn.cursor()
+
+cur.execute("CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT, password TEXT)")
+cur.execute("CREATE TABLE IF NOT EXISTS chats (id TEXT PRIMARY KEY, user_id TEXT, title TEXT, folder TEXT)")
+cur.execute("CREATE TABLE IF NOT EXISTS messages (chat_id TEXT, role TEXT, content TEXT)")
+conn.commit()
+
+# ================================
+# AI KEYS
+# ================================
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+
+SYSTEM = {
+"role":"system",
+"content":"""
+You are Bloxy-bot 🤖.
+- structured answers
+- vertical formatting
+- concise responses
+"""
+}
+
+# ================================
+# AUTH HELPERS
+# ================================
+def current_user():
+    return session.get("user_id")
+
+# ================================
+# AUTH ROUTES
+# ================================
+@app.route("/register", methods=["POST"])
+def register():
+    data=request.json
+    uid=str(uuid.uuid4())
+    cur.execute("INSERT INTO users VALUES (?,?,?)",
+                (uid,data["username"],generate_password_hash(data["password"])))
+    conn.commit()
+    return jsonify({"status":"registered"})
+
+@app.route("/login", methods=["POST"])
+def login():
+    data=request.json
+    cur.execute("SELECT * FROM users WHERE username=?",(data["username"],))
+    u=cur.fetchone()
+
+    if u and check_password_hash(u[2],data["password"]):
+        session["user_id"]=u[0]
+        return jsonify({"status":"ok"})
+    return jsonify({"status":"fail"})
+
+# ================================
+# CHAT SYSTEM
+# ================================
+@app.route("/new_chat", methods=["POST"])
+def new_chat():
+    cid=str(uuid.uuid4())
+    uid=current_user()
+    cur.execute("INSERT INTO chats VALUES (?,?,?,?)",(cid,uid,"New Chat","default"))
+    conn.commit()
+    return jsonify({"id":cid})
+
+@app.route("/rename_chat", methods=["POST"])
+def rename():
+    d=request.json
+    cur.execute("UPDATE chats SET title=? WHERE id=?",(d["title"],d["id"]))
+    conn.commit()
+    return jsonify({"ok":True})
+
+@app.route("/delete_chat", methods=["POST"])
+def delete():
+    d=request.json
+    cur.execute("DELETE FROM chats WHERE id=?",(d["id"],))
+    cur.execute("DELETE FROM messages WHERE chat_id=?",(d["id"],))
+    conn.commit()
+    return jsonify({"ok":True})
+
+@app.route("/chats")
+def chats():
+    uid=current_user()
+    cur.execute("SELECT * FROM chats WHERE user_id=?",(uid,))
+    return jsonify(cur.fetchall())
+
+# ================================
+# MEMORY SYSTEM (IMPROVED)
+# ================================
+def save(cid,role,content):
+    cur.execute("INSERT INTO messages VALUES (?,?,?)",(cid,role,content))
+    conn.commit()
+
+def memory(cid):
+    cur.execute("SELECT role,content FROM messages WHERE chat_id=? ORDER BY rowid DESC LIMIT 15",(cid,))
+    return [{"role":r,"content":c} for r,c in reversed(cur.fetchall())]
+
+def long_memory(uid):
+    cur.execute("SELECT content FROM messages m JOIN chats c ON m.chat_id=c.id WHERE c.user_id=?",(uid,))
+    data=cur.fetchall()
+    if len(data)<30:
+        return None
+    text=" ".join([x[0] for x in data[-60:]])
+    return text[:1000]
+
+# ================================
+# AI ENGINE
+# ================================
+def groq(messages):
+    r=requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization":f"Bearer {GROQ_API_KEY}"},
+        json={"model":"llama-3.3-70b-versatile","messages":messages}
     )
-    return res.choices[0].message.content
+    return r.json()["choices"][0]["message"]["content"]
 
-# --------------------------
-# 📚 WIKIPEDIA
-# --------------------------
-def wiki(query):
-    try:
-        return wikipedia.summary(query, sentences=2)
-    except:
-        return None
+def smart(q,cid,uid):
 
-# --------------------------
-# 🌐 TAVILY SEARCH
-# --------------------------
-def tavily_search(query):
-    try:
-        res = tavily.search(query=query)
-        return res["results"][0]["content"]
-    except:
-        return None
+    msgs=[SYSTEM]
 
-# --------------------------
-# 📖 DICTIONARY (NOT MAIN BRAIN)
-# --------------------------
-def dictionary(word):
-    try:
-        url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}"
-        r = requests.get(url).json()
-        return r[0]["meanings"][0]["definitions"][0]["definition"]
-    except:
-        return None
+    mem=long_memory(uid)
+    if mem:
+        msgs.append({"role":"system","content":"User history: "+mem})
 
-# --------------------------
-# 🤖 SMART ROUTER
-# --------------------------
-def agent(message):
-    msg = message.lower()
+    msgs+=memory(cid)
+    msgs.append({"role":"user","content":q})
 
-    # Dictionary ONLY when needed
-    if msg.startswith("define "):
-        word = msg.replace("define ", "")
-        return dictionary(word) or groq_ai(message)
+    return groq(msgs)
 
-    # Wikipedia for facts
-    if "who is" in msg or "what is" in msg:
-        return wiki(message) or groq_ai(message)
+# ================================
+# WEBSOCKET STREAM
+# ================================
+@socketio.on("send")
+def handle(data):
+    uid=current_user()
+    q=data["msg"]
+    cid=data["chat"]
 
-    # Tavily for search
-    if "latest" in msg or "search" in msg:
-        return tavily_search(message) or groq_ai(message)
+    reply=smart(q,cid,uid)
 
-    # Default brain
-    return groq_ai(message)
+    save(cid,"user",q)
 
-# --------------------------
-# 🌐 API ENDPOINT
-# --------------------------
-@app.route("/chat", methods=["POST"])
-def chat():
-    data = request.json
-    message = data.get("message", "")
-    reply = agent(message)
-    return jsonify({"reply": reply})
+    buffer=""
+    for w in reply.split():
+        buffer+=w+" "
+        emit("stream",{"data":buffer})
+        socketio.sleep(0.02)
 
-# --------------------------
-# 🎨 WEB UI
-# --------------------------
-HTML = """
+    save(cid,"assistant",reply)
+
+# ================================
+# UI (SIMPLE SAAS DASHBOARD)
+# ================================
+@app.route("/")
+def home():
+    return render_template_string("""
 <!DOCTYPE html>
 <html>
 <head>
-<title>Bloxy-bot AI</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <style>
-body {
-    margin:0;
-    font-family:Arial;
-    display:flex;
-    height:100vh;
-    background:#0f0f0f;
-    color:white;
-}
+body{margin:0;display:flex;height:100vh;font-family:sans-serif;background:#0d0d0d;color:white}
 
-/* SIDEBAR */
-.sidebar {
-    width:240px;
-    background:#1a1a1a;
-    padding:20px;
-}
+/* sidebar */
+#sidebar{width:260px;background:#111;overflow:auto;resize:horizontal}
+.chat{padding:10px;border-bottom:1px solid #222;cursor:pointer}
+.chat:hover{background:#222}
 
-.sidebar h2 {
-    color:#00b7ff;
-}
+/* main */
+#main{flex:1;display:flex;flex-direction:column}
+#chat{flex:1;padding:20px;overflow:auto}
 
-.fade {
-    opacity:0.5;
-    font-size:13px;
-    margin-top:10px;
-}
+.msg{padding:10px;margin:5px;border-radius:8px;max-width:70%}
+.user{background:#2563eb;margin-left:auto}
+.ai{background:#1f1f1f}
 
-/* CHAT */
-.chat {
-    flex:1;
-    display:flex;
-    flex-direction:column;
-}
-
-.messages {
-    flex:1;
-    padding:20px;
-    overflow-y:auto;
-}
-
-.input {
-    display:flex;
-}
-
-input {
-    flex:1;
-    padding:15px;
-    border:none;
-    outline:none;
-}
-
-button {
-    width:120px;
-    border:none;
-    background:#00b7ff;
-    color:white;
-}
-
-.msg {
-    margin:8px 0;
-}
-
-.user { color:#00b7ff; }
-.bot { color:white; }
+#input{display:flex;padding:10px;background:#111}
+input{flex:1;padding:10px;background:#222;color:white;border:none}
+button{margin-left:10px;background:#2563eb;color:white;border:none;padding:10px}
 </style>
 </head>
 
 <body>
 
-<div class="sidebar">
-<h2>Bloxy-bot</h2>
-
-<div class="fade">🧠 Groq = Main Brain</div>
-<div class="fade">📚 Wikipedia = Facts</div>
-<div class="fade">🌐 Tavily = Search</div>
-<div class="fade">📖 Dictionary = Definitions</div>
-<div class="fade">⚡ Smart AI Router</div>
+<div id="sidebar">
+<button onclick="newChat()">+ New</button>
+<div id="list"></div>
 </div>
 
-<div class="chat">
+<div id="main">
+<div id="chat"></div>
 
-<div class="messages" id="chat"></div>
-
-<div class="input">
-<input id="msg" placeholder="Type message...">
+<div id="input">
+<input id="msg">
 <button onclick="send()">Send</button>
 </div>
-
 </div>
 
 <script>
-async function send(){
-    let msg = document.getElementById("msg").value;
-    let chat = document.getElementById("chat");
+const socket=io();
+let current=null;
+let aiMsg=null;
 
-    chat.innerHTML += "<div class='msg user'>You: "+msg+"</div>";
-
-    let res = await fetch("/chat", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({message:msg})
-    });
-
-    let data = await res.json();
-
-    chat.innerHTML += "<div class='msg bot'>Bot: "+data.reply+"</div>";
-
-    document.getElementById("msg").value = "";
+function add(r,t){
+let d=document.createElement("div");
+d.className="msg "+r;
+d.textContent=t;
+chat.appendChild(d);
+return d;
 }
+
+socket.on("stream",d=>{
+if(aiMsg) aiMsg.textContent=d.data;
+chat.scrollTop=chat.scrollHeight;
+});
+
+function send(){
+let m=msg.value;
+if(!m)return;
+msg.value="";
+
+add("user",m);
+aiMsg=add("ai","...");
+socket.emit("send",{msg:m,chat:current});
+}
+
+async function newChat(){
+let r=await fetch("/new_chat",{method:"POST"});
+let d=await r.json();
+current=d.id;
+load();
+}
+
+async function load(){
+let r=await fetch("/chats");
+let data=await r.json();
+list.innerHTML="";
+data.forEach(c=>{
+let d=document.createElement("div");
+d.className="chat";
+d.textContent=c[2];
+d.onclick=()=>{current=c[0];chat.innerHTML="";}
+list.appendChild(d);
+});
+}
+
+load();
 </script>
 
 </body>
 </html>
-"""
+""")
 
-@app.route("/")
-def home():
-    return render_template_string(HTML)
+# ================================
+# RUN
+# ================================
+if __name__=="__main__":
+    socketio.run(app)
 
-# --------------------------
-# 🚀 START SERVER (IMPORTANT)
-# --------------------------
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
