@@ -1,49 +1,44 @@
-import eventlet
-eventlet.monkey_patch()
+import os
+import redis
+import uuid
+import requests
 
-from flask import Flask, request, jsonify, render_template_string, session
-from flask_socketio import SocketIO, emit
-from flask_session import Session
-import redis, sqlite3, requests, uuid, os
+from flask import Flask, request, jsonify, render_template_string
+from flask_socketio import SocketIO
 
 # ================================
-# APP
+# APP SETUP
 # ================================
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "bloxy_secret"
-
-# Redis sessions (multi-user SaaS)
-app.config["SESSION_TYPE"] = "redis"
-app.config["SESSION_REDIS"] = redis.Redis(host="localhost", port=6379)
-
-Session(app)
-
-socketio = SocketIO(app, cors_allowed_origins="*", message_queue="redis://")
-
-r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "bloxy_secret")
 
 # ================================
-# DATABASE
+# REDIS (SCALE + MEMORY)
 # ================================
-conn = sqlite3.connect("bloxy.db", check_same_thread=False)
-cur = conn.cursor()
-
-cur.execute("CREATE TABLE IF NOT EXISTS messages (user TEXT, chat TEXT, role TEXT, content TEXT)")
-cur.execute("CREATE TABLE IF NOT EXISTS chats (id TEXT, user TEXT, title TEXT)")
-conn.commit()
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+r = redis.from_url(REDIS_URL, decode_responses=True)
 
 # ================================
-# AI (GROQ)
+# SOCKET.IO (NO EVENTLET)
+# ================================
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode="threading"
+)
+
+# ================================
+# GROQ AI
 # ================================
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 SYSTEM = {
     "role": "system",
-    "content": "You are Bloxy-bot. Use structured, clean, vertical responses."
+    "content": "You are Bloxy-bot. Be structured, clear, and concise with vertical formatting."
 }
 
-def groq(messages):
-    r = requests.post(
+def ai(messages):
+    res = requests.post(
         "https://api.groq.com/openai/v1/chat/completions",
         headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
         json={
@@ -51,17 +46,14 @@ def groq(messages):
             "messages": messages
         }
     )
-    return r.json()["choices"][0]["message"]["content"]
+    return res.json()["choices"][0]["message"]["content"]
 
 # ================================
-# MEMORY SYSTEM
+# MEMORY (REDIS)
 # ================================
-def save(user, chat, role, content):
-    cur.execute("INSERT INTO messages VALUES (?,?,?,?)", (user, chat, role, content))
-    conn.commit()
-
-    r.lpush(f"chat:{chat}", f"{role}:{content}")
-    r.ltrim(f"chat:{chat}", 0, 25)
+def save(chat, role, msg):
+    r.lpush(f"chat:{chat}", f"{role}:{msg}")
+    r.ltrim(f"chat:{chat}", 0, 30)
 
 def memory(chat):
     data = r.lrange(f"chat:{chat}", 0, -1)
@@ -71,11 +63,14 @@ def memory(chat):
         out.append({"role": role, "content": content})
     return out
 
-def smart(chat, msg):
-    msgs = [SYSTEM]
-    msgs += memory(chat)
-    msgs.append({"role": "user", "content": msg})
-    return groq(msgs)
+# ================================
+# AI ENGINE
+# ================================
+def engine(chat, msg):
+    messages = [SYSTEM]
+    messages += memory(chat)
+    messages.append({"role": "user", "content": msg})
+    return ai(messages)
 
 # ================================
 # SOCKET STREAMING
@@ -84,49 +79,22 @@ def smart(chat, msg):
 def handle(data):
     chat = data["chat"]
     msg = data["msg"]
-    user = session.get("user_id")
 
-    reply = smart(chat, msg)
+    reply = engine(chat, msg)
 
-    save(user, chat, "user", msg)
+    save(chat, "user", msg)
 
     buffer = ""
+
     for word in reply.split():
         buffer += word + " "
-        emit("stream", {"data": buffer})
+        socketio.emit("stream", {"data": buffer})
         socketio.sleep(0.02)
 
-    save(user, chat, "assistant", reply)
+    save(chat, "assistant", reply)
 
 # ================================
-# CHAT API
-# ================================
-@app.route("/new_chat", methods=["POST"])
-def new_chat():
-    cid = str(uuid.uuid4())
-    user = session.get("user_id")
-
-    cur.execute("INSERT INTO chats VALUES (?,?,?)", (cid, user, "New Chat"))
-    conn.commit()
-
-    return jsonify({"id": cid})
-
-@app.route("/chats")
-def chats():
-    user = session.get("user_id")
-    cur.execute("SELECT * FROM chats WHERE user=?", (user,))
-    return jsonify(cur.fetchall())
-
-# ================================
-# SIMPLE LOGIN (AUTO USER)
-# ================================
-@app.route("/login")
-def login():
-    session["user_id"] = str(uuid.uuid4())
-    return jsonify({"ok": True})
-
-# ================================
-# UI (CHATGPT STYLE)
+# ROUTES
 # ================================
 @app.route("/")
 def home():
@@ -135,121 +103,31 @@ def home():
 <html>
 <head>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-
 <style>
-body{
-margin:0;
-display:flex;
-height:100vh;
-font-family:sans-serif;
-background:#0d0d0d;
-color:white;
-}
-
-/* SIDEBAR */
-#sidebar{
-width:260px;
-background:#111;
-display:flex;
-flex-direction:column;
-resize:horizontal;
-overflow:auto;
-}
-
-.chat{
-padding:10px;
-border-bottom:1px solid #222;
-cursor:pointer;
-}
-.chat:hover{background:#222}
-
-.title{
-padding:10px;
-font-weight:bold;
-}
-
-/* MAIN */
-#main{
-flex:1;
-display:flex;
-flex-direction:column;
-}
-
-#chat{
-flex:1;
-padding:20px;
-overflow:auto;
-}
-
-.msg{
-padding:10px;
-margin:6px;
-border-radius:10px;
-max-width:70%;
-white-space:pre-wrap;
-animation:fade 0.2s ease;
-}
-
-@keyframes fade{
-from{opacity:0;transform:translateY(5px)}
-to{opacity:1;transform:translateY(0)}
-}
-
+body{margin:0;font-family:sans-serif;background:#0d0d0d;color:white;display:flex;height:100vh}
+#sidebar{width:260px;background:#111;overflow:auto;resize:horizontal}
+#main{flex:1;display:flex;flex-direction:column}
+#chat{flex:1;padding:20px;overflow:auto}
+.msg{padding:10px;margin:6px;border-radius:10px;max-width:70%}
 .user{background:#2563eb;margin-left:auto}
 .ai{background:#1f1f1f}
-
-/* INPUT */
-#input{
-display:flex;
-padding:10px;
-background:#111;
-}
-
-input{
-flex:1;
-padding:10px;
-background:#222;
-border:none;
-color:white;
-outline:none;
-}
-
-button{
-margin-left:10px;
-padding:10px;
-background:#2563eb;
-border:none;
-color:white;
-cursor:pointer;
-}
-
-/* FADED TEXT */
-.faded{
-position:absolute;
-bottom:70px;
-left:50%;
-transform:translateX(-50%);
-color:#666;
-font-size:12px;
-}
+#input{display:flex;padding:10px;background:#111}
+input{flex:1;padding:10px;background:#222;color:white;border:none}
+button{margin-left:10px;background:#2563eb;color:white;border:none;padding:10px}
 </style>
 </head>
 
 <body>
 
 <div id="sidebar">
-<div class="title">💬 Bloxy-bot</div>
 <button onclick="newChat()">+ New Chat</button>
 <div id="list"></div>
 </div>
 
 <div id="main">
 <div id="chat"></div>
-
-<div class="faded">Bloxy-bot can make mistakes. Double check important info.</div>
-
 <div id="input">
-<input id="msg" placeholder="Message Bloxy-bot...">
+<input id="msg">
 <button onclick="send()">Send</button>
 </div>
 </div>
@@ -275,7 +153,6 @@ if(aiMsg) aiMsg.textContent=d.data;
 function send(){
 let m=msg.value;
 if(!m)return;
-
 msg.value="";
 
 add("user",m);
@@ -287,41 +164,22 @@ socket.emit("send",{msg:m,chat:current});
 async function newChat(){
 let r=await fetch("/new_chat",{method:"POST"});
 let d=await r.json();
-current=d.id;
+current=d.chat;
 chat.innerHTML="";
-load();
 }
-
-async function load(){
-let r=await fetch("/chats");
-let data=await r.json();
-
-list.innerHTML="";
-data.forEach(c=>{
-let d=document.createElement("div");
-d.className="chat";
-d.textContent=c[2];
-d.onclick=()=>{
-current=c[0];
-chat.innerHTML="";
-};
-list.appendChild(d);
-});
-}
-
-document.getElementById("msg").addEventListener("keypress",e=>{
-if(e.key==="Enter") send();
-});
-
-load();
 </script>
 
 </body>
 </html>
 """)
 
+@app.route("/new_chat", methods=["POST"])
+def new_chat():
+    return jsonify({"chat": str(uuid.uuid4())})
+
 # ================================
-# RUN (NO app.run)
+# PRODUCTION ENTRY (IMPORTANT)
 # ================================
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=10000)
+    port = int(os.environ.get("PORT", 10000))
+    socketio.run(app, host="0.0.0.0", port=port)
