@@ -2,7 +2,6 @@ import os
 import uuid
 import redis
 import requests
-
 from flask import Flask, request, jsonify, render_template_string, session
 from flask_socketio import SocketIO
 
@@ -14,19 +13,10 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "bloxy_secret")
 
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
-# =====================================================
-# REDIS
-# =====================================================
 r = redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379"), decode_responses=True)
 
 # =====================================================
-# API KEYS
-# =====================================================
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
-
-# =====================================================
-# AUTH SYSTEM (REAL)
+# USERS
 # =====================================================
 def create_user(u, p):
     r.hset(f"user:{u}", mapping={"password": p, "verified": "0"})
@@ -35,24 +25,32 @@ def get_user(u):
     return r.hgetall(f"user:{u}")
 
 # =====================================================
-# AI (GROQ)
+# ANALYTICS HELPERS (NEW)
 # =====================================================
+def inc_stat(key):
+    r.incr(f"stats:{key}")
+
+def get_stats():
+    return {
+        "users": len(r.keys("user:*")),
+        "chats": len(r.keys("title:*")),
+        "messages": int(r.get("stats:messages") or 0)
+    }
+
+# =====================================================
+# AI
+# =====================================================
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
+
 def groq(messages):
-    res = requests.post(
+    r1 = requests.post(
         "https://api.groq.com/openai/v1/chat/completions",
         headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
         json={"model": "llama-3.3-70b-versatile", "messages": messages}
     )
-    return res.json()["choices"][0]["message"]["content"]
+    return r1.json()["choices"][0]["message"]["content"]
 
-SYSTEM = {
-    "role": "system",
-    "content": "You are Bloxy-bot. Be clear, structured, and helpful."
-}
-
-# =====================================================
-# SOURCES
-# =====================================================
 def tavily(q):
     try:
         r1 = requests.post(
@@ -77,8 +75,13 @@ def dictionary(w):
     except:
         return ""
 
+SYSTEM = {
+    "role": "system",
+    "content": "You are Bloxy-bot. Be structured, helpful, and clear."
+}
+
 # =====================================================
-# MEMORY + INDEXING (PER USER)
+# MEMORY
 # =====================================================
 def save(chat, role, msg):
     user = session.get("user", "guest")
@@ -86,38 +89,34 @@ def save(chat, role, msg):
     r.lpush(f"chat:{user}:{chat}", f"{role}:{msg}")
     r.ltrim(f"chat:{user}:{chat}", 0, 40)
 
-    for w in msg.lower().split():
-        r.sadd(f"index:{user}:{w}", chat)
+    inc_stat("messages")
 
 def memory(chat):
     user = session.get("user", "guest")
     data = r.lrange(f"chat:{user}:{chat}", 0, -1)
 
-    return [{"role": m.split(":")[0], "content": m.split(":", 1)[1]} for m in reversed(data)]
+    return [{"role": m.split(":")[0], "content": m.split(":",1)[1]} for m in reversed(data)]
 
 # =====================================================
-# AI ROUTER (FIXED PRIORITY)
+# ENGINE
 # =====================================================
 def engine(chat, msg):
 
-    # 🌐 Tavily FIRST
     t = tavily(msg)
     if t:
         return "🌐 Web:\n" + t
 
-    # 🤖 Groq SECOND
     msgs = [SYSTEM] + memory(chat)
-    msgs.append({"role": "user", "content": msg})
+    msgs.append({"role":"user","content":msg})
+
     ai = groq(msgs)
     if ai:
         return ai
 
-    # 📚 Wikipedia THIRD
     w = wikipedia(msg)
     if w:
         return "📚 Wikipedia:\n" + w
 
-    # 📖 Dictionary LAST
     if len(msg.split()) == 1:
         d = dictionary(msg)
         if d:
@@ -126,12 +125,15 @@ def engine(chat, msg):
     return "No result found."
 
 # =====================================================
-# SOCKET STREAM
+# SOCKET
 # =====================================================
 @socketio.on("send")
 def handle(data):
-    chat = data["chat"]
-    msg = data["msg"]
+    chat = data.get("chat")
+    msg = data.get("msg")
+
+    if not chat:
+        return
 
     reply = engine(chat, msg)
 
@@ -147,14 +149,16 @@ def handle(data):
     save(chat, "assistant", reply)
 
 # =====================================================
-# AUTH ROUTES
+# AUTH
 # =====================================================
 @app.route("/register", methods=["POST"])
 def register():
     d = request.json
     if r.exists(f"user:{d['username']}"):
         return jsonify({"ok": False})
+
     create_user(d["username"], d["password"])
+    inc_stat("users")
     return jsonify({"ok": True})
 
 @app.route("/login", methods=["POST"])
@@ -162,10 +166,7 @@ def login():
     d = request.json
     u = get_user(d["username"])
 
-    if not u:
-        return jsonify({"ok": False})
-
-    if u["password"] != d["password"]:
+    if not u or u["password"] != d["password"]:
         return jsonify({"ok": False})
 
     session["user"] = d["username"]
@@ -174,19 +175,20 @@ def login():
 @app.route("/me")
 def me():
     u = session.get("user")
-    if not u:
-        return jsonify({"logged": False})
-
-    return jsonify({"logged": True, "user": u})
+    return jsonify({"logged": bool(u), "user": u})
 
 # =====================================================
-# CHAT SYSTEM
+# CHAT
 # =====================================================
 @app.route("/new_chat", methods=["POST"])
 def new_chat():
     user = session.get("user", "guest")
+
     cid = str(uuid.uuid4())
     r.set(f"title:{user}:{cid}", "New Chat")
+
+    inc_stat("chats")
+
     return jsonify({"id": cid})
 
 @app.route("/chats")
@@ -201,6 +203,7 @@ def chats():
 def rename():
     d = request.json
     user = session.get("user", "guest")
+
     r.set(f"title:{user}:{d['id']}", d["title"])
     return jsonify({"ok": True})
 
@@ -208,19 +211,20 @@ def rename():
 def delete():
     d = request.json
     user = session.get("user", "guest")
+
     r.delete(f"chat:{user}:{d['id']}")
     r.delete(f"title:{user}:{d['id']}")
     return jsonify({"ok": True})
 
 # =====================================================
-# REAL SEARCH (INDEXED)
+# SEARCH
 # =====================================================
 @app.route("/search_chats")
 def search():
-    q = request.args.get("q", "").lower()
-    user = session.get("user", "guest")
+    q = request.args.get("q","")
+    user = session.get("user","guest")
 
-    words = q.split()
+    words = q.lower().split()
     sets = []
 
     for w in words:
@@ -233,13 +237,25 @@ def search():
     for s in sets[1:]:
         res = res.intersection(s)
 
-    return jsonify([
-        {"id": cid, "title": r.get(f"title:{user}:{cid}")}
-        for cid in list(res)
-    ])
+    return jsonify([{"id":c,"title":r.get(f"title:{user}:{c}")} for c in list(res)])
 
 # =====================================================
-# UI
+# 🔥 ADMIN DASHBOARD (NEW)
+# =====================================================
+@app.route("/admin")
+def admin():
+    stats = get_stats()
+
+    return jsonify({
+        "dashboard": "Bloxy-bot Admin Panel",
+        "users": stats["users"],
+        "chats": stats["chats"],
+        "messages": stats["messages"],
+        "system": "running"
+    })
+
+# =====================================================
+# UI (UNCHANGED)
 # =====================================================
 @app.route("/")
 def home():
@@ -252,29 +268,24 @@ def home():
 <style>
 body{margin:0;display:flex;height:100vh;background:#0d0d0d;color:white;font-family:sans-serif}
 
-/* SIDEBAR */
 #sidebar{width:260px;background:#111;display:flex;flex-direction:column;resize:horizontal;overflow:auto}
 .chat{padding:10px;border-bottom:1px solid #222;cursor:pointer;display:flex;justify-content:space-between}
 .chat:hover{background:#222}
 .search{padding:10px;background:#222;border:none;color:white}
 
-/* MAIN */
 #main{flex:1;display:flex;flex-direction:column}
 #chat{flex:1;padding:20px;overflow:auto}
+
 .msg{padding:10px;margin:6px;border-radius:10px;max-width:70%}
+
 .user{background:#2563eb;margin-left:auto}
 .ai{background:#1f1f1f}
 
-/* INPUT */
 #input{display:flex;padding:10px;background:#111}
 input{flex:1;padding:10px;background:#222;border:none;color:white}
 button{margin-left:10px;background:#2563eb;border:none;color:white;padding:10px}
 
-/* FADED */
-.faded{
-position:absolute;bottom:60px;left:50%;transform:translateX(-50%);
-color:#666;font-size:12px;
-}
+.faded{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);color:#666;font-size:12px}
 </style>
 </head>
 
@@ -288,7 +299,8 @@ color:#666;font-size:12px;
 
 <div id="main">
 <div id="chat"></div>
-<div class="faded">Bloxy-bot can make mistakes. Double check responses.</div>
+
+<div class="faded">Bloxy-bot can make mistakes.</div>
 
 <div id="input">
 <input id="msg">
@@ -301,8 +313,8 @@ const socket = io();
 let current=null;
 let aiMsg=null;
 
-document.getElementById("msg").addEventListener("keydown", e=>{
-    if(e.key==="Enter") send();
+document.getElementById("msg").addEventListener("keydown",e=>{
+if(e.key==="Enter")send();
 });
 
 function add(r,t){
@@ -334,5 +346,5 @@ socket.emit("send",{msg:m,chat:current});
 # =====================================================
 # RUN
 # =====================================================
-if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+if __name__=="__main__":
+    socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT",10000)))
