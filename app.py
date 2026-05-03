@@ -60,10 +60,9 @@ def dictionary(word):
     except:
         return "No definition found."
 
-# ================= SMART ROUTER =================
+# ================= ROUTER =================
 
 def route(msg):
-
     t = msg.lower()
 
     if "define" in t or "meaning" in t:
@@ -90,25 +89,44 @@ def ai(msg):
         r = groq.chat.completions.create(
             model="llama3-70b-8192",
             messages=[
-                {"role":"system","content":"Respond in formal diplomatic structured tone."},
-                {"role":"user","content":msg}
+                {
+                    "role": "system",
+                    "content": "Respond in a formal, structured, diplomatic tone."
+                },
+                {"role": "user", "content": msg}
             ]
         )
         return r.choices[0].message.content
 
     except Exception as e:
         print("AI ERROR:", e)
-        return "⚠️ AI temporarily unavailable."
+        return "⚠️ AI temporarily unavailable (check API key / server logs)."
 
-# ================= CORE RESPONSE =================
+# ================= MEMORY SUMMARY =================
+
+def make_summary(conv):
+    try:
+        text = "\n".join([m["text"] for m in conv["messages"][-8:]])
+
+        r = groq.chat.completions.create(
+            model="llama3-70b-8192",
+            messages=[{
+                "role":"user",
+                "content":"Summarize this conversation in 1 short memory paragraph:\n"+text
+            }]
+        )
+
+        conv["summary"] = r.choices[0].message.content
+
+    except:
+        conv["summary"] = "No memory available."
+
+# ================= RESPONSE =================
 
 def get_response(msg):
-
     tool = route(msg)
-
     if tool:
         return tool
-
     return ai(msg)
 
 # ================= TITLE =================
@@ -238,20 +256,37 @@ padding:10px;
 background:#0f172a;
 }
 
-/* VERIFIED BADGE */
-.badge{
-width:28px;
-height:28px;
-border-radius:50%;
+/* USER LINE */
+.userline{
+display:flex;
+align-items:center;
+gap:8px;
+}
+
+.username{
+font-weight:bold;
+}
+
+/* ORANGE VERIFIED BADGE (YOUR IMAGE STYLE) */
+.verified{
+width:26px;
+height:26px;
 background:#f97316;
+clip-path: polygon(
+50% 0%, 61% 12%, 75% 10%, 82% 22%,
+95% 25%, 90% 40%, 100% 50%, 90% 60%,
+95% 75%, 82% 78%, 75% 90%, 61% 88%,
+50% 100%, 39% 88%, 25% 90%, 18% 78%,
+5% 75%, 10% 60%, 0% 50%, 10% 40%,
+5% 25%, 18% 22%, 25% 10%, 39% 12%
+);
 display:flex;
 align-items:center;
 justify-content:center;
+color:white;
+font-size:12px;
 font-weight:bold;
-box-shadow:
-inset 2px 2px 4px rgba(255,255,255,0.3),
-inset -2px -2px 4px rgba(0,0,0,0.4),
-0 2px 6px rgba(0,0,0,0.4);
+margin-left:auto;
 }
 </style>
 </head>
@@ -265,8 +300,10 @@ inset -2px -2px 4px rgba(0,0,0,0.4),
 <div class="conv" id="conv"></div>
 
 <div class="account">
-<div>✔ aTg</div>
-<div class="badge">✔</div>
+<div class="userline">
+<span class="username">aTg</span>
+<span class="verified">✔</span>
+</div>
 </div>
 
 </div>
@@ -298,8 +335,8 @@ async function newChat(){
 let r=await fetch("/new");
 let d=await r.json();
 current=d.id;
-load();
 document.getElementById("box").innerHTML="";
+load();
 }
 
 async function load(){
@@ -355,7 +392,7 @@ document.getElementById("box").appendChild(d);
 }
 
 async function renameChat(id){
-let n=prompt("Rename:");
+let n=prompt("Rename chat:");
 if(!n)return;
 
 await fetch("/rename",{
@@ -398,7 +435,8 @@ def new():
 
     conversations[cid]={
         "title":"New Chat",
-        "messages":[]
+        "messages":[],
+        "summary":""
     }
 
     return jsonify({"id":cid})
@@ -411,7 +449,11 @@ def chat():
     cid=data["id"]
 
     if cid not in conversations:
-        conversations[cid]={"title":"New Chat","messages":[]}
+        conversations[cid]={
+            "title":"New Chat",
+            "messages":[],
+            "summary":""
+        }
 
     conv=conversations[cid]
 
@@ -422,6 +464,8 @@ def chat():
 
     conv["messages"].append({"role":"user","text":msg})
     conv["messages"].append({"role":"ai","text":reply})
+
+    make_summary(conv)
 
     return jsonify({"reply":reply})
 
