@@ -11,7 +11,7 @@ import requests
 app = Flask(__name__)
 CORS(app)
 
-# 🔑 KEYS
+# 🔑 API KEYS
 groq = Groq(api_key="YOUR_GROQ_API_KEY")
 tavily = TavilyClient(api_key="YOUR_TAVILY_API_KEY")
 
@@ -29,7 +29,7 @@ def groq_ai(message):
     return res.choices[0].message.content
 
 # --------------------------
-# 📚 WIKIPEDIA (FACTS)
+# 📚 WIKIPEDIA
 # --------------------------
 def wiki(query):
     try:
@@ -38,7 +38,7 @@ def wiki(query):
         return None
 
 # --------------------------
-# 🌐 TAVILY (SEARCH)
+# 🌐 TAVILY SEARCH
 # --------------------------
 def tavily_search(query):
     try:
@@ -59,26 +59,25 @@ def dictionary(word):
         return None
 
 # --------------------------
-# 🤖 SMART ROUTER (PRIORITY SYSTEM)
+# 🤖 SMART ROUTER
 # --------------------------
 def agent(message):
     msg = message.lower()
 
-    # 📖 DICTIONARY FIRST (ONLY IF USER WANTS DEFINITIONS)
+    # Dictionary ONLY when needed
     if msg.startswith("define "):
         word = msg.replace("define ", "")
         return dictionary(word) or groq_ai(message)
 
-    # 📚 WIKIPEDIA SECOND
-    wiki_result = wiki(message)
-    if wiki_result and ("who is" in msg or "what is" in msg):
-        return wiki_result
+    # Wikipedia for facts
+    if "who is" in msg or "what is" in msg:
+        return wiki(message) or groq_ai(message)
 
-    # 🌐 TAVILY THIRD (SEARCH / CURRENT INFO)
+    # Tavily for search
     if "latest" in msg or "search" in msg:
         return tavily_search(message) or groq_ai(message)
 
-    # 🧠 GROQ ALWAYS DEFAULT BRAIN
+    # Default brain
     return groq_ai(message)
 
 # --------------------------
@@ -92,7 +91,7 @@ def chat():
     return jsonify({"reply": reply})
 
 # --------------------------
-# 🎨 WEB UI WITH SIDEBAR
+# 🎨 WEB UI
 # --------------------------
 HTML = """
 <!DOCTYPE html>
@@ -126,7 +125,7 @@ body {
     margin-top:10px;
 }
 
-/* CHAT AREA */
+/* CHAT */
 .chat {
     flex:1;
     display:flex;
@@ -175,7 +174,7 @@ button {
 <div class="fade">📚 Wikipedia = Facts</div>
 <div class="fade">🌐 Tavily = Search</div>
 <div class="fade">📖 Dictionary = Definitions</div>
-<div class="fade">⚡ Smart Routing System</div>
+<div class="fade">⚡ Smart AI Router</div>
 </div>
 
 <div class="chat">
@@ -216,10 +215,11 @@ async function send(){
 
 @app.route("/")
 def home():
-    return HTML
+    return render_template_string(HTML)
 
 # --------------------------
-# 🚀 RUN SERVER
+# 🚀 START SERVER (IMPORTANT)
 # --------------------------
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
