@@ -6,31 +6,36 @@ import requests
 import os
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY")
+app.secret_key = os.getenv("SECRET_KEY", "dev_key")
 
-# ================= AI + TOOLS =================
-groq = Groq(api_key=os.getenv("GROQ_API_KEY"))
-wolfram = wolframalpha.Client(os.getenv("WOLFRAM_APP_ID"))
+# ---------------- SAFE API INIT (prevents Render crash) ----------------
+groq_key = os.getenv("GROQ_API_KEY")
+wolfram_key = os.getenv("WOLFRAM_APP_ID")
+news_key = os.getenv("NEWS_API_KEY")
+tavily_key = os.getenv("TAVILY_API_KEY")
 
-NEWS_KEY = os.getenv("NEWS_API_KEY")
-TAVILY_KEY = os.getenv("TAVILY_API_KEY")
+groq_client = Groq(api_key=groq_key) if groq_key else None
+wolfram = wolframalpha.Client(wolfram_key) if wolfram_key else None
 
-# ================= MEMORY =================
-users = {}
+# ---------------- MEMORY ----------------
 chat_memory = {}
 
-# ================= TOOLS =================
+# ---------------- TOOLS (SAFE WRAPPED) ----------------
 
 def use_wolfram(q):
+    if not wolfram:
+        return "Wolfram not configured."
     try:
         res = wolfram.query(q)
         return next(res.results).text
     except:
         return "Math error."
 
-def use_news(q):
+def use_news(topic="general"):
+    if not news_key:
+        return "News API not configured."
     try:
-        url = f"https://newsapi.org/v2/top-headlines?category=general&apiKey={NEWS_KEY}"
+        url = f"https://newsapi.org/v2/top-headlines?category=general&apiKey={news_key}"
         r = requests.get(url).json()
         return "\n".join([a["title"] for a in r.get("articles", [])[:3]])
     except:
@@ -40,136 +45,49 @@ def use_wiki(q):
     try:
         return wikipedia.summary(q, sentences=2)
     except:
-        return "No wiki result."
+        return "No Wikipedia result."
 
 def use_dict(q):
     try:
-        r = requests.get(
-            f"https://api.dictionaryapi.dev/api/v2/entries/en/{q}"
-        ).json()
+        r = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{q}").json()
         return r[0]["meanings"][0]["definitions"][0]["definition"]
     except:
         return "No definition found."
 
-def use_tavily(q):
-    try:
-        r = requests.post(
-            "https://api.tavily.com/search",
-            json={"api_key": TAVILY_KEY, "query": q}
-        ).json()
-        return r.get("answer", "No web result.")
-    except:
-        return "Web error."
-
-# ================= UI =================
+# ---------------- UI ----------------
 
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
 <title>Bloxy-bot</title>
-
 <style>
-body {
-margin:0;
-font-family:Arial;
-background:#0b0f1a;
-color:white;
-display:flex;
-}
-
-.sidebar {
-width:260px;
-background:#111827;
-height:100vh;
-padding:15px;
-}
-
-.chat {
-flex:1;
-display:flex;
-flex-direction:column;
-height:100vh;
-}
-
-.topbar {
-padding:10px;
-background:#111827;
-}
-
-.messages {
-flex:1;
-overflow-y:auto;
-padding:20px;
-}
-
-.msg {
-margin:8px;
-padding:10px;
-border-radius:10px;
-max-width:70%;
-}
-
-.user { background:#2563eb; margin-left:auto; }
-.ai { background:#1f2937; }
-
-.inputbox {
-display:flex;
-padding:10px;
-background:#111827;
-}
-
-input {
-flex:1;
-padding:10px;
-}
-
-button {
-padding:10px;
-}
-
-.fade { opacity:0.6; font-size:12px; }
-
-.badge {
-background:linear-gradient(45deg,#3b82f6,#f97316);
-padding:3px 6px;
-border-radius:6px;
-font-size:11px;
-}
-
+body{margin:0;font-family:Arial;background:#0b0f1a;color:white;}
+.sidebar{width:220px;height:100vh;position:fixed;background:#111827;padding:10px;}
+.chat{margin-left:230px;padding:20px;}
+.msg{padding:10px;margin:6px;border-radius:8px;}
+.user{background:#2563eb;text-align:right;}
+.ai{background:#1f2937;}
+.fade{opacity:0.6;font-size:12px;}
 </style>
 </head>
-
 <body>
 
 <div class="sidebar">
 <h3>Bloxy-bot</h3>
-<p class="fade">⚠ AI can make mistakes</p>
-
+<p class="fade">AI can make mistakes</p>
 <hr>
-
-<button onclick="mode='ai'">AI Chat</button><br>
-<button onclick="mode='wiki'">Wikipedia</button><br>
+<button onclick="mode='ai'">AI</button><br>
+<button onclick="mode='wiki'">Wiki</button><br>
 <button onclick="mode='news'">News</button><br>
 <button onclick="mode='math'">Math</button><br>
-<button onclick="mode='web'">Web</button><br>
-<button onclick="mode='dict'">Dictionary</button><br>
-
+<button onclick="mode='dict'">Dict</button><br>
 </div>
 
 <div class="chat">
-
-<div class="topbar">
-<span class="badge">✔ aTg VERIFIED OWNER</span>
-</div>
-
-<div class="messages" id="box"></div>
-
-<div class="inputbox">
-<input id="input" placeholder="Message..." />
+<div id="box"></div>
+<input id="input">
 <button onclick="send()">Send</button>
-</div>
-
 </div>
 
 <script>
@@ -177,7 +95,7 @@ let mode="ai";
 
 async function send(){
 let msg=document.getElementById("input").value;
-if(!msg) return;
+if(!msg)return;
 
 add(msg,"user");
 
@@ -189,8 +107,6 @@ body:JSON.stringify({message:msg,mode:mode})
 
 let data=await res.json();
 add(data.reply,"ai");
-
-document.getElementById("input").value="";
 }
 
 function add(t,c){
@@ -199,47 +115,44 @@ d.className="msg "+c;
 d.innerText=t;
 document.getElementById("box").appendChild(d);
 }
-
 </script>
 
 </body>
 </html>
 """
 
-# ================= ROUTING ENGINE =================
+# ---------------- ROUTER ----------------
 
 def router(msg, mode):
-
     text = msg.lower()
 
-    # ✅ STRICT RULE: dictionary ONLY if explicitly asked
-    if mode == "dict" or "define" in text or "meaning of" in text:
+    # dictionary ONLY when explicitly needed
+    if mode == "dict" or "define" in text or "meaning" in text:
         return use_dict(msg)
 
-    # math
     if mode == "math":
         return use_wolfram(msg)
 
-    # news
     if mode == "news":
         return use_news(msg)
 
-    # wiki
     if mode == "wiki":
         return use_wiki(msg)
 
-    # web
-    if mode == "web":
-        return use_tavily(msg)
+    # fallback AI
+    if groq_client:
+        try:
+            r = groq_client.chat.completions.create(
+                model="llama3-70b-8192",
+                messages=[{"role":"user","content":msg}]
+            )
+            return r.choices[0].message.content
+        except:
+            return "AI error."
+    else:
+        return "Groq not configured."
 
-    # default AI brain
-    response = groq.chat.completions.create(
-        model="llama3-70b-8192",
-        messages=[{"role":"user","content":msg}]
-    )
-    return response.choices[0].message.content
-
-# ================= CHAT =================
+# ---------------- ROUTES ----------------
 
 @app.route("/")
 def home():
@@ -252,14 +165,12 @@ def chat():
     mode = data["mode"]
 
     user = session.get("user","guest")
-
-    # OWNER CHECK
     prefix = "✔ aTg (OWNER VERIFIED)" if user=="aTg" else user
 
     reply = router(msg, mode)
 
     return jsonify({"reply": f"{prefix}: {reply}"})
 
-# ================= RUN =================
+# ---------------- RUN ----------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
