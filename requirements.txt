@@ -4,4 +4,4 @@ groq
 tavily-python
 wikipedia
 requests
-eventlet
+gunicorn
