@@ -1,173 +1,265 @@
-import os
+from flask import Flask, request, jsonify, session, render_template_string
+from groq import Groq
+import wikipedia
+import wolframalpha
 import requests
-from flask import Flask, render_template_string
-from flask_socketio import SocketIO
+import os
 
-# =====================================================
-# SAFE INIT
-# =====================================================
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "bloxy_v2"
+app.secret_key = os.getenv("SECRET_KEY")
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+# ================= AI + TOOLS =================
+groq = Groq(api_key=os.getenv("GROQ_API_KEY"))
+wolfram = wolframalpha.Client(os.getenv("WOLFRAM_APP_ID"))
 
-# =====================================================
-# OPTIONAL KEYS
-# =====================================================
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
+NEWS_KEY = os.getenv("NEWS_API_KEY")
+TAVILY_KEY = os.getenv("TAVILY_API_KEY")
 
-# =====================================================
-# AI FUNCTIONS (SAFE)
-# =====================================================
+# ================= MEMORY =================
+users = {}
+chat_memory = {}
 
-def groq_ai(msg):
-    if not GROQ_API_KEY:
-        return None
+# ================= TOOLS =================
+
+def use_wolfram(q):
     try:
-        r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-            json={
-                "model": "llama-3.3-70b-versatile",
-                "messages": [
-                    {"role": "system", "content": "You are Bloxy-bot."},
-                    {"role": "user", "content": msg}
-                ]
-            }
-        )
-        return r.json()["choices"][0]["message"]["content"]
+        res = wolfram.query(q)
+        return next(res.results).text
     except:
-        return None
+        return "Math error."
 
+def use_news(q):
+    try:
+        url = f"https://newsapi.org/v2/top-headlines?category=general&apiKey={NEWS_KEY}"
+        r = requests.get(url).json()
+        return "\n".join([a["title"] for a in r.get("articles", [])[:3]])
+    except:
+        return "News error."
 
-def tavily(msg):
-    if not TAVILY_API_KEY:
-        return None
+def use_wiki(q):
+    try:
+        return wikipedia.summary(q, sentences=2)
+    except:
+        return "No wiki result."
+
+def use_dict(q):
+    try:
+        r = requests.get(
+            f"https://api.dictionaryapi.dev/api/v2/entries/en/{q}"
+        ).json()
+        return r[0]["meanings"][0]["definitions"][0]["definition"]
+    except:
+        return "No definition found."
+
+def use_tavily(q):
     try:
         r = requests.post(
             "https://api.tavily.com/search",
-            json={
-                "api_key": TAVILY_API_KEY,
-                "query": msg,
-                "max_results": 2
-            }
-        )
-        data = r.json().get("results", [])
-        return " ".join([x["content"] for x in data])
+            json={"api_key": TAVILY_KEY, "query": q}
+        ).json()
+        return r.get("answer", "No web result.")
     except:
-        return None
+        return "Web error."
 
+# ================= UI =================
 
-def wiki(msg):
-    try:
-        r = requests.get(
-            f"https://en.wikipedia.org/api/rest_v1/page/summary/{msg}"
-        )
-        return r.json().get("extract")
-    except:
-        return None
-
-# =====================================================
-# AI ENGINE (SAFE ROUTING)
-# =====================================================
-
-def ai_engine(msg):
-
-    web = tavily(msg)
-    if web:
-        return "🌐 Web:\n" + web
-
-    ai = groq_ai(msg)
-    if ai:
-        return ai
-
-    w = wiki(msg)
-    if w:
-        return "📚 Wikipedia:\n" + w
-
-    return f"You said: {msg}"
-
-# =====================================================
-# SOCKET HANDLER
-# =====================================================
-
-@socketio.on("msg")
-def handle(data):
-    msg = data.get("text", "")
-
-    reply = ai_engine(msg)
-
-    buffer = ""
-    for w in reply.split():
-        buffer += w + " "
-        socketio.emit("reply", {"text": buffer})
-        socketio.sleep(0.02)
-
-# =====================================================
-# SIMPLE UI (SAFE TEST UI)
-# =====================================================
-
-@app.route("/")
-def home():
-    return render_template_string("""
+HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<title>Bloxy-bot</title>
 
 <style>
-body{margin:0;background:#0b0f19;color:white;font-family:sans-serif;display:flex;height:100vh}
-#chat{flex:1;padding:10px;overflow:auto}
-.msg{margin:5px;padding:8px;border-radius:6px}
-.user{background:#2563eb;margin-left:auto}
-.bot{background:#1f1f1f}
-#input{display:flex;padding:10px;background:#111}
-input{flex:1;padding:10px}
-button{padding:10px}
+body {
+margin:0;
+font-family:Arial;
+background:#0b0f1a;
+color:white;
+display:flex;
+}
+
+.sidebar {
+width:260px;
+background:#111827;
+height:100vh;
+padding:15px;
+}
+
+.chat {
+flex:1;
+display:flex;
+flex-direction:column;
+height:100vh;
+}
+
+.topbar {
+padding:10px;
+background:#111827;
+}
+
+.messages {
+flex:1;
+overflow-y:auto;
+padding:20px;
+}
+
+.msg {
+margin:8px;
+padding:10px;
+border-radius:10px;
+max-width:70%;
+}
+
+.user { background:#2563eb; margin-left:auto; }
+.ai { background:#1f2937; }
+
+.inputbox {
+display:flex;
+padding:10px;
+background:#111827;
+}
+
+input {
+flex:1;
+padding:10px;
+}
+
+button {
+padding:10px;
+}
+
+.fade { opacity:0.6; font-size:12px; }
+
+.badge {
+background:linear-gradient(45deg,#3b82f6,#f97316);
+padding:3px 6px;
+border-radius:6px;
+font-size:11px;
+}
+
 </style>
 </head>
 
 <body>
 
-<div id="chat"></div>
+<div class="sidebar">
+<h3>Bloxy-bot</h3>
+<p class="fade">⚠ AI can make mistakes</p>
 
-<div id="input">
-<input id="msg">
+<hr>
+
+<button onclick="mode='ai'">AI Chat</button><br>
+<button onclick="mode='wiki'">Wikipedia</button><br>
+<button onclick="mode='news'">News</button><br>
+<button onclick="mode='math'">Math</button><br>
+<button onclick="mode='web'">Web</button><br>
+<button onclick="mode='dict'">Dictionary</button><br>
+
+</div>
+
+<div class="chat">
+
+<div class="topbar">
+<span class="badge">✔ aTg VERIFIED OWNER</span>
+</div>
+
+<div class="messages" id="box"></div>
+
+<div class="inputbox">
+<input id="input" placeholder="Message..." />
 <button onclick="send()">Send</button>
 </div>
 
-<script>
-const socket = io();
+</div>
 
-socket.on("reply", d=>{
-    add("bot", d.text);
+<script>
+let mode="ai";
+
+async function send(){
+let msg=document.getElementById("input").value;
+if(!msg) return;
+
+add(msg,"user");
+
+let res=await fetch("/chat",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({message:msg,mode:mode})
 });
 
-function add(t,x){
-let d=document.createElement("div");
-d.className="msg "+t;
-d.textContent=x;
-chat.appendChild(d);
+let data=await res.json();
+add(data.reply,"ai");
+
+document.getElementById("input").value="";
 }
 
-function send(){
-let m=msg.value;
-if(!m)return;
-msg.value="";
-add("user",m);
-socket.emit("msg",{text:m});
+function add(t,c){
+let d=document.createElement("div");
+d.className="msg "+c;
+d.innerText=t;
+document.getElementById("box").appendChild(d);
 }
+
 </script>
 
 </body>
 </html>
-""")
+"""
 
-# =====================================================
-# RUN SAFE
-# =====================================================
+# ================= ROUTING ENGINE =================
 
+def router(msg, mode):
+
+    text = msg.lower()
+
+    # ✅ STRICT RULE: dictionary ONLY if explicitly asked
+    if mode == "dict" or "define" in text or "meaning of" in text:
+        return use_dict(msg)
+
+    # math
+    if mode == "math":
+        return use_wolfram(msg)
+
+    # news
+    if mode == "news":
+        return use_news(msg)
+
+    # wiki
+    if mode == "wiki":
+        return use_wiki(msg)
+
+    # web
+    if mode == "web":
+        return use_tavily(msg)
+
+    # default AI brain
+    response = groq.chat.completions.create(
+        model="llama3-70b-8192",
+        messages=[{"role":"user","content":msg}]
+    )
+    return response.choices[0].message.content
+
+# ================= CHAT =================
+
+@app.route("/")
+def home():
+    return render_template_string(HTML)
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    data = request.json
+    msg = data["message"]
+    mode = data["mode"]
+
+    user = session.get("user","guest")
+
+    # OWNER CHECK
+    prefix = "✔ aTg (OWNER VERIFIED)" if user=="aTg" else user
+
+    reply = router(msg, mode)
+
+    return jsonify({"reply": f"{prefix}: {reply}"})
+
+# ================= RUN =================
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    socketio.run(app, host="0.0.0.0", port=port)
+    app.run(debug=True)
