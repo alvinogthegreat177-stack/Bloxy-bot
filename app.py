@@ -6,98 +6,110 @@ import requests
 import os
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "dev_key")
+app.secret_key = os.getenv("SECRET_KEY")
 
-# ---------------- SAFE API INIT (prevents Render crash) ----------------
-groq_key = os.getenv("GROQ_API_KEY")
-wolfram_key = os.getenv("WOLFRAM_APP_ID")
-news_key = os.getenv("NEWS_API_KEY")
-tavily_key = os.getenv("TAVILY_API_KEY")
+# ================= AI ENGINES =================
+groq = Groq(api_key=os.getenv("GROQ_API_KEY"))
+wolfram = wolframalpha.Client(os.getenv("WOLFRAM_APP_ID"))
 
-groq_client = Groq(api_key=groq_key) if groq_key else None
-wolfram = wolframalpha.Client(wolfram_key) if wolfram_key else None
+NEWS = os.getenv("NEWS_API_KEY")
+TAVILY = os.getenv("TAVILY_API_KEY")
 
-# ---------------- MEMORY ----------------
-chat_memory = {}
-
-# ---------------- TOOLS (SAFE WRAPPED) ----------------
-
-def use_wolfram(q):
-    if not wolfram:
-        return "Wolfram not configured."
-    try:
-        res = wolfram.query(q)
-        return next(res.results).text
-    except:
-        return "Math error."
-
-def use_news(topic="general"):
-    if not news_key:
-        return "News API not configured."
-    try:
-        url = f"https://newsapi.org/v2/top-headlines?category=general&apiKey={news_key}"
-        r = requests.get(url).json()
-        return "\n".join([a["title"] for a in r.get("articles", [])[:3]])
-    except:
-        return "News error."
-
-def use_wiki(q):
-    try:
-        return wikipedia.summary(q, sentences=2)
-    except:
-        return "No Wikipedia result."
-
-def use_dict(q):
-    try:
-        r = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{q}").json()
-        return r[0]["meanings"][0]["definitions"][0]["definition"]
-    except:
-        return "No definition found."
-
-# ---------------- UI ----------------
-
+# ================= UI =================
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
 <title>Bloxy-bot</title>
+
 <style>
-body{margin:0;font-family:Arial;background:#0b0f1a;color:white;}
-.sidebar{width:220px;height:100vh;position:fixed;background:#111827;padding:10px;}
-.chat{margin-left:230px;padding:20px;}
-.msg{padding:10px;margin:6px;border-radius:8px;}
-.user{background:#2563eb;text-align:right;}
-.ai{background:#1f2937;}
-.fade{opacity:0.6;font-size:12px;}
+body{margin:0;font-family:Arial;background:#0b0f1a;color:white;display:flex;height:100vh}
+
+/* SIDEBAR */
+.sidebar{
+width:260px;background:#111827;padding:15px
+}
+.sidebar button{
+width:100%;padding:10px;margin:5px;background:#1f2937;color:white;border:none;border-radius:6px
+}
+
+/* CHAT */
+.chat{flex:1;display:flex;flex-direction:column}
+
+/* TOP */
+.top{padding:10px;background:#111827;display:flex;justify-content:space-between}
+
+/* MESSAGES */
+.box{flex:1;overflow-y:auto;padding:15px}
+.msg{padding:10px;margin:8px;border-radius:10px;max-width:70%}
+.user{background:#2563eb;margin-left:auto}
+.ai{background:#1f2937}
+
+/* INPUT */
+.input{
+display:flex;padding:10px;background:#111827
+}
+input{flex:1;padding:10px;border:none;outline:none}
+button.send{padding:10px;background:#2563eb;color:white;border:none}
+
+/* FOOTER */
+.footer{
+text-align:center;font-size:12px;opacity:0.6;padding:5px
+}
+
+/* typing */
+.typing{opacity:0.6;font-style:italic}
 </style>
 </head>
+
 <body>
 
 <div class="sidebar">
 <h3>Bloxy-bot</h3>
-<p class="fade">AI can make mistakes</p>
-<hr>
-<button onclick="mode='ai'">AI</button><br>
-<button onclick="mode='wiki'">Wiki</button><br>
-<button onclick="mode='news'">News</button><br>
-<button onclick="mode='math'">Math</button><br>
-<button onclick="mode='dict'">Dict</button><br>
+
+<button onclick="mode='ai'">AI Chat</button>
+<button onclick="mode='wiki'">Wikipedia</button>
+<button onclick="mode='news'">News</button>
+<button onclick="mode='math'">Math</button>
+<button onclick="mode='web'">Web Search</button>
+<button onclick="mode='dict'">Dictionary</button>
 </div>
 
 <div class="chat">
-<div id="box"></div>
-<input id="input">
-<button onclick="send()">Send</button>
+
+<div class="top">
+<span>✔ aTg (Owner Verified)</span>
+</div>
+
+<div class="box" id="box"></div>
+
+<div class="input">
+<input id="input" placeholder="Message Bloxy-bot..." onkeypress="key(event)">
+<button class="send" onclick="send()">Send</button>
+</div>
+
+<div class="footer">
+Bloxy-bot can make mistakes. Double check important information.
+</div>
+
 </div>
 
 <script>
 let mode="ai";
 
+function key(e){
+if(e.key==="Enter") send();
+}
+
 async function send(){
-let msg=document.getElementById("input").value;
-if(!msg)return;
+let input=document.getElementById("input");
+let msg=input.value;
+if(!msg) return;
 
 add(msg,"user");
+input.value="";
+
+add("Thinking...","ai typing");
 
 let res=await fetch("/chat",{
 method:"POST",
@@ -106,14 +118,26 @@ body:JSON.stringify({message:msg,mode:mode})
 });
 
 let data=await res.json();
+
+removeTyping();
 add(data.reply,"ai");
 }
 
-function add(t,c){
+function add(text,type){
 let d=document.createElement("div");
-d.className="msg "+c;
-d.innerText=t;
+d.className="msg "+type;
+d.innerText=text;
 document.getElementById("box").appendChild(d);
+scroll();
+}
+
+function removeTyping(){
+document.querySelectorAll(".typing").forEach(e=>e.remove());
+}
+
+function scroll(){
+let box=document.getElementById("box");
+box.scrollTop=box.scrollHeight;
 }
 </script>
 
@@ -121,56 +145,96 @@ document.getElementById("box").appendChild(d);
 </html>
 """
 
-# ---------------- ROUTER ----------------
+# ================= TOOL FUNCTIONS =================
 
-def router(msg, mode):
-    text = msg.lower()
+def wiki(q):
+    try:
+        return wikipedia.summary(q, sentences=2)
+    except:
+        return "No wiki result."
 
-    # dictionary ONLY when explicitly needed
-    if mode == "dict" or "define" in text or "meaning" in text:
-        return use_dict(msg)
+def math(q):
+    try:
+        res = wolfram.query(q)
+        return next(res.results).text
+    except:
+        return "Math error."
 
-    if mode == "math":
-        return use_wolfram(msg)
+def news(q):
+    try:
+        url=f"https://newsapi.org/v2/top-headlines?category=general&apiKey={NEWS}"
+        r=requests.get(url).json()
+        return "\n".join([a["title"] for a in r.get("articles",[])[:3]])
+    except:
+        return "News error."
 
-    if mode == "news":
-        return use_news(msg)
+def dictionary(q):
+    try:
+        r=requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{q}").json()
+        return r[0]["meanings"][0]["definitions"][0]["definition"]
+    except:
+        return "No definition."
 
-    if mode == "wiki":
-        return use_wiki(msg)
+def web(q):
+    try:
+        r=requests.post("https://api.tavily.com/search",
+        json={"api_key":TAVILY,"query":q}).json()
+        return r.get("answer","No result.")
+    except:
+        return "Web error."
 
-    # fallback AI
-    if groq_client:
-        try:
-            r = groq_client.chat.completions.create(
-                model="llama3-70b-8192",
-                messages=[{"role":"user","content":msg}]
-            )
-            return r.choices[0].message.content
-        except:
-            return "AI error."
-    else:
-        return "Groq not configured."
+# ================= ROUTER =================
 
-# ---------------- ROUTES ----------------
+def router(msg,mode):
+
+    text=msg.lower()
+
+    # STRICT RULE (your requirement)
+    if mode=="dict" or "define" in text or "meaning" in text:
+        return dictionary(msg)
+
+    if mode=="math":
+        return math(msg)
+
+    if mode=="wiki":
+        return wiki(msg)
+
+    if mode=="news":
+        return news(msg)
+
+    if mode=="web":
+        return web(msg)
+
+    # MAIN BRAIN (Groq)
+    try:
+        r=groq.chat.completions.create(
+            model="llama3-70b-8192",
+            messages=[{"role":"user","content":msg}]
+        )
+        return r.choices[0].message.content
+    except:
+        return "AI error."
+
+# ================= CHAT =================
 
 @app.route("/")
 def home():
     return render_template_string(HTML)
 
-@app.route("/chat", methods=["POST"])
+@app.route("/chat",methods=["POST"])
 def chat():
-    data = request.json
-    msg = data["message"]
-    mode = data["mode"]
+    data=request.json
+    msg=data["message"]
+    mode=data["mode"]
 
-    user = session.get("user","guest")
-    prefix = "✔ aTg (OWNER VERIFIED)" if user=="aTg" else user
+    user=session.get("user","guest")
 
-    reply = router(msg, mode)
+    prefix="✔ aTg (OWNER VERIFIED)" if user=="aTg" else user
 
-    return jsonify({"reply": f"{prefix}: {reply}"})
+    reply=router(msg,mode)
 
-# ---------------- RUN ----------------
-if __name__ == "__main__":
+    return jsonify({"reply":f"{prefix}: {reply}"})
+
+# ================= RUN =================
+if __name__=="__main__":
     app.run()
