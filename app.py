@@ -1,153 +1,117 @@
 import os
+import requests
 
-from flask import Flask, render_template_string
 from flask_socketio import SocketIO
 
-# =====================================================
-# SAFE INIT (NO CRASH ZONE)
-# =====================================================
-app = Flask(__name__)
-app.config["SECRET_KEY"] = "bloxy_base"
+# (keep your existing app + socketio setup from v1)
+# ONLY ADD AI LAYER BELOW
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
 
 # =====================================================
-# BASIC ROUTE (ENSURES SERVER ALWAYS STARTS)
+# AI SOURCES
 # =====================================================
-@app.route("/")
-def home():
-    return render_template_string("""
-<!DOCTYPE html>
-<html>
-<head>
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
-<style>
-body{
-margin:0;
-background:#0b0f19;
-color:white;
-font-family:sans-serif;
-display:flex;
-height:100vh;
-}
+def groq_ai(msg):
+    if not GROQ_API_KEY:
+        return None
+    try:
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": "You are Bloxy-bot. Be helpful and structured."},
+                    {"role": "user", "content": msg}
+                ]
+            }
+        )
+        return r.json()["choices"][0]["message"]["content"]
+    except:
+        return None
 
-#sidebar{
-width:240px;
-background:#111;
-padding:10px;
-}
 
-#main{
-flex:1;
-display:flex;
-flex-direction:column;
-}
+def tavily_search(msg):
+    if not TAVILY_API_KEY:
+        return None
+    try:
+        r = requests.post(
+            "https://api.tavily.com/search",
+            json={
+                "api_key": TAVILY_API_KEY,
+                "query": msg,
+                "max_results": 3
+            }
+        )
+        results = r.json().get("results", [])
+        return " ".join([i["content"] for i in results])
+    except:
+        return None
 
-#chat{
-flex:1;
-padding:10px;
-overflow:auto;
-}
 
-.msg{
-margin:6px;
-padding:10px;
-border-radius:8px;
-max-width:70%;
-}
+def wikipedia(msg):
+    try:
+        r = requests.get(
+            f"https://en.wikipedia.org/api/rest_v1/page/summary/{msg}"
+        )
+        return r.json().get("extract")
+    except:
+        return None
 
-.user{background:#2563eb;margin-left:auto}
-.bot{background:#1f1f1f}
 
-#input{
-display:flex;
-padding:10px;
-background:#111;
-}
-
-input{
-flex:1;
-padding:10px;
-background:#222;
-border:none;
-color:white;
-}
-
-button{
-padding:10px;
-background:#2563eb;
-border:none;
-color:white;
-}
-</style>
-</head>
-
-<body>
-
-<div id="sidebar">
-<h3>Bloxy-bot</h3>
-<p style="color:#777;font-size:12px">
-Stable Base v1
-</p>
-</div>
-
-<div id="main">
-
-<div id="chat"></div>
-
-<div id="input">
-<input id="msg" placeholder="Type...">
-<button onclick="send()">Send</button>
-</div>
-
-</div>
-
-<script>
-const socket = io();
-
-function add(type,text){
-let d=document.createElement("div");
-d.className="msg "+type;
-d.textContent=text;
-chat.appendChild(d);
-chat.scrollTop=chat.scrollHeight;
-}
-
-socket.on("reply",data=>{
-add("bot",data.text);
-});
-
-function send(){
-let m=msg.value;
-if(!m)return;
-
-msg.value="";
-add("user",m);
-
-socket.emit("msg",{text:m});
-}
-</script>
-
-</body>
-</html>
-""")
+def dictionary(msg):
+    try:
+        r = requests.get(
+            f"https://api.dictionaryapi.dev/api/v2/entries/en/{msg}"
+        )
+        return r.json()[0]["meanings"][0]["definitions"][0]["definition"]
+    except:
+        return None
 
 # =====================================================
-# SOCKET (SAFE + MINIMAL)
+# SMART ENGINE (NEW BRAIN SYSTEM)
 # =====================================================
+
+def ai_engine(msg):
+
+    # 1. Web first
+    web = tavily_search(msg)
+    if web:
+        return "🌐 Web Result:\n" + web
+
+    # 2. Groq AI
+    ai = groq_ai(msg)
+    if ai:
+        return ai
+
+    # 3. Wikipedia
+    wiki = wikipedia(msg)
+    if wiki:
+        return "📚 Wikipedia:\n" + wiki
+
+    # 4. Dictionary (only short inputs)
+    if len(msg.split()) == 1:
+        d = dictionary(msg)
+        if d:
+            return "📖 Definition:\n" + d
+
+    return "I couldn't find a result."
+
+# =====================================================
+# SOCKET UPDATE (REPLACE YOUR v1 HANDLER ONLY)
+# =====================================================
+
 @socketio.on("msg")
 def handle(data):
     text = data.get("text","")
 
-    # SAFE RESPONSE (NO AI YET)
-    reply = f"You said: {text}"
+    reply = ai_engine(text)
 
-    socketio.emit("reply", {"text": reply})
+    buffer = ""
 
-# =====================================================
-# RUN (CRASH SAFE)
-# =====================================================
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    socketio.run(app, host="0.0.0.0", port=port)
+    for w in reply.split():
+        buffer += w + " "
+        socketio.emit("reply", {"text": buffer})
+        socketio.sleep(0.02)
