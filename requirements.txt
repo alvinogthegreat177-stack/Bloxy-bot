@@ -1,8 +1,6 @@
 flask
-flask-cors
-groq
-tavily-python
-wikipedia
+flask-socketio
+eventlet
 requests
 gunicorn
-
+werkzeug
