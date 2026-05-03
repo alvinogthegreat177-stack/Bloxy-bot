@@ -5,3 +5,4 @@ tavily-python
 wikipedia
 requests
 gunicorn
+eventlet
