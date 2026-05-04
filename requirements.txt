@@ -1,6 +1,7 @@
 flask
+flask-cors
 groq
-requests
 wikipedia
+requests
 wolframalpha
 gunicorn
