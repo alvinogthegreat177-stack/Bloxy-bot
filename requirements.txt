@@ -1,6 +1,4 @@
 flask
-flask_sqlalchemy
-werkzeug
 groq
 requests
 wikipedia
