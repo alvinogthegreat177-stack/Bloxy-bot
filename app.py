@@ -1,329 +1,304 @@
-from flask import Flask, request, jsonify, render_template_string, session, Response, stream_with_context
+from flask import Flask, request, jsonify, render_template_string, session
 from groq import Groq
-import sqlite3
-import os
-import uuid
-import hashlib
-import requests
+import wikipedia, wolframalpha, requests, os, uuid
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "dev_secret")
+app.secret_key = os.getenv("SECRET_KEY", "dev")
 
-groq = Groq(api_key=os.getenv("GROQ_API_KEY"))
+# ================= API KEYS =================
+groq = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
+wolfram = wolframalpha.Client(os.getenv("WOLFRAM_APP_ID", ""))
 
-OWNER_EMAIL = "alvinogthegreat177@gmail.com"
-DB = "app.db"
+NEWS_KEY = os.getenv("NEWS_API_KEY", "")
+TAVILY_KEY = os.getenv("TAVILY_API_KEY", "")
 
-# ================= DB =================
+# ================= USERS =================
+users = {
+    "aTg": {"password": "admin123", "verified": True}
+}
 
-def init_db():
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
+# ================= MEMORY =================
+conversations = {}
 
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        username TEXT UNIQUE,
-        email TEXT UNIQUE,
-        password TEXT,
-        verified INTEGER DEFAULT 0
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-init_db()
-
-def hash_pw(pw):
-    return hashlib.sha256(pw.encode()).hexdigest()
-
-def current_user():
-    uid = session.get("uid")
-    if not uid:
-        return None
-
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute("SELECT id, username, email, verified FROM users WHERE id=?", (uid,))
-    user = c.fetchone()
-    conn.close()
-    return user
-
-# ================= AUTH =================
-
-@app.route("/signup", methods=["POST"])
-def signup():
-    d = request.json
-    uid = str(uuid.uuid4())
-
-    verified = 1 if d["email"] == OWNER_EMAIL else 0
-
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-
-    c.execute("""
-    INSERT INTO users VALUES (?,?,?,?,?)
-    """, (uid, d["username"], d["email"], hash_pw(d["password"]), verified))
-
-    conn.commit()
-    conn.close()
-
-    return jsonify({"ok": True})
-
-@app.route("/login", methods=["POST"])
-def login():
-    d = request.json
-
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-
-    c.execute("SELECT id FROM users WHERE username=? AND password=?",
-              (d["username"], hash_pw(d["password"])))
-
-    u = c.fetchone()
-    conn.close()
-
-    if u:
-        session["uid"] = u[0]
-        return jsonify({"ok": True})
-
-    return jsonify({"error": "Invalid login"})
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return jsonify({"ok": True})
+# ================= USER =================
+def get_user():
+    u = session.get("user")
+    if not u:
+        return {"name": "Guest", "verified": False}
+    return {"name": u, "verified": users[u]["verified"]}
 
 # ================= TOOLS =================
 
 def wiki(q):
-    try:
-        import wikipedia
-        return wikipedia.summary(q, sentences=2)
-    except:
-        return "Wikipedia error"
+    try: return wikipedia.summary(q, sentences=2)
+    except: return None
 
-def math_tool(q):
-    try:
-        import wolframalpha
-        client = wolframalpha.Client(os.getenv("WOLFRAM_APP_ID"))
-        return next(client.query(q).results).text
-    except:
-        return "Math error"
+def math(q):
+    try: return next(wolfram.query(q).results).text
+    except: return None
 
 def news():
     try:
-        r = requests.get(
-            f"https://newsapi.org/v2/top-headlines?apiKey={os.getenv('NEWS_API_KEY')}"
-        ).json()
-        return "\n".join([a["title"] for a in r["articles"][:5]])
-    except:
-        return "News error"
+        r = requests.get(f"https://newsapi.org/v2/top-headlines?apiKey={NEWS_KEY}").json()
+        return "\n".join([a["title"] for a in r.get("articles", [])[:5]])
+    except: return None
 
-def dictionary(q):
+def web(q):
     try:
-        r = requests.get(
-            f"https://api.dictionaryapi.dev/api/v2/entries/en/{q}"
-        ).json()
+        r = requests.post("https://api.tavily.com/search",
+        json={"api_key":TAVILY_KEY,"query":q}).json()
+        return r.get("answer")
+    except: return None
+
+def dictionary(word):
+    try:
+        r = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}").json()
         return r[0]["meanings"][0]["definitions"][0]["definition"]
-    except:
-        return "Dict error"
-
-def tavily(q):
-    try:
-        r = requests.post(
-            "https://api.tavily.com/search",
-            json={
-                "api_key": os.getenv("TAVILY_API_KEY"),
-                "query": q
-            }
-        ).json()
-        return r.get("answer", "No result")
-    except:
-        return "Tavily error"
+    except: return None
 
 # ================= ROUTER =================
-
 def route(msg):
     t = msg.lower()
 
-    if "define" in t:
-        return "dict"
-    if any(x in t for x in ["solve", "+", "-", "/", "="]):
-        return "math"
+    if "define" in t or "meaning" in t:
+        return dictionary(msg)
+
+    if any(x in t for x in ["solve","+","-","/","equation"]):
+        return math(msg)
+
+    if "news" in t or "latest" in t:
+        return news()
+
     if "who is" in t or "what is" in t:
-        return "wiki"
-    if "news" in t:
-        return "news"
-    if "search" in t:
-        return "tavily"
+        return wiki(msg)
+
+    if "search" in t or "find" in t:
+        return web(msg)
+
     return None
 
-# ================= CHAT =================
-
-@app.route("/chat", methods=["POST"])
-def chat():
-    user = current_user()
-    if not user:
-        return "NOT LOGGED IN"
-
-    msg = request.json["message"]
-    tool = route(msg)
-
-    if tool == "wiki":
-        return wiki(msg)
-    if tool == "math":
-        return math_tool(msg)
-    if tool == "news":
-        return news()
-    if tool == "dict":
-        return dictionary(msg)
-    if tool == "tavily":
-        return tavily(msg)
-
-    def generate():
-        completion = groq.chat.completions.create(
+# ================= AI =================
+def ai(msg):
+    try:
+        r = groq.chat.completions.create(
             model="llama3-70b-8192",
-            messages=[{"role": "user", "content": msg}],
-            stream=True
+            messages=[
+                {"role":"system","content":"Respond formally and clearly."},
+                {"role":"user","content":msg}
+            ]
         )
+        return r.choices[0].message.content
+    except Exception as e:
+        print("AI ERROR:", e)
+        return "⚠️ AI temporarily unavailable."
 
-        for chunk in completion:
-            if chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+def get_response(msg):
+    tool = route(msg)
+    if tool:
+        return tool
+    return ai(msg)
 
-    return Response(stream_with_stream(generate()), mimetype="text/plain")
-
-# ================= UI (RESTORED FULL) =================
-
+# ================= UI =================
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>Bloxy AI</title>
+<title>Bloxy-bot</title>
 <style>
 body{margin:0;font-family:Arial;background:#0b0f1a;color:white;display:flex;height:100vh;}
-.sidebar{width:260px;background:#111827;padding:10px;}
+.sidebar{width:260px;background:#111827;display:flex;flex-direction:column;}
+.newchat{margin:10px;padding:10px;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;}
+.conv{flex:1;overflow-y:auto;padding:10px;}
+.item{padding:8px;margin:5px;background:#1f2937;border-radius:6px;cursor:pointer;}
 .chat{flex:1;display:flex;flex-direction:column;}
-.box{flex:1;overflow-y:auto;padding:10px;}
-.msg{padding:10px;margin:5px;border-radius:10px;max-width:70%;}
+.box{flex:1;overflow-y:auto;padding:15px;}
+.msg{padding:10px;margin:8px;border-radius:10px;max-width:75%;white-space:pre-line;}
 .user{background:#2563eb;margin-left:auto;}
 .ai{background:#1f2937;}
 .input{display:flex;padding:10px;background:#111827;}
-input{flex:1;padding:10px;}
+input{flex:1;padding:10px;border:none;outline:none;}
 button{padding:10px;background:#2563eb;color:white;border:none;}
-
-.verified{color:#f97316;font-weight:bold;}
+.footer{text-align:center;font-size:12px;opacity:0.6;padding:5px;}
+.verify{
+display:inline-flex;align-items:center;justify-content:center;
+width:22px;height:22px;background:#f97316;color:white;
+margin-left:6px;
+clip-path: polygon(
+50% 0%,60% 10%,75% 5%,85% 18%,100% 25%,92% 40%,100% 50%,92% 60%,
+100% 75%,85% 82%,75% 95%,60% 90%,50% 100%,40% 90%,25% 95%,15% 82%,
+0% 75%,8% 60%,0% 50%,8% 40%,0% 25%,15% 18%,25% 5%,40% 10%
+);
+}
+.auth{padding:10px;}
 </style>
 </head>
 
 <body>
 
 <div class="sidebar">
-<div id="profile"></div>
+<button class="newchat" onclick="newChat()">+ New Chat</button>
+
+<div class="auth">
+<input id="user" placeholder="username"><br>
+<input id="pass" placeholder="password" type="password"><br>
+<button onclick="signup()">Sign Up</button>
+<button onclick="login()">Login</button>
+<button onclick="logout()">Logout</button>
 </div>
 
-<div class="chat" id="main">
+<div class="conv" id="conv"></div>
+</div>
 
+<div class="chat">
 <div class="box" id="box"></div>
 
 <div class="input">
-<input id="input">
+<input id="input" placeholder="Type..." onkeypress="if(event.key==='Enter')send()">
 <button onclick="send()">Send</button>
 </div>
 
+<div class="footer">Bloxy-bot can make mistakes. Double check just incase.</div>
 </div>
 
 <script>
 
-async function profile(){
+let current="default";
+let currentUser = {name:"Guest", verified:false};
+
+async function getMe(){
 let r=await fetch("/me");
-let d=await r.json();
-
-if(!d.logged_in){
-document.getElementById("main").innerHTML=`
-<h2>Login</h2>
-<input id="u"><br>
-<input id="p" type="password"><br>
-<button onclick="login()">Login</button>
-
-<h3>Signup</h3>
-<input id="su"><br>
-<input id="se"><br>
-<input id="sp" type="password"><br>
-<button onclick="signup()">Signup</button>
-`;
-return;
-}
-
-document.getElementById("profile").innerHTML =
-d.username + (d.verified ? " ✔ VERIFIED" : "");
-}
-
-async function login(){
-await fetch("/login",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({username:u.value,password:p.value})
-});
-location.reload();
+currentUser=await r.json();
 }
 
 async function signup(){
-await fetch("/signup",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({username:su.value,email:se.value,password:sp.value})
-});
-alert("created");
+await fetch("/signup",{method:"POST",headers:{"Content-Type":"application/json"},
+body:JSON.stringify({username:user.value,password:pass.value})});
+alert("Signed up");
+}
+
+async function login(){
+await fetch("/login",{method:"POST",headers:{"Content-Type":"application/json"},
+body:JSON.stringify({username:user.value,password:pass.value})});
+getMe();
+}
+
+async function logout(){
+await fetch("/logout");
+currentUser={name:"Guest",verified:false};
+}
+
+function badge(){
+return currentUser.verified ? "<span class='verify'>✔</span>" : "";
 }
 
 async function send(){
+
 let msg=input.value;
 if(!msg)return;
 
-let box=document.getElementById("box");
+add(currentUser.name+" "+badge()+": "+msg,"user");
+input.value="";
 
-let user=document.createElement("div");
-user.className="msg user";
-user.innerText=msg;
-box.appendChild(user);
-
-let ai=document.createElement("div");
-ai.className="msg ai";
-box.appendChild(ai);
-
-let r=await fetch("/chat",{
-method:"POST",
+let r=await fetch("/chat",{method:"POST",
 headers:{"Content-Type":"application/json"},
-body:JSON.stringify({message:msg})
-});
+body:JSON.stringify({message:msg,id:current})});
 
-const reader=r.body.getReader();
-const decoder=new TextDecoder();
-
-ai.innerText="";
-
-while(true){
-const {value,done}=await reader.read();
-if(done)break;
-ai.innerText+=decoder.decode(value);
-}
+let d=await r.json();
+add("Bloxy-bot: "+d.reply,"ai");
+load();
 }
 
-profile();
+function add(t,c){
+let d=document.createElement("div");
+d.className="msg "+c;
+d.innerHTML=t;
+box.appendChild(d);
+}
+
+async function newChat(){
+let r=await fetch("/new");
+let d=await r.json();
+current=d.id;
+box.innerHTML="";
+load();
+}
+
+async function load(){
+let r=await fetch("/conversations");
+let d=await r.json();
+conv.innerHTML=d.map(c=>`<div class="item">${c.title}</div>`).join("");
+}
+
+getMe();
+load();
 
 </script>
-
 </body>
 </html>
 """
+
+# ================= ROUTES =================
 
 @app.route("/")
 def home():
     return render_template_string(HTML)
 
+@app.route("/signup",methods=["POST"])
+def signup():
+    d=request.json
+    if d["username"] in users:
+        return jsonify({"error":"exists"})
+    users[d["username"]]={"password":d["password"],"verified":False}
+    return jsonify({"ok":True})
+
+@app.route("/login",methods=["POST"])
+def login():
+    d=request.json
+    if d["username"] in users and users[d["username"]]["password"]==d["password"]:
+        session["user"]=d["username"]
+        return jsonify({"ok":True})
+    return jsonify({"error":"invalid"})
+
+@app.route("/logout")
+def logout():
+    session.pop("user",None)
+    return jsonify({"ok":True})
+
+@app.route("/me")
+def me():
+    return jsonify(get_user())
+
+@app.route("/new")
+def new():
+    cid=str(uuid.uuid4())
+    conversations[cid]={"title":"New Chat","messages":[]}
+    return jsonify({"id":cid})
+
+@app.route("/chat",methods=["POST"])
+def chat():
+    d=request.json
+    msg=d["message"]
+    cid=d["id"]
+
+    if cid not in conversations:
+        conversations[cid]={"title":"New Chat","messages":[]}
+
+    conv=conversations[cid]
+
+    if len(conv["messages"])==0:
+        conv["title"]=msg[:20]
+
+    reply=get_response(msg)
+
+    conv["messages"].append({"role":"user","text":msg})
+    conv["messages"].append({"role":"ai","text":reply})
+
+    return jsonify({"reply":reply})
+
+@app.route("/conversations")
+def convs():
+    return jsonify([{"id":k,"title":v["title"]} for k,v in conversations.items()])
+
 # ================= RUN =================
-if __name__ == "__main__":
+if __name__=="__main__":
     app.run()
