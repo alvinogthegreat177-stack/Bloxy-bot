@@ -1,220 +1,219 @@
-from flask import Flask, request, jsonify, render_template_string, session
+from flask import Flask, request, jsonify, session, Response, render_template_string
 from werkzeug.security import generate_password_hash, check_password_hash
 from groq import Groq
-import wikipedia, requests, os, uuid
+import sqlite3, os, json, uuid
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "dev-key-change")
+app.secret_key = os.getenv("SECRET_KEY", "dev-key")
 
-# ================= APIs =================
+# ================= AI =================
 groq = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
 
-NEWS_KEY = os.getenv("NEWS_API_KEY", "")
-TAVILY_KEY = os.getenv("TAVILY_API_KEY", "")
-WOLFRAM_APP = os.getenv("WOLFRAM_APP_ID", "")
+# ================= DATABASE =================
+db = sqlite3.connect("chatgpt.db", check_same_thread=False)
+cur = db.cursor()
 
-# ================= USERS (hashed auth) =================
-users = {
-    "aTg": {
-        "password": generate_password_hash("alvintheultimedev17.og"),
-        "verified": True
-    }
-}
+cur.execute("""
+CREATE TABLE IF NOT EXISTS users (
+username TEXT PRIMARY KEY,
+password TEXT,
+verified INTEGER
+)
+""")
 
-# ================= MEMORY =================
-conversations = {}
+cur.execute("""
+CREATE TABLE IF NOT EXISTS chats (
+id TEXT,
+user TEXT,
+data TEXT
+)
+""")
+db.commit()
 
-# ================= USER =================
+# ================= LOCKED OWNER SYSTEM =================
+OWNER_USERNAME = "aTg"
+
+def init_owner():
+    cur.execute("SELECT * FROM users WHERE username=?", (OWNER_USERNAME,))
+    if not cur.fetchone():
+        cur.execute(
+            "INSERT INTO users VALUES (?,?,?)",
+            (OWNER_USERNAME, generate_password_hash("alvintheultimede17.og"), 1)
+        )
+        db.commit()
+
+init_owner()
+
+# ================= AUTH =================
+def register_user(u,p):
+    if u == OWNER_USERNAME:
+        return False
+    cur.execute("INSERT OR IGNORE INTO users VALUES (?,?,?)",
+                (u, generate_password_hash(p), 0))
+    db.commit()
+    return True
+
+def login_user(u,p):
+    cur.execute("SELECT password FROM users WHERE username=?", (u,))
+    row = cur.fetchone()
+    if row and check_password_hash(row[0], p):
+        session["user"] = u
+        return True
+    return False
+
 def get_user():
     u = session.get("user")
-    if not u or u not in users:
-        return {"name": "Guest", "verified": False}
-    return {"name": u, "verified": users[u]["verified"]}
+    if not u:
+        return {"name":"Guest","verified":False}
 
-# ================= TOOLS =================
-def wiki(q):
-    try:
-        return wikipedia.summary(q, sentences=2)
-    except:
-        return None
+    cur.execute("SELECT verified FROM users WHERE username=?", (u,))
+    r = cur.fetchone()
+    return {
+        "name": u,
+        "verified": bool(r[0]) if r else False
+    }
 
-def dictionary(word):
-    try:
-        r = requests.get(
-            f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}"
-        ).json()
-        return r[0]["meanings"][0]["definitions"][0]["definition"]
-    except:
-        return None
+# ================= CHAT MEMORY (ChatGPT STYLE) =================
+def save_chat(user, cid, msg, reply):
+    cur.execute("SELECT data FROM chats WHERE id=? AND user=?", (cid,user))
+    row = cur.fetchone()
 
-def tavily(q):
-    try:
-        r = requests.post(
-            "https://api.tavily.com/search",
-            json={"api_key": TAVILY_KEY, "query": q}
-        ).json()
-        return r.get("results", [{}])[0].get("content")
-    except:
-        return None
+    data = json.loads(row[0]) if row else []
 
-def news():
-    try:
-        r = requests.get(
-            f"https://newsapi.org/v2/top-headlines?apiKey={NEWS_KEY}&country=us"
-        ).json()
-        return "\n".join([a["title"] for a in r.get("articles", [])[:5]])
-    except:
-        return None
+    data.append({"role":"user","content":msg})
+    data.append({"role":"assistant","content":reply})
 
-def wolfram(q):
-    try:
-        import wolframalpha
-        client = wolframalpha.Client(WOLFRAM_APP)
-        res = next(client.query(q).results).text
-        return res
-    except:
-        return None
+    if row:
+        cur.execute("UPDATE chats SET data=? WHERE id=? AND user=?",
+                    (json.dumps(data), cid, user))
+    else:
+        cur.execute("INSERT INTO chats VALUES (?,?,?)",
+                    (cid,user,json.dumps(data)))
 
-# ================= ROUTER =================
-def route(msg):
-    t = msg.lower()
+    db.commit()
 
-    if t.startswith("define"):
-        return dictionary(msg.replace("define","").strip())
+# ================= VECTOR MEMORY (SIMPLIFIED CHATGPT STYLE) =================
+def memory_context(user, msg):
+    cur.execute("SELECT data FROM chats WHERE user=? ORDER BY rowid DESC LIMIT 5", (user,))
+    rows = cur.fetchall()
 
-    if any(x in t for x in ["who is", "what is"]):
-        return wiki(msg)
+    context = []
+    for r in rows:
+        try:
+            context.extend(json.loads(r[0])[-4:])
+        except:
+            pass
 
-    if any(x in t for x in ["solve", "+", "-", "/", "equation"]):
-        return wolfram(msg)
+    return context
 
-    if "news" in t:
-        return news()
+# ================= AI AGENT (NO RULES - CHATGPT STYLE) =================
+def ai_agent(user, msg):
+    context = memory_context(user, msg)
 
-    if "search" in t:
-        return tavily(msg)
+    messages = [
+        {"role":"system","content":
+         "You are a ChatGPT-level assistant. Use memory and reasoning."}
+    ]
 
-    return None
+    for c in context:
+        messages.append({"role":c["role"],"content":c["content"]})
 
-# ================= AI (FIXED RELIABILITY) =================
-def ai(msg):
-    try:
-        res = groq.chat.completions.create(
-            model="llama3-70b-8192",
-            messages=[
-                {"role": "system", "content": "You are Bloxy-bot, a helpful AI assistant. Always respond clearly."},
-                {"role": "user", "content": msg}
-            ],
-            temperature=0.7
-        )
-        return res.choices[0].message.content
-    except Exception as e:
-        print("AI ERROR:", e)
-        return "⚠️ AI temporarily unavailable. Please try again."
+    messages.append({"role":"user","content":msg})
 
-def get_response(msg):
-    tool = route(msg)
-    if tool:
-        return tool
-    return ai(msg)
+    res = groq.chat.completions.create(
+        model="llama3-70b-8192",
+        messages=messages,
+        temperature=0.7
+    )
+
+    return res.choices[0].message.content
+
+# ================= STREAMING (CHATGPT TYPING EFFECT) =================
+def stream_ai(user, msg):
+    res = groq.chat.completions.create(
+        model="llama3-70b-8192",
+        messages=[
+            {"role":"system","content":"You are a streaming AI."},
+            {"role":"user","content":msg}
+        ],
+        stream=True
+    )
+
+    full = ""
+
+    for chunk in res:
+        if chunk.choices[0].delta.content:
+            token = chunk.choices[0].delta.content
+            full += token
+            yield token
+
+    save_chat(user, str(uuid.uuid4()), msg, full)
 
 # ================= UI =================
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>Bloxy-bot AI</title>
-
+<title>ChatGPT-Level AI</title>
 <style>
 body{margin:0;font-family:Arial;background:#0b0f1a;color:white;display:flex;height:100vh;}
-.sidebar{width:260px;background:#111827;display:flex;flex-direction:column;}
-.newchat{margin:10px;padding:10px;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;}
-.conv{flex:1;overflow-y:auto;padding:10px;}
-.item{padding:8px;margin:5px;background:#1f2937;border-radius:6px;cursor:pointer;}
 .chat{flex:1;display:flex;flex-direction:column;}
-.box{flex:1;overflow-y:auto;padding:15px;}
-.msg{padding:10px;margin:8px;border-radius:10px;max-width:75%;white-space:pre-line;}
-.user{background:#2563eb;margin-left:auto;}
-.ai{background:#1f2937;}
+.box{flex:1;overflow:auto;padding:15px;}
+.msg{padding:10px;margin:6px;border-radius:10px;max-width:70%;}
+.u{background:#2563eb;margin-left:auto;}
+.a{background:#1f2937;}
 .input{display:flex;padding:10px;background:#111827;}
 input{flex:1;padding:10px;border:none;outline:none;}
-button{padding:10px;background:#2563eb;color:white;border:none;}
-.footer{text-align:center;font-size:12px;opacity:0.6;padding:5px;}
-.badge{width:16px;height:16px;margin-left:6px;vertical-align:middle;}
-.userpanel{position:fixed;bottom:10px;left:10px;background:#1f2937;padding:10px;border-radius:8px;display:flex;align-items:center;gap:6px;}
+button{padding:10px;background:#2563eb;color:white;}
+.userpanel{position:fixed;bottom:10px;left:10px;background:#1f2937;padding:10px;border-radius:8px;}
 </style>
 </head>
-
 <body>
-
-<div class="sidebar">
-<button class="newchat" onclick="newChat()">+ New Chat</button>
-<div class="conv" id="conv"></div>
-</div>
 
 <div class="chat">
 <div class="box" id="box"></div>
 
 <div class="input">
-<input id="input" placeholder="Type..." onkeypress="if(event.key==='Enter')send()">
+<input id="inp">
 <button onclick="send()">Send</button>
 </div>
-
-<div class="footer">Bloxy-bot may make mistakes.</div>
 </div>
 
-<div class="userpanel" id="userpanel">Guest</div>
+<div class="userpanel" id="userpanel"></div>
 
 <script>
 
-let current="default";
-let user={name:"Guest",verified:false};
-
-const badge=`<svg class="badge" viewBox="0 0 24 24" fill="#22c55e">
-<path d="M12 2l2.9 6.6L22 9.3l-5 5 1.2 7.2L12 18l-6.2 3.5L7 14.3 2 9.3l7.1-0.7L12 2z"/>
-<path d="M10.5 12.5l1.5 1.5 3-3" stroke="white" stroke-width="2" fill="none"/>
-</svg>`;
-
-async function getMe(){
- let r=await fetch("/me");
- user=await r.json();
- update();
-}
-
-function update(){
- userpanel.innerHTML=user.name+(user.verified?badge:"");
-}
-
 async function send(){
- let msg=input.value;
- if(!msg)return;
+ let m=inp.value;
+ box.innerHTML+="<div class='msg u'>"+m+"</div>";
 
- add(user.name+": "+msg,"user");
- input.value="";
+ let res = await fetch("/stream",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({m})});
 
- let r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg,id:current})});
+ let reader = res.body.getReader();
+ let decoder = new TextDecoder();
+
+ let ai="";
+ let div=document.createElement("div");
+ div.className="msg a";
+ box.appendChild(div);
+
+ while(true){
+  let {done,value}=await reader.read();
+  if(done)break;
+  ai+=decoder.decode(value);
+  div.innerText=ai;
+ }
+}
+
+async function me(){
+ let r=await fetch("/me");
  let d=await r.json();
- add("Bloxy-bot: "+d.reply,"ai");
+ userpanel.innerText=d.name + (d.verified ? " ✔ Verified" : "");
 }
-
-function add(t,c){
- let d=document.createElement("div");
- d.className="msg "+c;
- d.innerHTML=t;
- box.appendChild(d);
- box.scrollTop=box.scrollHeight;
-}
-
-async function newChat(){
- let r=await fetch("/new");
- let d=await r.json();
- current=d.id;
- box.innerHTML="";
-}
-
-getMe();
+me();
 
 </script>
+
 </body>
 </html>
 """
@@ -228,20 +227,24 @@ def home():
 def me():
     return jsonify(get_user())
 
-@app.route("/new")
-def new():
-    cid=str(uuid.uuid4())
-    conversations[cid]={"messages":[]}
-    return jsonify({"id":cid})
-
-@app.route("/chat",methods=["POST"])
-def chat():
+@app.route("/login",methods=["POST"])
+def login():
     d=request.json
-    msg=d.get("message","")
+    if login_user(d["u"],d["p"]):
+        return jsonify({"ok":True})
+    return jsonify({"ok":False})
 
-    reply=get_response(msg)
+@app.route("/signup",methods=["POST"])
+def signup():
+    d=request.json
+    register_user(d["u"],d["p"])
+    return jsonify({"ok":True})
 
-    return jsonify({"reply":reply})
+@app.route("/stream",methods=["POST"])
+def stream():
+    user = get_user()["name"]
+    msg = request.json["m"]
+    return Response(stream_ai(user,msg), mimetype="text/plain")
 
 # ================= RUN =================
 if __name__=="__main__":
