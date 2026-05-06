@@ -9,7 +9,7 @@ import json
 app = FastAPI()
 
 # =====================
-# API KEY
+# CONFIG
 # =====================
 GROQ = os.getenv("GROQ_API_KEY")
 
@@ -19,7 +19,7 @@ OWNER_PASSWORD = "alvindev17.og"
 DB_FILE = "users.json"
 
 # =====================
-# LOAD / SAVE DATABASE
+# PERSISTENT STORAGE
 # =====================
 def load_users():
     try:
@@ -63,26 +63,25 @@ def signup(data: Auth):
     }
 
     save_users()
-
     return {"ok": True}
 
 # =====================
-# LOGIN (PERSISTENT + FIXED aTg ACCOUNT)
+# LOGIN
 # =====================
 @app.post("/login")
 def login(data: Auth):
 
-    # special aTg account (your fixed admin account)
+    # aTg special account
     if data.email == OWNER_EMAIL:
         if data.password != OWNER_PASSWORD:
             return {"ok": False, "error": "Wrong password"}
 
-        session_id = str(uuid.uuid4())
-        sessions[session_id] = data.email
+        sid = str(uuid.uuid4())
+        sessions[sid] = data.email
 
         return {
             "ok": True,
-            "session_id": session_id,
+            "session_id": sid,
             "username": "aTg",
             "verified": True
         }
@@ -94,18 +93,18 @@ def login(data: Auth):
     if users[data.email]["password"] != data.password:
         return {"ok": False, "error": "Wrong password"}
 
-    session_id = str(uuid.uuid4())
-    sessions[session_id] = data.email
+    sid = str(uuid.uuid4())
+    sessions[sid] = data.email
 
     return {
         "ok": True,
-        "session_id": session_id,
+        "session_id": sid,
         "username": users[data.email]["username"],
         "verified": False
     }
 
 # =====================
-# AI (SAFE)
+# AI (STABLE)
 # =====================
 def ask_ai(messages):
     try:
@@ -119,18 +118,18 @@ def ask_ai(messages):
                 "model": "llama3-70b-8192",
                 "messages": messages
             },
-            timeout=20
+            timeout=30
         )
 
         data = r.json()
 
-        if "choices" in data and data["choices"]:
+        if isinstance(data, dict) and "choices" in data:
             return data["choices"][0]["message"]["content"]
 
-        return "AI returned no response."
+        return "AI error: invalid response."
 
     except:
-        return "AI is currently unavailable."
+        return "AI error: service unavailable."
 
 # =====================
 # CHAT
@@ -147,16 +146,14 @@ def chat(data: Chat):
 You are Bloxy-bot AI.
 
 Rules:
-- Formal tone
-- Vertical formatting for lists
-- No AI/user labels
+- Be formal
+- Always format lists vertically
+- No labels like AI:
 """
 
-    messages = [
-        {"role": "system", "content": system_prompt}
-    ] + history + [
-        {"role": "user", "content": data.message}
-    ]
+    messages = [{"role": "system", "content": system_prompt}]
+    messages += history
+    messages.append({"role": "user", "content": data.message})
 
     reply = ask_ai(messages)
 
@@ -177,9 +174,19 @@ def home():
 <title>Bloxy-bot</title>
 
 <style>
-body { margin:0; font-family:Arial; background:#0f0f0f; color:white; }
-.container { display:flex; height:100vh; }
+body {
+    margin:0;
+    font-family:Arial;
+    background:#0f0f0f;
+    color:white;
+}
 
+.container {
+    display:flex;
+    height:100vh;
+}
+
+/* SIDEBAR */
 .sidebar {
     width:260px;
     background:#111;
@@ -189,27 +196,66 @@ body { margin:0; font-family:Arial; background:#0f0f0f; color:white; }
     padding:10px;
 }
 
-.main { flex:1; display:flex; flex-direction:column; }
+.chat {
+    padding:8px;
+    margin:5px;
+    background:#1a1a1a;
+    border-radius:6px;
+    cursor:pointer;
+}
 
-.messages { flex:1; padding:20px; overflow:auto; }
+/* MAIN */
+.main {
+    flex:1;
+    display:flex;
+    flex-direction:column;
+}
 
-.msg { margin:8px 0; padding:10px; background:#222; border-radius:8px; }
+.messages {
+    flex:1;
+    padding:20px;
+    overflow:auto;
+}
 
-.input { padding:10px; background:#111; }
+.msg {
+    margin:8px 0;
+    padding:10px;
+    background:#222;
+    border-radius:8px;
+}
 
-input { width:100%; padding:12px; background:#222; border:none; color:white; }
+/* INPUT */
+.input {
+    padding:10px;
+    background:#111;
+}
 
+input {
+    width:100%;
+    padding:12px;
+    background:#222;
+    border:none;
+    color:white;
+    outline:none;
+}
+
+/* LOGIN */
 #login {
     position:fixed;
-    top:0; left:0; right:0; bottom:0;
+    top:0;left:0;right:0;bottom:0;
     background:#000000cc;
     display:flex;
     align-items:center;
     justify-content:center;
 }
 
-.box { background:#1a1a1a; padding:20px; width:300px; }
+.box {
+    background:#1a1a1a;
+    padding:20px;
+    width:300px;
+}
 
+/* SPIKY VERIFIED BADGE */
 .badge {
     width:14px;
     height:14px;
@@ -283,10 +329,10 @@ function login(){
         document.getElementById("login").style.display="none";
 
         let badge = d.verified ? `
-        <svg class="badge" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="10" fill="#ff8c00"></circle>
-            <path d="M7 12l3 3 7-7" stroke="white" stroke-width="2" fill="none"/>
-        </svg>` : "";
+<svg class="badge" viewBox="0 0 24 24">
+<path fill="#ff8c00" d="M12 2 L15 8 L22 9 L17 13 L18 20 L12 16 L6 20 L7 13 L2 9 L9 8 Z"/>
+<path d="M9 12l2 2 4-5" stroke="white" stroke-width="2" fill="none"/>
+</svg>` : "";
 
         document.getElementById("user").innerHTML =
             d.username + badge;
@@ -299,6 +345,7 @@ function send(){
     input.value="";
 
     chats[chat_id].push({role:"user",content:msg});
+    render();
 
     fetch("/chat",{
         method:"POST",
@@ -310,8 +357,6 @@ function send(){
         chats[chat_id].push({role:"assistant",content:d.reply});
         render();
     });
-
-    render();
 }
 
 function render(){
@@ -323,6 +368,7 @@ function render(){
         d.innerHTML="<b>"+m.role+":</b> "+m.content;
         box.appendChild(d);
     }
+    box.scrollTop=box.scrollHeight;
 }
 
 render();
