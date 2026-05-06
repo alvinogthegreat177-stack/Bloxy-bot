@@ -2,18 +2,18 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import requests
-import os
 import uuid
+import os
 
 app = FastAPI()
 
-# =====================
-# CONFIG
-# =====================
 GROQ = os.getenv("GROQ_API_KEY")
+NEWS = os.getenv("NEWS_API_KEY")
+TAVILY = os.getenv("TAVILY_API_KEY")
+WOLFRAM = os.getenv("WOLFRAM_APP_ID")
 
 OWNER_EMAIL = "alvinogthegreat177@gmail.com"
-OWNER_PASSWORD = "1234"
+OWNER_PASSWORD = "alvinthedev17.og"
 
 users = {}
 sessions = {}
@@ -38,7 +38,7 @@ class Chat(BaseModel):
 def signup(data: Auth):
 
     if data.email in users:
-        return {"error": "User already exists"}
+        return {"error": "User exists"}
 
     users[data.email] = {
         "password": data.password,
@@ -54,25 +54,49 @@ def signup(data: Auth):
 def login(data: Auth):
 
     if data.email not in users:
-        return {"error": "User not found"}
+        return {"error": "No user"}
 
     if users[data.email]["password"] != data.password:
         return {"error": "Wrong password"}
 
-    session_id = str(uuid.uuid4())
+    sid = str(uuid.uuid4())
+    sessions[sid] = data.email
 
-    sessions[session_id] = data.email
-
-    verified = (data.email == OWNER_EMAIL)
+    verified = data.email == OWNER_EMAIL
 
     return {
-        "session_id": session_id,
+        "session_id": sid,
         "username": "aTg" if verified else users[data.email]["username"],
         "verified": verified
     }
 
 # =====================
-# CHAT
+# SAFE TOOLS
+# =====================
+def tools(q):
+    out = []
+
+    try:
+        w = requests.get(
+            f"https://en.wikipedia.org/api/rest_v1/page/summary/{q}"
+        ).json().get("extract")
+        if w:
+            out.append(w)
+    except:
+        pass
+
+    try:
+        n = requests.get(
+            f"https://newsapi.org/v2/everything?q={q}&apiKey={NEWS}"
+        ).json().get("articles", [])[:2]
+        out.append(str([a["title"] for a in n]))
+    except:
+        pass
+
+    return "\n".join(out)
+
+# =====================
+# CHAT (FIXED SAFE ENGINE)
 # =====================
 @app.post("/chat")
 def chat(data: Chat):
@@ -86,18 +110,9 @@ def chat(data: Chat):
 You are Bloxy-bot AI.
 
 Rules:
-- Respond in a formal, diplomatic, and professional tone
-- Be clear and structured
-- Always format lists vertically like:
-
-1. Item one
-2. Item two
-3. Item three
-
-- Never use inline lists
-- Never include usernames or labels like "AI:" or "user:"
-- Avoid repetition or messy formatting
-- Use emojis only when naturally appropriate
+- Always respond formally and diplomatically
+- Always format lists vertically
+- Never use labels like AI: or user:
 """
 
     try:
@@ -112,20 +127,21 @@ Rules:
                 "messages": [
                     {"role": "system", "content": system_prompt}
                 ] + history + [
-                    {"role": "user", "content": data.message}
+                    {"role": "user", "content": data.message + "\n\nTOOLS:\n" + tools(data.message)}
                 ]
-            }
+            },
+            timeout=20
         )
 
         res = r.json()
 
-        if "choices" not in res:
-            reply = "AI error occurred."
-        else:
-            reply = res["choices"][0]["message"]["content"]
+        reply = res.get("choices", [{}])[0].get("message", {}).get("content")
 
-    except Exception as e:
-        reply = "Server error."
+        if not reply:
+            reply = "I am unable to respond at this moment. Please try again."
+
+    except:
+        reply = "Connection error. Please try again."
 
     chats[data.chat_id].append({"role": "user", "content": data.message})
     chats[data.chat_id].append({"role": "assistant", "content": reply})
@@ -133,7 +149,7 @@ Rules:
     return {"reply": reply}
 
 # =====================
-# FRONTEND
+# FRONTEND (FULL FIXED UI + LOGIN + SIDEBAR)
 # =====================
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -166,20 +182,12 @@ body {
   padding:10px;
 }
 
-.title {
-  font-weight:bold;
-}
-
 .chat-item {
   padding:8px;
   margin:5px;
   background:#1a1a1a;
   border-radius:6px;
   cursor:pointer;
-}
-
-.chat-item:hover {
-  background:#222;
 }
 
 /* MAIN */
@@ -196,27 +204,48 @@ body {
 }
 
 .msg {
-  background:#222;
-  margin:10px 0;
+  margin:8px 0;
   padding:10px;
+  background:#222;
   border-radius:8px;
+  animation:fade .15s ease;
+}
+
+@keyframes fade {
+  from {opacity:0; transform:translateY(8px);}
+  to {opacity:1; transform:translateY(0);}
+}
+
+/* INPUT */
+.input {
+  padding:10px;
+  background:#111;
 }
 
 input {
   width:100%;
   padding:12px;
+  background:#222;
   border:none;
-  outline:none;
-  background:#111;
   color:white;
+  outline:none;
 }
 
-/* FOOTER */
-.footer {
-  font-size:11px;
-  color:#777;
-  text-align:center;
-  padding:5px;
+/* LOGIN */
+#login {
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  background:#000000cc;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.box {
+  background:#1a1a1a;
+  padding:20px;
+  width:300px;
+  border-radius:10px;
 }
 </style>
 
@@ -224,32 +253,35 @@ input {
 
 <body>
 
+<!-- LOGIN -->
+<div id="login">
+  <div class="box">
+    <h3>Login / Signup</h3>
+    <input id="email" placeholder="email">
+    <input id="password" placeholder="password">
+    <button onclick="signup()">Signup</button>
+    <button onclick="login()">Login</button>
+  </div>
+</div>
+
 <div class="container">
 
-<!-- SIDEBAR -->
 <div class="sidebar">
-
   <div>
-    <div class="title">Bloxy-bot</div>
-    <div id="chatList"></div>
+    <b>Bloxy-bot</b>
+    <div id="chats"></div>
     <button onclick="newChat()">+ New Chat</button>
   </div>
 
-  <div>
-    <div id="user">Guest</div>
-  </div>
-
+  <div id="user">Guest</div>
 </div>
 
-<!-- MAIN -->
 <div class="main">
 
   <div id="messages" class="messages"></div>
 
-  <input id="input" placeholder="Message..." onkeydown="if(event.key==='Enter'){send()}">
-
-  <div class="footer">
-    Bloxy-bot can make mistakes. Double check just incase
+  <div class="input">
+    <input id="input" placeholder="Message..." onkeydown="if(event.key==='Enter'){send()}">
   </div>
 
 </div>
@@ -258,66 +290,76 @@ input {
 
 <script>
 
-let chats = {"main": []};
-let current = "main";
+let session="none";
+let current="main";
+let chats={"main":[]};
+
+function signup(){
+ fetch("/signup",{method:"POST",headers:{"Content-Type":"application/json"},
+ body:JSON.stringify({email:email.value,password:password.value})});
+}
+
+function login(){
+ fetch("/login",{method:"POST",headers:{"Content-Type":"application/json"},
+ body:JSON.stringify({email:email.value,password:password.value})})
+ .then(r=>r.json())
+ .then(d=>{
+   session=d.session_id;
+   document.getElementById("login").style.display="none";
+   document.getElementById("user").innerText =
+     d.username + (d.verified ? " 🟧" : "");
+ });
+}
 
 function newChat(){
-  let id = "chat_" + Date.now();
-  chats[id] = [];
-  current = id;
-  renderChats();
-  renderMessages();
+ let id="chat_"+Date.now();
+ chats[id]=[];
+ current=id;
+ renderChats();
+ render();
 }
 
 function renderChats(){
-  let box = document.getElementById("chatList");
-  box.innerHTML = "";
-
-  for(let c in chats){
-    let div = document.createElement("div");
-    div.className="chat-item";
-    div.innerText=c;
-    div.onclick=()=>{current=c; renderMessages();};
-    box.appendChild(div);
-  }
-}
-
-function renderMessages(){
-  let box = document.getElementById("messages");
-  box.innerHTML="";
-
-  for(let m of chats[current]){
-    let div=document.createElement("div");
-    div.className="msg";
-    div.innerHTML="<b>"+m.role+":</b> "+m.content;
-    box.appendChild(div);
-  }
+ let box=document.getElementById("chats");
+ box.innerHTML="";
+ for(let c in chats){
+   let d=document.createElement("div");
+   d.className="chat-item";
+   d.innerText=c;
+   d.onclick=()=>{current=c; render();};
+   box.appendChild(d);
+ }
 }
 
 function send(){
+ let msg=input.value;
+ input.value="";
 
-  let input=document.getElementById("input");
-  let msg=input.value;
-  input.value="";
+ chats[current].push({role:"user",content:msg});
+ render();
 
-  chats[current].push({role:"user",content:msg});
-  renderMessages();
+ fetch("/chat",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({session_id:session,chat_id:current,message:msg})
+ })
+ .then(r=>r.json())
+ .then(d=>{
+   chats[current].push({role:"assistant",content:d.reply});
+   render();
+ });
+}
 
-  fetch("/chat",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      chat_id:current,
-      message:msg,
-      session_id:"none"
-    })
-  })
-  .then(r=>r.json())
-  .then(d=>{
-    chats[current].push({role:"assistant",content:d.reply});
-    renderMessages();
-  });
-
+function render(){
+ let box=document.getElementById("messages");
+ box.innerHTML="";
+ for(let m of chats[current]){
+   let d=document.createElement("div");
+   d.className="msg";
+   d.innerHTML="<b>"+m.role+":</b> "+m.content;
+   box.appendChild(d);
+ }
+ box.scrollTop=box.scrollHeight;
 }
 
 renderChats();
