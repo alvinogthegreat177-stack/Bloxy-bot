@@ -11,12 +11,11 @@ app = FastAPI()
 # API KEYS
 # =====================
 GROQ = os.getenv("GROQ_API_KEY")
-NEWS = os.getenv("NEWS_API_KEY")
 
 OWNER_EMAIL = "alvinogthegreat177@gmail.com"
 
 # =====================
-# STORAGE
+# MEMORY
 # =====================
 users = {}
 sessions = {}
@@ -35,12 +34,13 @@ class Chat(BaseModel):
     message: str
 
 # =====================
-# AUTH SYSTEM
+# SIGNUP
 # =====================
 @app.post("/signup")
 def signup(data: Auth):
+
     if data.email in users:
-        return {"error": "User exists"}
+        return {"ok": False, "error": "User already exists"}
 
     users[data.email] = {
         "password": data.password,
@@ -49,14 +49,17 @@ def signup(data: Auth):
 
     return {"ok": True}
 
+# =====================
+# LOGIN (FIXED SAFE VERSION)
+# =====================
 @app.post("/login")
 def login(data: Auth):
 
     if data.email not in users:
-        return {"error": "No user"}
+        return {"ok": False, "error": "User not found"}
 
     if users[data.email]["password"] != data.password:
-        return {"error": "Wrong password"}
+        return {"ok": False, "error": "Wrong password"}
 
     session_id = str(uuid.uuid4())
     sessions[session_id] = data.email
@@ -64,15 +67,17 @@ def login(data: Auth):
     verified = data.email == OWNER_EMAIL
 
     return {
+        "ok": True,
         "session_id": session_id,
         "username": "aTg" if verified else users[data.email]["username"],
         "verified": verified
     }
 
 # =====================
-# SAFE AI CALL
+# AI CALL (SAFE)
 # =====================
-def ask_groq(messages):
+def ask_ai(messages):
+
     try:
         r = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -92,13 +97,13 @@ def ask_groq(messages):
         if "choices" in data and len(data["choices"]) > 0:
             return data["choices"][0]["message"]["content"]
 
-        return None
+        return "AI returned no response."
 
     except:
-        return None
+        return "AI is currently unavailable."
 
 # =====================
-# CHAT SYSTEM
+# CHAT
 # =====================
 @app.post("/chat")
 def chat(data: Chat):
@@ -114,7 +119,7 @@ You are Bloxy-bot AI.
 Rules:
 - Be formal and structured
 - Always format lists vertically
-- No labels like AI:
+- No AI/user labels
 """
 
     messages = [
@@ -123,10 +128,7 @@ Rules:
         {"role": "user", "content": data.message}
     ]
 
-    reply = ask_groq(messages)
-
-    if not reply:
-        reply = "I am unable to respond right now. Please try again."
+    reply = ask_ai(messages)
 
     chats[data.chat_id].append({"role": "user", "content": data.message})
     chats[data.chat_id].append({"role": "assistant", "content": reply})
@@ -134,7 +136,7 @@ Rules:
     return {"reply": reply}
 
 # =====================
-# FRONTEND (CLEAN + VERIFIED + SIDEBAR)
+# FRONTEND
 # =====================
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -175,6 +177,10 @@ body {
     cursor:pointer;
 }
 
+.chat:hover {
+    background:#222;
+}
+
 /* MAIN */
 .main {
     flex:1;
@@ -207,15 +213,13 @@ input {
     background:#222;
     border:none;
     color:white;
+    outline:none;
 }
 
 /* LOGIN */
 #login {
     position:fixed;
-    top:0;
-    left:0;
-    right:0;
-    bottom:0;
+    top:0;left:0;right:0;bottom:0;
     background:#000000cc;
     display:flex;
     align-items:center;
@@ -297,13 +301,23 @@ function login(){
     })
     .then(r=>r.json())
     .then(d=>{
+
+        if(!d.ok){
+            alert(d.error);
+            return;
+        }
+
         session = d.session_id;
         document.getElementById("login").style.display="none";
 
+        let badge = d.verified ? `
+        <svg class="badge" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" fill="#ff8c00"></circle>
+            <path d="M7 12l3 3 7-7" stroke="white" stroke-width="2" fill="none"/>
+        </svg>` : "";
+
         document.getElementById("user").innerHTML =
-            d.username + (d.verified ?
-            '<svg class="badge" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#ff8c00"/><path d="M7 12l3 3 7-7" stroke="white" stroke-width="2" fill="none"/></svg>'
-            : "");
+            d.username + badge;
     });
 }
 
@@ -329,6 +343,7 @@ function renderChats(){
 }
 
 function send(){
+
     let msg = input.value;
     input.value = "";
 
