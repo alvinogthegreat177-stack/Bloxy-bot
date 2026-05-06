@@ -1,150 +1,52 @@
-from flask import Flask, request, jsonify, render_template_string
-import requests, os
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
+import requests
+import os
 
-app = Flask(__name__)
+app = FastAPI()
 
-# KEYS
+# ======================
+# 🔑 CONFIG
+# ======================
 GROQ = os.getenv("GROQ_API_KEY")
-TAVILY = os.getenv("TAVILY_API_KEY")
-NEWS = os.getenv("NEWS_API_KEY")
-WOLFRAM = os.getenv("WOLFRAM_APP_ID")
+OWNER_EMAIL = "alvinogthegreat177@gmail.com"
 
-ACCOUNT_NAME = "aTg"
+# simple in-memory chat storage
+memory = {}
 
-HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-<title>aTg AI</title>
-<style>
-body {margin:0;display:flex;font-family:Arial;background:#0f0f0f;color:white;}
-.sidebar {width:250px;background:#181818;padding:20px;}
-.main {flex:1;display:flex;flex-direction:column;align-items:center;}
-#chat {width:60%;margin-top:50px;}
-.message {background:#222;padding:10px;margin:10px 0;border-radius:10px;animation:slide .3s;}
-input {width:60%;padding:15px;margin:20px;border-radius:10px;border:none;}
-@keyframes slide {from{opacity:0;transform:translateY(-10px);}to{opacity:1;}}
-.badge svg {width:14px;height:14px;fill:orange;margin-left:5px;}
-.name {color:#aaa;font-size:12px;}
-</style>
-</head>
-<body>
+# ======================
+# MODELS
+# ======================
+class Login(BaseModel):
+    email: str
 
-<div class="sidebar">
-  <h2>aTg AI</h2>
-  <div>
-    aTg
-    <span class="badge">
-      <svg viewBox="0 0 24 24">
-        <path d="M12 2l3 7h7l-5.5 4.2L18 21l-6-4-6 4 1.5-7.8L2 9h7z"/>
-      </svg>
-    </span>
-  </div>
+class Chat(BaseModel):
+    email: str
+    message: str
+    chat_id: str
 
-  <p>Sources:</p>
-  <ul>
-    <li>Groq</li>
-    <li>Tavily</li>
-    <li>Wikipedia</li>
-    <li>NewsAPI</li>
-    <li>Wolfram</li>
-  </ul>
-</div>
+# ======================
+# LOGIN SYSTEM
+# ======================
+@app.post("/login")
+def login(data: Login):
+    return {
+        "username": "aTg" if data.email == OWNER_EMAIL else "Guest",
+        "verified": data.email == OWNER_EMAIL
+    }
 
-<div class="main">
-  <div id="chat"></div>
-  <input id="input" placeholder="Ask anything..." />
-</div>
+# ======================
+# CHAT SYSTEM
+# ======================
+@app.post("/chat")
+def chat(data: Chat):
 
-<script>
-const chat = document.getElementById("chat");
-const input = document.getElementById("input");
+    history = memory.get(data.chat_id, [])
 
-input.addEventListener("keypress", async (e) => {
- if(e.key==="Enter"){
-   const msg = input.value;
-   input.value="";
-   addMessage("aTg", msg, true);
-
-   const res = await fetch("/chat", {
-     method:"POST",
-     headers:{"Content-Type":"application/json"},
-     body:JSON.stringify({message:msg})
-   });
-
-   const data = await res.json();
-   addMessage("AI", data.reply, false);
- }
-});
-
-function addMessage(name, text, isUser){
- const div = document.createElement("div");
- div.className="message";
-
- const badge = isUser ? `
- <span class="badge">
-   <svg viewBox="0 0 24 24">
-     <path d="M12 2l3 7h7l-5.5 4.2L18 21l-6-4-6 4 1.5-7.8L2 9h7z"/>
-   </svg>
- </span>` : "";
-
- div.innerHTML = `<div class="name">${name}${badge}</div>${text}`;
- chat.appendChild(div);
-}
-</script>
-
-</body>
-</html>
-"""
-
-@app.route("/")
-def home():
-    return render_template_string(HTML)
-
-# TOOL FUNCTIONS
-def tavily_search(q):
-    try:
-        r = requests.post("https://api.tavily.com/search", json={
-            "api_key": TAVILY,
-            "query": q
-        })
-        return r.json().get("results", [])[:2]
-    except:
-        return []
-
-def wiki_summary(q):
-    try:
-        r = requests.get(f"https://en.wikipedia.org/api/rest_v1/page/summary/{q}")
-        return r.json().get("extract", "")
-    except:
-        return ""
-
-def news(q):
-    try:
-        r = requests.get(f"https://newsapi.org/v2/everything?q={q}&apiKey={NEWS}")
-        articles = r.json().get("articles", [])[:2]
-        return [a["title"] for a in articles]
-    except:
-        return []
-
-def wolfram(q):
-    try:
-        r = requests.get(f"http://api.wolframalpha.com/v1/result?i={q}&appid={WOLFRAM}")
-        return r.text
-    except:
-        return ""
-
-@app.route("/chat", methods=["POST"])
-def chat():
-    msg = request.json.get("message")
-
-    # TOOL AGGREGATION
-    context = ""
-
-    context += "\\nWikipedia: " + wiki_summary(msg)
-    context += "\\nNews: " + str(news(msg))
-    context += "\\nSearch: " + str(tavily_search(msg))
-    context += "\\nMath: " + wolfram(msg)
+    messages = history + [
+        {"role": "user", "content": data.message}
+    ]
 
     try:
         r = requests.post(
@@ -155,19 +57,216 @@ def chat():
             },
             json={
                 "model": "llama3-70b-8192",
-                "messages": [
-                    {"role":"system","content":"Use provided tools context when helpful."},
-                    {"role":"user","content": msg + "\\n\\n" + context}
-                ]
+                "messages": messages[-10:]
             }
         )
 
         reply = r.json()["choices"][0]["message"]["content"]
 
-    except:
-        reply = "Error."
+    except Exception as e:
+        reply = f"Error: {str(e)}"
 
-    return jsonify({"reply": reply})
+    memory.setdefault(data.chat_id, []).append({"role": "user", "content": data.message})
+    memory.setdefault(data.chat_id, []).append({"role": "assistant", "content": reply})
 
+    return {"reply": reply}
+
+# ======================
+# FRONTEND (CHAT UI)
+# ======================
+@app.get("/", response_class=HTMLResponse)
+def home():
+    return """
+<!DOCTYPE html>
+<html>
+<head>
+<title>aTg AI</title>
+
+<style>
+body {
+  margin:0;
+  font-family:Arial;
+  background:#0f0f0f;
+  color:white;
+}
+
+.container {
+  display:flex;
+  height:100vh;
+}
+
+/* SIDEBAR */
+.sidebar {
+  width:240px;
+  background:#171717;
+  padding:15px;
+  position:relative;
+}
+
+.user {
+  margin-top:10px;
+  font-size:15px;
+}
+
+/* 🔶 ORANGE VERIFIED BADGE */
+.verified {
+  width:16px;
+  height:16px;
+  margin-left:6px;
+  vertical-align:middle;
+}
+
+.verified path {
+  fill:#ff8c00; /* ORANGE */
+}
+
+/* LOGIN BOX */
+.login {
+  position:absolute;
+  bottom:20px;
+  left:15px;
+  right:15px;
+}
+
+.login input {
+  width:100%;
+  padding:8px;
+  border:none;
+  border-radius:8px;
+}
+
+/* CHAT AREA */
+.chat {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+}
+
+.messages {
+  flex:1;
+  overflow-y:auto;
+  padding:20px;
+}
+
+.msg {
+  background:#222;
+  padding:10px;
+  margin:10px 0;
+  border-radius:10px;
+}
+
+input.chatbox {
+  width:100%;
+  padding:12px;
+  border:none;
+  outline:none;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <h3>aTg AI</h3>
+
+    <div id="user" class="user">Guest</div>
+
+    <div class="login">
+      <input id="email" placeholder="Enter email..."
+      onkeydown="if(event.key==='Enter'){login()}">
+    </div>
+
+  </div>
+
+  <!-- CHAT -->
+  <div class="chat">
+
+    <div class="messages" id="messages"></div>
+
+    <input class="chatbox" id="input"
+      placeholder="Message..."
+      onkeydown="if(event.key==='Enter'){send()}">
+
+  </div>
+
+</div>
+
+<script>
+
+let email = "";
+let user = "Guest";
+let verified = false;
+
+function login(){
+  email = document.getElementById("email").value;
+
+  fetch("/login",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({email})
+  })
+  .then(r=>r.json())
+  .then(d=>{
+    user = d.username;
+    verified = d.verified;
+
+    renderUser();
+  });
+}
+
+function renderUser(){
+  document.getElementById("user").innerHTML =
+    user +
+    (verified
+      ? `<svg class="verified" viewBox="0 0 24 24">
+           <path d="M9 12l2 2 4-4"></path>
+         </svg>`
+      : "");
+}
+
+function send(){
+  const input = document.getElementById("input");
+  const msg = input.value;
+  input.value = "";
+
+  add(user, msg, true);
+
+  fetch("/chat",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      email,
+      message:msg,
+      chat_id:"main"
+    })
+  })
+  .then(r=>r.json())
+  .then(d=>{
+    add("AI", d.reply, false);
+  });
+}
+
+function add(name,text,isUser){
+  const div = document.createElement("div");
+  div.className="msg";
+  div.innerHTML = "<b>" + name + ":</b> " + text;
+  document.getElementById("messages").appendChild(div);
+}
+
+</script>
+
+</body>
+</html>
+"""
+
+# ======================
+# RUN
+# ======================
 if __name__ == "__main__":
-    app.run()
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
