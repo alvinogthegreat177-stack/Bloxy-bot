@@ -4,20 +4,35 @@ from pydantic import BaseModel
 import requests
 import uuid
 import os
+import json
 
 app = FastAPI()
 
 # =====================
-# API KEYS
+# API KEY
 # =====================
 GROQ = os.getenv("GROQ_API_KEY")
 
 OWNER_EMAIL = "alvinogthegreat177@gmail.com"
+OWNER_PASSWORD = "alvindev17.og"
+
+DB_FILE = "users.json"
 
 # =====================
-# MEMORY
+# LOAD / SAVE DATABASE
 # =====================
-users = {}
+def load_users():
+    try:
+        with open(DB_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_users():
+    with open(DB_FILE, "w") as f:
+        json.dump(users, f)
+
+users = load_users()
 sessions = {}
 chats = {}
 
@@ -47,14 +62,32 @@ def signup(data: Auth):
         "username": data.email.split("@")[0]
     }
 
+    save_users()
+
     return {"ok": True}
 
 # =====================
-# LOGIN (FIXED SAFE VERSION)
+# LOGIN (PERSISTENT + FIXED aTg ACCOUNT)
 # =====================
 @app.post("/login")
 def login(data: Auth):
 
+    # special aTg account (your fixed admin account)
+    if data.email == OWNER_EMAIL:
+        if data.password != OWNER_PASSWORD:
+            return {"ok": False, "error": "Wrong password"}
+
+        session_id = str(uuid.uuid4())
+        sessions[session_id] = data.email
+
+        return {
+            "ok": True,
+            "session_id": session_id,
+            "username": "aTg",
+            "verified": True
+        }
+
+    # normal users
     if data.email not in users:
         return {"ok": False, "error": "User not found"}
 
@@ -64,20 +97,17 @@ def login(data: Auth):
     session_id = str(uuid.uuid4())
     sessions[session_id] = data.email
 
-    verified = data.email == OWNER_EMAIL
-
     return {
         "ok": True,
         "session_id": session_id,
-        "username": "aTg" if verified else users[data.email]["username"],
-        "verified": verified
+        "username": users[data.email]["username"],
+        "verified": False
     }
 
 # =====================
-# AI CALL (SAFE)
+# AI (SAFE)
 # =====================
 def ask_ai(messages):
-
     try:
         r = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -94,7 +124,7 @@ def ask_ai(messages):
 
         data = r.json()
 
-        if "choices" in data and len(data["choices"]) > 0:
+        if "choices" in data and data["choices"]:
             return data["choices"][0]["message"]["content"]
 
         return "AI returned no response."
@@ -117,8 +147,8 @@ def chat(data: Chat):
 You are Bloxy-bot AI.
 
 Rules:
-- Be formal and structured
-- Always format lists vertically
+- Formal tone
+- Vertical formatting for lists
 - No AI/user labels
 """
 
@@ -147,19 +177,9 @@ def home():
 <title>Bloxy-bot</title>
 
 <style>
-body {
-    margin:0;
-    font-family:Arial;
-    background:#0f0f0f;
-    color:white;
-}
+body { margin:0; font-family:Arial; background:#0f0f0f; color:white; }
+.container { display:flex; height:100vh; }
 
-.container {
-    display:flex;
-    height:100vh;
-}
-
-/* SIDEBAR */
 .sidebar {
     width:260px;
     background:#111;
@@ -169,70 +189,27 @@ body {
     padding:10px;
 }
 
-.chat {
-    padding:8px;
-    margin:5px;
-    background:#1a1a1a;
-    border-radius:6px;
-    cursor:pointer;
-}
+.main { flex:1; display:flex; flex-direction:column; }
 
-.chat:hover {
-    background:#222;
-}
+.messages { flex:1; padding:20px; overflow:auto; }
 
-/* MAIN */
-.main {
-    flex:1;
-    display:flex;
-    flex-direction:column;
-}
+.msg { margin:8px 0; padding:10px; background:#222; border-radius:8px; }
 
-.messages {
-    flex:1;
-    padding:20px;
-    overflow:auto;
-}
+.input { padding:10px; background:#111; }
 
-.msg {
-    margin:8px 0;
-    padding:10px;
-    background:#222;
-    border-radius:8px;
-}
+input { width:100%; padding:12px; background:#222; border:none; color:white; }
 
-/* INPUT */
-.input {
-    padding:10px;
-    background:#111;
-}
-
-input {
-    width:100%;
-    padding:12px;
-    background:#222;
-    border:none;
-    color:white;
-    outline:none;
-}
-
-/* LOGIN */
 #login {
     position:fixed;
-    top:0;left:0;right:0;bottom:0;
+    top:0; left:0; right:0; bottom:0;
     background:#000000cc;
     display:flex;
     align-items:center;
     justify-content:center;
 }
 
-.box {
-    background:#1a1a1a;
-    padding:20px;
-    width:300px;
-}
+.box { background:#1a1a1a; padding:20px; width:300px; }
 
-/* VERIFIED BADGE */
 .badge {
     width:14px;
     height:14px;
@@ -258,12 +235,7 @@ input {
 <div class="container">
 
 <div class="sidebar">
-    <div>
-        <b>Bloxy-bot</b>
-        <div id="chats"></div>
-        <button onclick="newChat()">+ New Chat</button>
-    </div>
-
+    <div><b>Bloxy-bot</b></div>
     <div id="user">Guest</div>
 </div>
 
@@ -281,9 +253,9 @@ input {
 
 <script>
 
-let session = "none";
-let current = "main";
-let chats = {"main":[]};
+let session="none";
+let chat_id="main";
+let chats={"main":[]};
 
 function signup(){
     fetch("/signup",{
@@ -307,7 +279,7 @@ function login(){
             return;
         }
 
-        session = d.session_id;
+        session=d.session_id;
         document.getElementById("login").style.display="none";
 
         let badge = d.verified ? `
@@ -321,62 +293,39 @@ function login(){
     });
 }
 
-function newChat(){
-    let id = "chat_" + Date.now();
-    chats[id] = [];
-    current = id;
-    renderChats();
-    render();
-}
-
-function renderChats(){
-    let box = document.getElementById("chats");
-    box.innerHTML = "";
-
-    for(let c in chats){
-        let d = document.createElement("div");
-        d.className = "chat";
-        d.innerText = c;
-        d.onclick = ()=>{current=c; render();};
-        box.appendChild(d);
-    }
-}
-
 function send(){
 
-    let msg = input.value;
-    input.value = "";
+    let msg=input.value;
+    input.value="";
 
-    chats[current].push({role:"user",content:msg});
-    render();
+    chats[chat_id].push({role:"user",content:msg});
 
     fetch("/chat",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({session_id:session,chat_id:current,message:msg})
+        body:JSON.stringify({session_id:session,chat_id:chat_id,message:msg})
     })
     .then(r=>r.json())
     .then(d=>{
-        chats[current].push({role:"assistant",content:d.reply});
+        chats[chat_id].push({role:"assistant",content:d.reply});
         render();
     });
+
+    render();
 }
 
 function render(){
-    let box = document.getElementById("messages");
-    box.innerHTML = "";
-
-    for(let m of chats[current]){
-        let d = document.createElement("div");
-        d.className = "msg";
-        d.innerHTML = "<b>"+m.role+":</b> "+m.content;
+    let box=document.getElementById("messages");
+    box.innerHTML="";
+    for(let m of chats[chat_id]){
+        let d=document.createElement("div");
+        d.className="msg";
+        d.innerHTML="<b>"+m.role+":</b> "+m.content;
         box.appendChild(d);
     }
-
-    box.scrollTop = box.scrollHeight;
 }
 
-renderChats();
+render();
 
 </script>
 
