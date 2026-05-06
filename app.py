@@ -1,251 +1,173 @@
-from flask import Flask, request, jsonify, session, Response, render_template_string
-from werkzeug.security import generate_password_hash, check_password_hash
-from groq import Groq
-import sqlite3, os, json, uuid
+from flask import Flask, request, jsonify, render_template_string
+import requests, os
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "dev-key")
 
-# ================= AI =================
-groq = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
+# KEYS
+GROQ = os.getenv("GROQ_API_KEY")
+TAVILY = os.getenv("TAVILY_API_KEY")
+NEWS = os.getenv("NEWS_API_KEY")
+WOLFRAM = os.getenv("WOLFRAM_APP_ID")
 
-# ================= DATABASE =================
-db = sqlite3.connect("chatgpt.db", check_same_thread=False)
-cur = db.cursor()
+ACCOUNT_NAME = "aTg"
 
-cur.execute("""
-CREATE TABLE IF NOT EXISTS users (
-username TEXT PRIMARY KEY,
-password TEXT,
-verified INTEGER
-)
-""")
-
-cur.execute("""
-CREATE TABLE IF NOT EXISTS chats (
-id TEXT,
-user TEXT,
-data TEXT
-)
-""")
-db.commit()
-
-# ================= LOCKED OWNER SYSTEM =================
-OWNER_USERNAME = "aTg"
-
-def init_owner():
-    cur.execute("SELECT * FROM users WHERE username=?", (OWNER_USERNAME,))
-    if not cur.fetchone():
-        cur.execute(
-            "INSERT INTO users VALUES (?,?,?)",
-            (OWNER_USERNAME, generate_password_hash("alvintheultimede17.og"), 1)
-        )
-        db.commit()
-
-init_owner()
-
-# ================= AUTH =================
-def register_user(u,p):
-    if u == OWNER_USERNAME:
-        return False
-    cur.execute("INSERT OR IGNORE INTO users VALUES (?,?,?)",
-                (u, generate_password_hash(p), 0))
-    db.commit()
-    return True
-
-def login_user(u,p):
-    cur.execute("SELECT password FROM users WHERE username=?", (u,))
-    row = cur.fetchone()
-    if row and check_password_hash(row[0], p):
-        session["user"] = u
-        return True
-    return False
-
-def get_user():
-    u = session.get("user")
-    if not u:
-        return {"name":"Guest","verified":False}
-
-    cur.execute("SELECT verified FROM users WHERE username=?", (u,))
-    r = cur.fetchone()
-    return {
-        "name": u,
-        "verified": bool(r[0]) if r else False
-    }
-
-# ================= CHAT MEMORY (ChatGPT STYLE) =================
-def save_chat(user, cid, msg, reply):
-    cur.execute("SELECT data FROM chats WHERE id=? AND user=?", (cid,user))
-    row = cur.fetchone()
-
-    data = json.loads(row[0]) if row else []
-
-    data.append({"role":"user","content":msg})
-    data.append({"role":"assistant","content":reply})
-
-    if row:
-        cur.execute("UPDATE chats SET data=? WHERE id=? AND user=?",
-                    (json.dumps(data), cid, user))
-    else:
-        cur.execute("INSERT INTO chats VALUES (?,?,?)",
-                    (cid,user,json.dumps(data)))
-
-    db.commit()
-
-# ================= VECTOR MEMORY (SIMPLIFIED CHATGPT STYLE) =================
-def memory_context(user, msg):
-    cur.execute("SELECT data FROM chats WHERE user=? ORDER BY rowid DESC LIMIT 5", (user,))
-    rows = cur.fetchall()
-
-    context = []
-    for r in rows:
-        try:
-            context.extend(json.loads(r[0])[-4:])
-        except:
-            pass
-
-    return context
-
-# ================= AI AGENT (NO RULES - CHATGPT STYLE) =================
-def ai_agent(user, msg):
-    context = memory_context(user, msg)
-
-    messages = [
-        {"role":"system","content":
-         "You are a ChatGPT-level assistant. Use memory and reasoning."}
-    ]
-
-    for c in context:
-        messages.append({"role":c["role"],"content":c["content"]})
-
-    messages.append({"role":"user","content":msg})
-
-    res = groq.chat.completions.create(
-        model="llama3-70b-8192",
-        messages=messages,
-        temperature=0.7
-    )
-
-    return res.choices[0].message.content
-
-# ================= STREAMING (CHATGPT TYPING EFFECT) =================
-def stream_ai(user, msg):
-    res = groq.chat.completions.create(
-        model="llama3-70b-8192",
-        messages=[
-            {"role":"system","content":"You are a streaming AI."},
-            {"role":"user","content":msg}
-        ],
-        stream=True
-    )
-
-    full = ""
-
-    for chunk in res:
-        if chunk.choices[0].delta.content:
-            token = chunk.choices[0].delta.content
-            full += token
-            yield token
-
-    save_chat(user, str(uuid.uuid4()), msg, full)
-
-# ================= UI =================
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>ChatGPT-Level AI</title>
+<title>aTg AI</title>
 <style>
-body{margin:0;font-family:Arial;background:#0b0f1a;color:white;display:flex;height:100vh;}
-.chat{flex:1;display:flex;flex-direction:column;}
-.box{flex:1;overflow:auto;padding:15px;}
-.msg{padding:10px;margin:6px;border-radius:10px;max-width:70%;}
-.u{background:#2563eb;margin-left:auto;}
-.a{background:#1f2937;}
-.input{display:flex;padding:10px;background:#111827;}
-input{flex:1;padding:10px;border:none;outline:none;}
-button{padding:10px;background:#2563eb;color:white;}
-.userpanel{position:fixed;bottom:10px;left:10px;background:#1f2937;padding:10px;border-radius:8px;}
+body {margin:0;display:flex;font-family:Arial;background:#0f0f0f;color:white;}
+.sidebar {width:250px;background:#181818;padding:20px;}
+.main {flex:1;display:flex;flex-direction:column;align-items:center;}
+#chat {width:60%;margin-top:50px;}
+.message {background:#222;padding:10px;margin:10px 0;border-radius:10px;animation:slide .3s;}
+input {width:60%;padding:15px;margin:20px;border-radius:10px;border:none;}
+@keyframes slide {from{opacity:0;transform:translateY(-10px);}to{opacity:1;}}
+.badge svg {width:14px;height:14px;fill:orange;margin-left:5px;}
+.name {color:#aaa;font-size:12px;}
 </style>
 </head>
 <body>
 
-<div class="chat">
-<div class="box" id="box"></div>
+<div class="sidebar">
+  <h2>aTg AI</h2>
+  <div>
+    aTg
+    <span class="badge">
+      <svg viewBox="0 0 24 24">
+        <path d="M12 2l3 7h7l-5.5 4.2L18 21l-6-4-6 4 1.5-7.8L2 9h7z"/>
+      </svg>
+    </span>
+  </div>
 
-<div class="input">
-<input id="inp">
-<button onclick="send()">Send</button>
-</div>
+  <p>Sources:</p>
+  <ul>
+    <li>Groq</li>
+    <li>Tavily</li>
+    <li>Wikipedia</li>
+    <li>NewsAPI</li>
+    <li>Wolfram</li>
+  </ul>
 </div>
 
-<div class="userpanel" id="userpanel"></div>
+<div class="main">
+  <div id="chat"></div>
+  <input id="input" placeholder="Ask anything..." />
+</div>
 
 <script>
+const chat = document.getElementById("chat");
+const input = document.getElementById("input");
 
-async function send(){
- let m=inp.value;
- box.innerHTML+="<div class='msg u'>"+m+"</div>";
+input.addEventListener("keypress", async (e) => {
+ if(e.key==="Enter"){
+   const msg = input.value;
+   input.value="";
+   addMessage("aTg", msg, true);
 
- let res = await fetch("/stream",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({m})});
+   const res = await fetch("/chat", {
+     method:"POST",
+     headers:{"Content-Type":"application/json"},
+     body:JSON.stringify({message:msg})
+   });
 
- let reader = res.body.getReader();
- let decoder = new TextDecoder();
-
- let ai="";
- let div=document.createElement("div");
- div.className="msg a";
- box.appendChild(div);
-
- while(true){
-  let {done,value}=await reader.read();
-  if(done)break;
-  ai+=decoder.decode(value);
-  div.innerText=ai;
+   const data = await res.json();
+   addMessage("AI", data.reply, false);
  }
-}
+});
 
-async function me(){
- let r=await fetch("/me");
- let d=await r.json();
- userpanel.innerText=d.name + (d.verified ? " ✔ Verified" : "");
-}
-me();
+function addMessage(name, text, isUser){
+ const div = document.createElement("div");
+ div.className="message";
 
+ const badge = isUser ? `
+ <span class="badge">
+   <svg viewBox="0 0 24 24">
+     <path d="M12 2l3 7h7l-5.5 4.2L18 21l-6-4-6 4 1.5-7.8L2 9h7z"/>
+   </svg>
+ </span>` : "";
+
+ div.innerHTML = `<div class="name">${name}${badge}</div>${text}`;
+ chat.appendChild(div);
+}
 </script>
 
 </body>
 </html>
 """
 
-# ================= ROUTES =================
 @app.route("/")
 def home():
     return render_template_string(HTML)
 
-@app.route("/me")
-def me():
-    return jsonify(get_user())
+# TOOL FUNCTIONS
+def tavily_search(q):
+    try:
+        r = requests.post("https://api.tavily.com/search", json={
+            "api_key": TAVILY,
+            "query": q
+        })
+        return r.json().get("results", [])[:2]
+    except:
+        return []
 
-@app.route("/login",methods=["POST"])
-def login():
-    d=request.json
-    if login_user(d["u"],d["p"]):
-        return jsonify({"ok":True})
-    return jsonify({"ok":False})
+def wiki_summary(q):
+    try:
+        r = requests.get(f"https://en.wikipedia.org/api/rest_v1/page/summary/{q}")
+        return r.json().get("extract", "")
+    except:
+        return ""
 
-@app.route("/signup",methods=["POST"])
-def signup():
-    d=request.json
-    register_user(d["u"],d["p"])
-    return jsonify({"ok":True})
+def news(q):
+    try:
+        r = requests.get(f"https://newsapi.org/v2/everything?q={q}&apiKey={NEWS}")
+        articles = r.json().get("articles", [])[:2]
+        return [a["title"] for a in articles]
+    except:
+        return []
 
-@app.route("/stream",methods=["POST"])
-def stream():
-    user = get_user()["name"]
-    msg = request.json["m"]
-    return Response(stream_ai(user,msg), mimetype="text/plain")
+def wolfram(q):
+    try:
+        r = requests.get(f"http://api.wolframalpha.com/v1/result?i={q}&appid={WOLFRAM}")
+        return r.text
+    except:
+        return ""
 
-# ================= RUN =================
-if __name__=="__main__":
-    app.run(host="0.0.0.0",port=5000)
+@app.route("/chat", methods=["POST"])
+def chat():
+    msg = request.json.get("message")
+
+    # TOOL AGGREGATION
+    context = ""
+
+    context += "\\nWikipedia: " + wiki_summary(msg)
+    context += "\\nNews: " + str(news(msg))
+    context += "\\nSearch: " + str(tavily_search(msg))
+    context += "\\nMath: " + wolfram(msg)
+
+    try:
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama3-70b-8192",
+                "messages": [
+                    {"role":"system","content":"Use provided tools context when helpful."},
+                    {"role":"user","content": msg + "\\n\\n" + context}
+                ]
+            }
+        )
+
+        reply = r.json()["choices"][0]["message"]["content"]
+
+    except:
+        reply = "Error."
+
+    return jsonify({"reply": reply})
+
+if __name__ == "__main__":
+    app.run()
