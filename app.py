@@ -3,49 +3,111 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import requests
 import os
+import uuid
 
 app = FastAPI()
 
-# ======================
-# 🔑 CONFIG
-# ======================
+# =====================
+# API KEYS
+# =====================
 GROQ = os.getenv("GROQ_API_KEY")
+TAVILY = os.getenv("TAVILY_API_KEY")
+NEWS = os.getenv("NEWS_API_KEY")
+WOLFRAM = os.getenv("WOLFRAM_APP_ID")
+
 OWNER_EMAIL = "alvinogthegreat177@gmail.com"
+OWNER_PASSWORD = "alvinthegreatdev17.og"
 
-# simple in-memory chat storage
-memory = {}
+# =====================
+# MEMORY STORE
+# =====================
+chats = {}  # chat_id -> messages
+titles = {}  # chat_id -> title
 
-# ======================
+# =====================
 # MODELS
-# ======================
+# =====================
 class Login(BaseModel):
     email: str
+    password: str
 
 class Chat(BaseModel):
     email: str
     message: str
     chat_id: str
 
-# ======================
-# LOGIN SYSTEM
-# ======================
+# =====================
+# LOGIN
+# =====================
 @app.post("/login")
 def login(data: Login):
+    verified = (data.email == OWNER_EMAIL and data.password == OWNER_PASSWORD)
+
     return {
-        "username": "aTg" if data.email == OWNER_EMAIL else "Guest",
-        "verified": data.email == OWNER_EMAIL
+        "username": "aTg" if verified else data.email.split("@")[0],
+        "verified": verified
     }
 
-# ======================
-# CHAT SYSTEM
-# ======================
+# =====================
+# TOOLS ENGINE
+# =====================
+def tools(query):
+    out = []
+
+    try:
+        w = requests.get(
+            f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}"
+        ).json().get("extract")
+        if w:
+            out.append("Wikipedia: " + w)
+    except:
+        pass
+
+    try:
+        n = requests.get(
+            f"https://newsapi.org/v2/everything?q={query}&apiKey={NEWS}"
+        ).json().get("articles", [])[:2]
+        out.append("News: " + str([a["title"] for a in n]))
+    except:
+        pass
+
+    try:
+        t = requests.post(
+            "https://api.tavily.com/search",
+            json={"api_key": TAVILY, "query": query}
+        ).json().get("results", [])[:2]
+        out.append("Search: " + str(t))
+    except:
+        pass
+
+    try:
+        w = requests.get(
+            f"http://api.wolframalpha.com/v1/result?i={query}&appid={WOLFRAM}"
+        ).text
+        out.append("Math: " + w)
+    except:
+        pass
+
+    return "\n".join(out)
+
+# =====================
+# CHAT
+# =====================
 @app.post("/chat")
 def chat(data: Chat):
 
-    history = memory.get(data.chat_id, [])
+    if data.chat_id not in chats:
+        chats[data.chat_id] = []
+
+    history = chats[data.chat_id]
+
+    tool_data = tools(data.message)
 
     messages = history + [
-        {"role": "user", "content": data.message}
+        {
+            "role": "user",
+            "content": data.message + "\n\nTOOLS:\n" + tool_data
+        }
     ]
 
     try:
@@ -57,39 +119,49 @@ def chat(data: Chat):
             },
             json={
                 "model": "llama3-70b-8192",
-                "messages": messages[-10:]
+                "messages": messages
             }
         )
 
-        reply = r.json()["choices"][0]["message"]["content"]
+        res = r.json()
+
+        if "choices" not in res:
+            reply = str(res)
+        else:
+            reply = res["choices"][0]["message"]["content"]
 
     except Exception as e:
-        reply = f"Error: {str(e)}"
+        reply = str(e)
 
-    memory.setdefault(data.chat_id, []).append({"role": "user", "content": data.message})
-    memory.setdefault(data.chat_id, []).append({"role": "assistant", "content": reply})
+    chats[data.chat_id].append({"role": "user", "content": data.message})
+    chats[data.chat_id].append({"role": "assistant", "content": reply})
+
+    # auto-title
+    if data.chat_id not in titles:
+        titles[data.chat_id] = data.message[:25]
 
     return {"reply": reply}
 
-# ======================
-# FRONTEND (CHAT UI)
-# ======================
+# =====================
+# FRONTEND (CHATGPT STYLE UI)
+# =====================
 @app.get("/", response_class=HTMLResponse)
 def home():
     return """
 <!DOCTYPE html>
 <html>
 <head>
-<title>aTg AI</title>
+<title>Bloxy-bot</title>
 
 <style>
 body {
   margin:0;
   font-family:Arial;
-  background:#0f0f0f;
+  background:#0d0d0d;
   color:white;
 }
 
+/* LAYOUT */
 .container {
   display:flex;
   height:100vh;
@@ -97,166 +169,166 @@ body {
 
 /* SIDEBAR */
 .sidebar {
-  width:240px;
-  background:#171717;
-  padding:15px;
-  position:relative;
+  width:280px;
+  background:#111;
+  padding:10px;
+  overflow-y:auto;
 }
 
-.user {
-  margin-top:10px;
-  font-size:15px;
-}
-
-/* 🔶 ORANGE VERIFIED BADGE */
-.verified {
-  width:16px;
-  height:16px;
-  margin-left:6px;
-  vertical-align:middle;
-}
-
-.verified path {
-  fill:#ff8c00; /* ORANGE */
-}
-
-/* LOGIN BOX */
-.login {
-  position:absolute;
-  bottom:20px;
-  left:15px;
-  right:15px;
-}
-
-.login input {
-  width:100%;
-  padding:8px;
-  border:none;
+.chat-item {
+  padding:10px;
+  margin:5px;
+  background:#1a1a1a;
   border-radius:8px;
+  cursor:pointer;
 }
 
-/* CHAT AREA */
-.chat {
+.chat-item:hover {
+  background:#222;
+}
+
+/* MAIN CHAT */
+.main {
   flex:1;
   display:flex;
   flex-direction:column;
 }
 
+/* MESSAGES */
 .messages {
   flex:1;
-  overflow-y:auto;
   padding:20px;
+  overflow-y:auto;
 }
 
 .msg {
-  background:#222;
-  padding:10px;
   margin:10px 0;
+  padding:10px;
   border-radius:10px;
+  background:#1f1f1f;
 }
 
-input.chatbox {
-  width:100%;
+/* INPUT */
+.input-area {
+  display:flex;
+  padding:10px;
+  background:#111;
+}
+
+input {
+  flex:1;
   padding:12px;
   border:none;
+  border-radius:8px;
   outline:none;
 }
-</style>
 
+/* VERIFIED */
+.verified {
+  width:14px;
+  height:14px;
+  margin-left:6px;
+}
+
+.verified circle {
+  fill:#ff8c00;
+}
+
+.verified path {
+  fill:none;
+  stroke:white;
+  stroke-width:2;
+}
+</style>
 </head>
 
 <body>
 
 <div class="container">
 
-  <!-- SIDEBAR -->
-  <div class="sidebar">
+<div class="sidebar">
+  <button onclick="newChat()">+ New Chat</button>
+  <div id="chatList"></div>
+</div>
 
-    <h3>aTg AI</h3>
+<div class="main">
 
-    <div id="user" class="user">Guest</div>
+  <div id="messages" class="messages"></div>
 
-    <div class="login">
-      <input id="email" placeholder="Enter email..."
-      onkeydown="if(event.key==='Enter'){login()}">
-    </div>
-
+  <div class="input-area">
+    <input id="input" placeholder="Message..." onkeydown="if(event.key==='Enter'){send()}">
   </div>
 
-  <!-- CHAT -->
-  <div class="chat">
-
-    <div class="messages" id="messages"></div>
-
-    <input class="chatbox" id="input"
-      placeholder="Message..."
-      onkeydown="if(event.key==='Enter'){send()}">
-
-  </div>
+</div>
 
 </div>
 
 <script>
 
-let email = "";
-let user = "Guest";
-let verified = false;
+let currentChat = "main";
+let chats = {"main":[]};
 
-function login(){
-  email = document.getElementById("email").value;
-
-  fetch("/login",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({email})
-  })
-  .then(r=>r.json())
-  .then(d=>{
-    user = d.username;
-    verified = d.verified;
-
-    renderUser();
-  });
+function newChat(){
+  let id = "chat_" + Date.now();
+  chats[id] = [];
+  currentChat = id;
+  renderChats();
 }
 
-function renderUser(){
-  document.getElementById("user").innerHTML =
-    user +
-    (verified
-      ? `<svg class="verified" viewBox="0 0 24 24">
-           <path d="M9 12l2 2 4-4"></path>
-         </svg>`
-      : "");
+function renderChats(){
+  let box = document.getElementById("chatList");
+  box.innerHTML = "";
+
+  for(let c in chats){
+    let div = document.createElement("div");
+    div.className = "chat-item";
+    div.innerText = c;
+    div.onclick = ()=>{currentChat=c; renderMessages();};
+    box.appendChild(div);
+  }
+}
+
+function renderMessages(){
+  let box = document.getElementById("messages");
+  box.innerHTML = "";
+
+  for(let m of chats[currentChat]){
+    let div = document.createElement("div");
+    div.className = "msg";
+    div.innerHTML = "<b>"+m.role+":</b> "+m.content;
+    box.appendChild(div);
+  }
 }
 
 function send(){
-  const input = document.getElementById("input");
-  const msg = input.value;
+
+  let input = document.getElementById("input");
+  let msg = input.value;
   input.value = "";
 
-  add(user, msg, true);
+  add("user", msg);
 
   fetch("/chat",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
-      email,
+      email:"test",
       message:msg,
-      chat_id:"main"
+      chat_id:currentChat
     })
   })
   .then(r=>r.json())
   .then(d=>{
-    add("AI", d.reply, false);
+    add("AI", d.reply);
   });
 }
 
-function add(name,text,isUser){
-  const div = document.createElement("div");
-  div.className="msg";
-  div.innerHTML = "<b>" + name + ":</b> " + text;
-  document.getElementById("messages").appendChild(div);
+function add(role,text){
+  chats[currentChat].push({role,text});
+  renderMessages();
 }
+
+renderChats();
 
 </script>
 
@@ -264,9 +336,9 @@ function add(name,text,isUser){
 </html>
 """
 
-# ======================
+# =====================
 # RUN
-# ======================
+# =====================
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
