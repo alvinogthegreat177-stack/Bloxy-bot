@@ -4,63 +4,73 @@ from pydantic import BaseModel
 import requests
 import json
 import os
-import uuid
 
 app = FastAPI()
 
-# ======================================================
-# ENVIRONMENT VARIABLES
-# ======================================================
+# =========================================================
+# API KEYS
+# =========================================================
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY")
 
-# ======================================================
-# OWNER ACCOUNT
-# ======================================================
+# =========================================================
+# VERIFIED OWNER ACCOUNT
+# =========================================================
 
 OWNER_EMAIL = "alvinogthegreat177@gmail.com"
 OWNER_PASSWORD = "alvindev17.og"
 
-# ======================================================
-# DATABASE
-# ======================================================
+# =========================================================
+# FILES
+# =========================================================
 
 USERS_FILE = "users.json"
 CHATS_FILE = "chats.json"
 
+# =========================================================
+# LOAD / SAVE
+# =========================================================
+
 def load_json(path, default):
+
     try:
+
         with open(path, "r") as f:
             return json.load(f)
+
     except:
         return default
 
+
 def save_json(path, data):
+
     with open(path, "w") as f:
         json.dump(data, f)
+
 
 users = load_json(USERS_FILE, {})
 chat_memory = load_json(CHATS_FILE, {})
 
-# ======================================================
+# =========================================================
 # MODELS
-# ======================================================
+# =========================================================
 
 class Auth(BaseModel):
     email: str
     password: str
+
 
 class ChatRequest(BaseModel):
     email: str
     chat_id: str
     message: str
 
-# ======================================================
-# TOOLS
-# ======================================================
+# =========================================================
+# WIKIPEDIA
+# =========================================================
 
 def wikipedia_search(query):
 
@@ -79,6 +89,10 @@ def wikipedia_search(query):
         pass
 
     return ""
+
+# =========================================================
+# NEWS API
+# =========================================================
 
 def news_search(query):
 
@@ -106,14 +120,19 @@ def news_search(query):
         output = []
 
         for a in articles:
+
             output.append(
-                f"{a['title']} - {a.get('source', {}).get('name','News')}"
+                f"{a['title']} - {a['source']['name']}"
             )
 
         return "\n".join(output)
 
     except:
         return ""
+
+# =========================================================
+# TAVILY SEARCH
+# =========================================================
 
 def tavily_search(query):
 
@@ -138,12 +157,18 @@ def tavily_search(query):
         output = []
 
         for x in results:
-            output.append(x.get("content", ""))
+            output.append(
+                x.get("content", "")
+            )
 
         return "\n".join(output)
 
     except:
         return ""
+
+# =========================================================
+# WOLFRAM
+# =========================================================
 
 def wolfram_search(query):
 
@@ -165,41 +190,9 @@ def wolfram_search(query):
     except:
         return ""
 
-# ======================================================
-# AI BRAIN
-# ======================================================
-
-def ask_groq(messages):
-
-    try:
-
-        r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "llama3-70b-8192",
-                "messages": messages,
-                "temperature": 0.7
-            },
-            timeout=60
-        )
-
-        data = r.json()
-
-        if "choices" in data:
-            return data["choices"][0]["message"]["content"]
-
-        return "Bloxy-bot could not generate a response."
-
-    except Exception:
-        return "Bloxy-bot is temporarily unavailable."
-
-# ======================================================
-# SMART ROUTER
-# ======================================================
+# =========================================================
+# TOOL ROUTER
+# =========================================================
 
 def build_tool_context(prompt):
 
@@ -220,14 +213,15 @@ def build_tool_context(prompt):
         wiki = wikipedia_search(prompt)
 
         if wiki:
+
             context.append(
                 f"WIKIPEDIA:\n{wiki}"
             )
 
     # NEWS
     if any(x in text for x in [
-        "news",
         "latest",
+        "news",
         "today",
         "current",
         "trending"
@@ -236,6 +230,7 @@ def build_tool_context(prompt):
         news = news_search(prompt)
 
         if news:
+
             context.append(
                 f"NEWS:\n{news}"
             )
@@ -252,36 +247,80 @@ def build_tool_context(prompt):
         wolfram = wolfram_search(prompt)
 
         if wolfram:
+
             context.append(
                 f"WOLFRAM:\n{wolfram}"
             )
 
     # TAVILY
     if any(x in text for x in [
-        "search",
         "internet",
-        "web",
         "online",
+        "web",
+        "search",
         "research"
     ]):
 
         tav = tavily_search(prompt)
 
         if tav:
+
             context.append(
                 f"TAVILY:\n{tav}"
             )
 
     return "\n\n".join(context)
 
-# ======================================================
+# =========================================================
+# GROQ AI
+# =========================================================
+
+def ask_groq(messages):
+
+    try:
+
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama3-70b-8192",
+                "messages": messages,
+                "temperature": 0.7,
+                "max_tokens": 1200
+            },
+            timeout=60
+        )
+
+        if r.status_code != 200:
+            return "Bloxy-bot API connection issue."
+
+        data = r.json()
+
+        if (
+            isinstance(data, dict)
+            and "choices" in data
+            and len(data["choices"]) > 0
+        ):
+
+            return data["choices"][0]["message"]["content"]
+
+        return "Bloxy-bot could not generate a response."
+
+    except:
+        return "Bloxy-bot is temporarily unavailable."
+
+# =========================================================
 # SIGNUP
-# ======================================================
+# =========================================================
 
 @app.post("/signup")
 def signup(data: Auth):
 
     if data.email in users:
+
         return {
             "ok": False,
             "error": "User already exists"
@@ -298,17 +337,18 @@ def signup(data: Auth):
         "ok": True
     }
 
-# ======================================================
+# =========================================================
 # LOGIN
-# ======================================================
+# =========================================================
 
 @app.post("/login")
 def login(data: Auth):
 
-    # VERIFIED OWNER ACCOUNT
+    # VERIFIED ACCOUNT
     if data.email == OWNER_EMAIL:
 
         if data.password != OWNER_PASSWORD:
+
             return {
                 "ok": False,
                 "error": "Wrong password"
@@ -323,12 +363,14 @@ def login(data: Auth):
 
     # NORMAL USERS
     if data.email not in users:
+
         return {
             "ok": False,
             "error": "User not found"
         }
 
     if users[data.email]["password"] != data.password:
+
         return {
             "ok": False,
             "error": "Wrong password"
@@ -341,9 +383,9 @@ def login(data: Auth):
         "email": data.email
     }
 
-# ======================================================
+# =========================================================
 # CHAT
-# ======================================================
+# =========================================================
 
 @app.post("/chat")
 def chat(data: ChatRequest):
@@ -362,14 +404,18 @@ def chat(data: ChatRequest):
 You are Bloxy-bot AI.
 
 Rules:
-- Be intelligent
-- Be diplomatic
-- Use vertical formatting
-- Use emojis naturally
-- Be modern and conversational
-- Never say 'As an AI language model'
 
-External tool context:
+- Speak formally and diplomatically
+- Format responses vertically
+- Avoid huge paragraphs
+- Use spacing cleanly
+- Use emojis naturally but not excessively
+- Be intelligent and calm
+- Be modern and helpful
+- Never say:
+  'As an AI language model'
+
+External Context:
 {tool_context}
 """
 
@@ -405,9 +451,9 @@ External tool context:
         "reply": reply
     }
 
-# ======================================================
+# =========================================================
 # FRONTEND
-# ======================================================
+# =========================================================
 
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -509,8 +555,9 @@ padding:16px;
 margin-bottom:18px;
 background:#1a1a1a;
 border-radius:16px;
-line-height:1.7;
+line-height:1.8;
 animation:fade 0.18s ease;
+white-space:pre-wrap;
 }
 
 @keyframes fade{
@@ -592,8 +639,8 @@ cursor:pointer;
 }
 
 .badge{
-width:16px;
-height:16px;
+width:17px;
+height:17px;
 vertical-align:middle;
 margin-left:5px;
 }
@@ -609,9 +656,18 @@ margin-left:5px;
 
 <h2>Bloxy-bot</h2>
 
-<input class="authinput" id="email" placeholder="Email">
+<input
+class="authinput"
+id="email"
+placeholder="Email"
+>
 
-<input class="authinput" id="password" type="password" placeholder="Password">
+<input
+class="authinput"
+id="password"
+type="password"
+placeholder="Password"
+>
 
 <button class="authbtn" onclick="signup()">
 Signup
@@ -687,14 +743,42 @@ let chats = {
 };
 
 function verifiedBadge(){
+
 return `
 <svg class="badge" viewBox="0 0 24 24">
-<path fill="#ff8c00"
-d="M12 2 L15 8 L22 9 L17 13 L18 20 L12 16 L6 20 L7 13 L2 9 L9 8 Z"/>
-<path d="M9 12l2 2 4-5"
+
+<path
+fill="#ff8c00"
+d="
+M12 2.2
+C13.2 2.2 14 3.5 15 4
+C16 4.5 17.5 4.2 18.4 5
+C19.3 5.8 19.1 7.2 19.6 8.3
+C20.1 9.4 21.4 10.2 21.4 11.5
+C21.4 12.8 20.1 13.6 19.6 14.7
+C19.1 15.8 19.3 17.2 18.4 18
+C17.5 18.8 16 18.5 15 19
+C14 19.5 13.2 20.8 12 20.8
+C10.8 20.8 10 19.5 9 19
+C8 18.5 6.5 18.8 5.6 18
+C4.7 17.2 4.9 15.8 4.4 14.7
+C3.9 13.6 2.6 12.8 2.6 11.5
+C2.6 10.2 3.9 9.4 4.4 8.3
+C4.9 7.2 4.7 5.8 5.6 5
+C6.5 4.2 8 4.5 9 4
+C10 3.5 10.8 2.2 12 2.2
+Z">
+</path>
+
+<path
+d="M8.3 12.2 L10.7 14.4 L15.7 9.2"
 stroke="white"
-stroke-width="2"
-fill="none"/>
+stroke-width="2.2"
+fill="none"
+stroke-linecap="round"
+stroke-linejoin="round">
+</path>
+
 </svg>
 `;
 }
@@ -882,7 +966,7 @@ name += verifiedBadge();
 
 d.innerHTML = `
 <b>${name}</b>
-<br><br>
+
 ${m.content}
 `;
 
@@ -890,7 +974,7 @@ ${m.content}
 
 d.innerHTML = `
 <b>Bloxy-bot</b>
-<br><br>
+
 ${m.content}
 `;
 }
@@ -910,12 +994,13 @@ render();
 </html>
 """
 
-# ======================================================
+# =========================================================
 # RUN
-# ======================================================
+# =========================================================
 
 if __name__ == "__main__":
 
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
+  
