@@ -1,132 +1,248 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-import requests, json, os, traceback
+import requests
+import json
+import os
+import traceback
 
 app = FastAPI()
 
-# ================= KEYS =================
+# =========================================================
+# API KEYS
+# =========================================================
+
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY")
 
-# ================= OWNER =================
-OWNER_EMAIL = "alvinogthegreat177@gmail.com"
+# =========================================================
+# OWNER VERIFIED ACCOUNT
+# =========================================================
 
-# ================= STORAGE =================
+OWNER_EMAIL = "alvinogthegreat177@gmail.com"
+OWNER_PASSWORD = "alvindev17.og"
+
+# =========================================================
+# FILES
+# =========================================================
+
 USERS_FILE = "users.json"
 CHATS_FILE = "chats.json"
 
-def load(f, d):
+# =========================================================
+# HELPERS
+# =========================================================
+
+def load_json(path, default):
+
     try:
-        return json.load(open(f))
+        with open(path, "r") as f:
+            return json.load(f)
     except:
-        return d
+        return default
 
-def save(f, d):
-    try:
-        json.dump(d, open(f,"w"))
-    except:
-        pass
+def save_json(path, data):
 
-users = load(USERS_FILE, {})
-chats = load(CHATS_FILE, {})
+    with open(path, "w") as f:
+        json.dump(data, f)
 
-# ================= MODELS =================
+users = load_json(USERS_FILE, {})
+chat_memory = load_json(CHATS_FILE, {})
+
+# =========================================================
+# MODELS
+# =========================================================
+
 class Auth(BaseModel):
     email: str
     password: str
 
-class Chat(BaseModel):
+class ChatRequest(BaseModel):
     email: str
     chat_id: str
     message: str
 
-# ================= TOOLS =================
-def wiki(q):
+# =========================================================
+# TOOLS
+# =========================================================
+
+def wikipedia_search(query):
+
     try:
-        return requests.get(
-            "https://en.wikipedia.org/api/rest_v1/page/summary/" + q
-        ).json().get("extract","")
+
+        r = requests.get(
+            f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}"
+        )
+
+        data = r.json()
+
+        return data.get("extract", "")
+
     except:
         return ""
 
-def tavily(q):
-    try:
-        if not TAVILY_API_KEY:
-            return ""
-        r = requests.post("https://api.tavily.com/search", json={
-            "api_key": TAVILY_API_KEY,
-            "query": q,
-            "max_results": 2
-        })
-        return "\n".join([i.get("content","") for i in r.json().get("results",[])])
-    except:
+def tavily_search(query):
+
+    if not TAVILY_API_KEY:
         return ""
 
-def news(q):
     try:
-        if not NEWS_API_KEY:
-            return ""
-        r = requests.get("https://newsapi.org/v2/everything",
-            params={"q": q, "apiKey": NEWS_API_KEY, "pageSize": 2})
-        return "\n".join([a.get("title","") for a in r.json().get("articles",[])])
-    except:
-        return ""
 
-def wolfram(q):
-    try:
-        if not WOLFRAM_API_KEY:
-            return ""
-        return requests.get(
-            "http://api.wolframalpha.com/v1/result",
-            params={"appid": WOLFRAM_API_KEY, "i": q}
-        ).text
-    except:
-        return ""
-
-# ================= CONTEXT =================
-def context(msg):
-    t = msg.lower()
-    out = []
-
-    if any(x in t for x in ["who","what","city","country"]):
-        w = wiki(msg)
-        if w: out.append("WIKI:\n"+w)
-
-    if "news" in t:
-        w = news(msg)
-        if w: out.append("NEWS:\n"+w)
-
-    if any(x in t for x in ["math","solve","equation"]):
-        w = wolfram(msg)
-        if w: out.append("MATH:\n"+w)
-
-    if any(x in t for x in ["search","web"]):
-        w = tavily(msg)
-        if w: out.append("WEB:\n"+w)
-
-    return "\n\n".join(out)
-
-# ================= GROQ FIX =================
-def ai(messages):
-    if not GROQ_API_KEY:
-        return "Missing API key"
-
-    clean = []
-    for m in messages:
-        if not isinstance(m, dict): continue
-        if "role" not in m or "content" not in m: continue
-        if m["content"] is None: continue
-
-        clean.append({
-            "role": str(m["role"]),
-            "content": str(m["content"])
-        })
-
-    try:
         r = requests.post(
+            "https://api.tavily.com/search",
+            json={
+                "api_key": TAVILY_API_KEY,
+                "query": query,
+                "max_results": 2
+            },
+            timeout=20
+        )
+
+        data = r.json()
+
+        results = data.get("results", [])
+
+        text = []
+
+        for x in results:
+            text.append(x.get("content", ""))
+
+        return "\n".join(text)
+
+    except:
+        return ""
+
+def news_search(query):
+
+    if not NEWS_API_KEY:
+        return ""
+
+    try:
+
+        r = requests.get(
+            "https://newsapi.org/v2/everything",
+            params={
+                "q": query,
+                "apiKey": NEWS_API_KEY,
+                "pageSize": 2
+            },
+            timeout=20
+        )
+
+        data = r.json()
+
+        articles = data.get("articles", [])
+
+        text = []
+
+        for a in articles:
+            text.append(
+                f"{a['title']} - {a['source']['name']}"
+            )
+
+        return "\n".join(text)
+
+    except:
+        return ""
+
+def wolfram_search(query):
+
+    if not WOLFRAM_API_KEY:
+        return ""
+
+    try:
+
+        r = requests.get(
+            "http://api.wolframalpha.com/v1/result",
+            params={
+                "appid": WOLFRAM_API_KEY,
+                "i": query
+            },
+            timeout=20
+        )
+
+        return r.text
+
+    except:
+        return ""
+
+# =========================================================
+# SMART TOOL ROUTER
+# =========================================================
+
+def build_tool_context(prompt):
+
+    text = prompt.lower()
+
+    context = []
+
+    if any(x in text for x in [
+        "who is",
+        "what is",
+        "history",
+        "country",
+        "city"
+    ]):
+
+        wiki = wikipedia_search(prompt)
+
+        if wiki:
+            context.append(f"WIKIPEDIA:\n{wiki}")
+
+    if any(x in text for x in [
+        "news",
+        "latest",
+        "today",
+        "trending"
+    ]):
+
+        news = news_search(prompt)
+
+        if news:
+            context.append(f"NEWS:\n{news}")
+
+    if any(x in text for x in [
+        "solve",
+        "calculate",
+        "equation",
+        "math",
+        "physics"
+    ]):
+
+        wolfram = wolfram_search(prompt)
+
+        if wolfram:
+            context.append(f"WOLFRAM:\n{wolfram}")
+
+    if any(x in text for x in [
+        "search",
+        "internet",
+        "web",
+        "online",
+        "research"
+    ]):
+
+        tav = tavily_search(prompt)
+
+        if tav:
+            context.append(f"TAVILY:\n{tav}")
+
+    return "\n\n".join(context)
+
+# =========================================================
+# AI SYSTEM
+# =========================================================
+
+def ask_ai(messages):
+
+    if not GROQ_API_KEY:
+        return "Groq API key missing."
+
+    try:
+
+        response = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={
                 "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -134,115 +250,484 @@ def ai(messages):
             },
             json={
                 "model": "llama3-70b-8192",
-                "messages": clean,
-                "temperature": 1.8,
-                "max_tokens": 1000000
-            }
+                "messages": messages,
+                "temperature": 0.7,
+                "max_tokens": 2500
+            },
+            timeout=90
         )
 
-        if r.status_code != 200:
-            return f"AI ERROR {r.status_code}"
+        print("STATUS:", response.status_code)
+        print("TEXT:", response.text)
 
-        return r.json()["choices"][0]["message"]["content"]
+        if response.status_code != 200:
+            return f"AI Error {response.status_code}"
 
-    except:
-        return "AI error"
+        data = response.json()
 
-# ================= SIGNUP =================
+        if (
+            isinstance(data, dict)
+            and "choices" in data
+            and len(data["choices"]) > 0
+        ):
+
+            return data["choices"][0]["message"]["content"]
+
+        return "Bloxy-bot could not generate a response."
+
+    except Exception as e:
+
+        print(traceback.format_exc())
+
+        return "Bloxy-bot AI system error."
+
+# =========================================================
+# SIGNUP
+# =========================================================
+
 @app.post("/signup")
-def signup(d: Auth):
-    if d.email in users:
-        return {"ok": False, "error": "exists"}
+def signup(data: Auth):
 
-    users[d.email] = {
-        "password": d.password,
-        "username": d.email.split("@")[0]
+    if data.email in users:
+
+        return {
+            "ok": False,
+            "error": "Account already exists"
+        }
+
+    users[data.email] = {
+        "password": data.password,
+        "username": data.email.split("@")[0]
     }
 
-    save(USERS_FILE, users)
-    return {"ok": True}
+    save_json(USERS_FILE, users)
 
-# ================= LOGIN =================
+    return {
+        "ok": True
+    }
+
+# =========================================================
+# LOGIN
+# =========================================================
+
 @app.post("/login")
-def login(d: Auth):
+def login(data: Auth):
 
-    if d.email not in users:
-        return {"ok": False}
+    if data.email == OWNER_EMAIL:
 
-    if users[d.email]["password"] != d.password:
-        return {"ok": False}
+        if data.password != OWNER_PASSWORD:
+
+            return {
+                "ok": False,
+                "error": "Wrong password"
+            }
+
+        return {
+            "ok": True,
+            "username": "aTg",
+            "verified": True,
+            "email": OWNER_EMAIL
+        }
+
+    if data.email not in users:
+
+        return {
+            "ok": False,
+            "error": "Account not found"
+        }
+
+    if users[data.email]["password"] != data.password:
+
+        return {
+            "ok": False,
+            "error": "Wrong password"
+        }
 
     return {
         "ok": True,
-        "email": d.email,
-        "username": users[d.email]["username"],
-        "verified": d.email == OWNER_EMAIL
+        "username": users[data.email]["username"],
+        "verified": False,
+        "email": data.email
     }
 
-# ================= CHAT =================
+# =========================================================
+# CHAT
+# =========================================================
+
 @app.post("/chat")
-def chat(d: Chat):
+def chat(data: ChatRequest):
 
-    if d.email not in chats:
-        chats[d.email] = {}
+    if data.email not in chat_memory:
+        chat_memory[data.email] = {}
 
-    if d.chat_id not in chats[d.email]:
-        chats[d.email][d.chat_id] = []
+    if data.chat_id not in chat_memory[data.email]:
+        chat_memory[data.email][data.chat_id] = []
 
-    history = chats[d.email][d.chat_id]
+    history = chat_memory[data.email][data.chat_id]
 
-    system = {
-        "role": "system",
-        "content": "Bloxy-bot enterprise AI\n\n" + context(d.message)
-    }
+    tool_context = build_tool_context(data.message)
 
-    messages = [system] + history + [
-        {"role":"user","content":d.message}
+    system_prompt = f"""
+You are Bloxy-bot AI.
+
+Rules:
+
+- Speak formally and diplomatically
+- Format responses vertically
+- Use clean spacing
+- Avoid giant paragraphs
+- Be modern and intelligent
+- Use emojis naturally
+- Never say:
+  'As an AI language model'
+
+External Context:
+{tool_context}
+"""
+
+    messages = [
+        {
+            "role": "system",
+            "content": system_prompt
+        }
     ]
 
-    reply = ai(messages)
+    messages += history
 
-    history.append({"role":"user","content":d.message})
-    history.append({"role":"assistant","content":reply})
+    messages.append({
+        "role": "user",
+        "content": data.message
+    })
 
-    save(CHATS_FILE, chats)
+    reply = ask_ai(messages)
 
-    return {"reply": reply}
+    history.append({
+        "role": "user",
+        "content": data.message
+    })
 
-# ================= UI =================
+    history.append({
+        "role": "assistant",
+        "content": reply
+    })
+
+    save_json(CHATS_FILE, chat_memory)
+
+    return {
+        "reply": reply
+    }
+
+# =========================================================
+# FRONTEND
+# =========================================================
+
 @app.get("/", response_class=HTMLResponse)
 def home():
+
     return """
 <!DOCTYPE html>
 <html>
 <head>
-<title>Bloxy-bot v6</title>
+<title>Bloxy-bot</title>
+
 <style>
-body{margin:0;font-family:Arial;background:#0f0f0f;color:white;}
-.container{display:flex;height:100vh;}
-.sidebar{width:280px;background:#111;display:flex;flex-direction:column;}
-.main{flex:1;display:flex;flex-direction:column;}
-.msg{padding:12px;margin:10px;background:#1a1a1a;border-radius:10px;}
-.input{padding:10px;background:#111;display:flex;}
-input{flex:1;padding:10px;}
-button{padding:10px;background:orange;border:none;}
+
+*{
+box-sizing:border-box;
+}
+
+body{
+margin:0;
+background:#0f0f0f;
+color:white;
+font-family:Arial;
+overflow:hidden;
+}
+
+.container{
+display:flex;
+height:100vh;
+}
+
+.sidebar{
+width:280px;
+background:#111;
+border-right:1px solid #222;
+display:flex;
+flex-direction:column;
+justify-content:space-between;
+}
+
+.side-top{
+padding:12px;
+}
+
+.logo{
+font-size:24px;
+font-weight:bold;
+margin-bottom:15px;
+}
+
+.newchat{
+width:100%;
+padding:14px;
+background:#1e1e1e;
+border:none;
+border-radius:12px;
+color:white;
+cursor:pointer;
+margin-bottom:14px;
+transition:0.2s;
+}
+
+.newchat:hover{
+background:#2a2a2a;
+}
+
+.chatitem{
+padding:12px;
+background:#1a1a1a;
+border-radius:12px;
+margin-top:8px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+
+.chatname{
+cursor:pointer;
+flex:1;
+}
+
+.actions{
+display:flex;
+gap:5px;
+}
+
+.actionbtn{
+background:transparent;
+border:none;
+color:white;
+cursor:pointer;
+font-size:14px;
+}
+
+.userbox{
+padding:18px;
+border-top:1px solid #222;
+background:#101010;
+}
+
+.main{
+flex:1;
+display:flex;
+flex-direction:column;
+}
+
+.messages{
+flex:1;
+overflow:auto;
+padding:25px;
+scroll-behavior:smooth;
+}
+
+.msg{
+padding:16px;
+margin-bottom:18px;
+background:#1a1a1a;
+border-radius:16px;
+line-height:1.8;
+white-space:pre-wrap;
+animation:fade 0.2s ease;
+}
+
+@keyframes fade{
+from{
+opacity:0;
+transform:translateY(10px);
+}
+to{
+opacity:1;
+transform:translateY(0px);
+}
+}
+
+.input-area{
+padding:18px;
+border-top:1px solid #222;
+background:#111;
+}
+
+.inputbox{
+width:100%;
+padding:16px;
+border:none;
+outline:none;
+border-radius:18px;
+background:#1d1d1d;
+color:white;
+font-size:15px;
+}
+
+.notice{
+text-align:center;
+font-size:12px;
+color:#777;
+margin-top:10px;
+}
+
+#auth{
+position:fixed;
+top:0;
+left:0;
+right:0;
+bottom:0;
+background:#000000dd;
+display:flex;
+justify-content:center;
+align-items:center;
+z-index:999;
+backdrop-filter:blur(10px);
+}
+
+.authbox{
+width:360px;
+background:#171717;
+padding:30px;
+border-radius:22px;
+box-shadow:0 0 40px rgba(0,0,0,0.5);
+}
+
+.authtitle{
+font-size:28px;
+font-weight:bold;
+margin-bottom:18px;
+}
+
+.authinput{
+width:100%;
+padding:16px;
+margin-top:12px;
+border:none;
+outline:none;
+border-radius:14px;
+background:#222;
+color:white;
+font-size:15px;
+}
+
+.authbtn{
+width:100%;
+padding:16px;
+margin-top:14px;
+border:none;
+border-radius:14px;
+background:#ff8c00;
+color:white;
+font-weight:bold;
+cursor:pointer;
+font-size:15px;
+transition:0.2s;
+}
+
+.authbtn:hover{
+opacity:0.9;
+}
+
+.badge{
+width:18px;
+height:18px;
+display:inline-block;
+vertical-align:middle;
+margin-left:4px;
+}
+
+.username{
+display:flex;
+align-items:center;
+gap:4px;
+font-weight:bold;
+}
+
 </style>
 </head>
+
 <body>
+
+<div id="auth">
+
+<div class="authbox">
+
+<div class="authtitle">
+Bloxy-bot
+</div>
+
+<input
+class="authinput"
+id="email"
+placeholder="Email"
+>
+
+<input
+class="authinput"
+id="password"
+type="password"
+placeholder="Password"
+>
+
+<button class="authbtn" onclick="signup()">
+Signup
+</button>
+
+<button class="authbtn" onclick="login()">
+Login
+</button>
+
+</div>
+
+</div>
 
 <div class="container">
 
 <div class="sidebar">
-<h3 style="padding:10px;">Bloxy-bot v6</h3>
+
+<div class="side-top">
+
+<div class="logo">
+Bloxy-bot
+</div>
+
+<button class="newchat" onclick="newChat()">
++ New Chat
+</button>
+
+<div id="chatlist"></div>
+
+</div>
+
+<div class="userbox" id="userbox">
+Guest
+</div>
+
 </div>
 
 <div class="main">
 
-<div id="chat"></div>
+<div class="messages" id="messages"></div>
 
-<div class="input">
-<input id="msg">
-<button onclick="send()">Send</button>
+<div class="input-area">
+
+<input
+class="inputbox"
+id="message"
+placeholder="Message Bloxy-bot..."
+onkeydown="if(event.key==='Enter'){send()}"
+>
+
+<div class="notice">
+Bloxy-bot can make mistakes. Double check just in case.
+</div>
+
 </div>
 
 </div>
@@ -250,25 +735,352 @@ button{padding:10px;background:orange;border:none;}
 </div>
 
 <script>
-let email="test@test.com";
-let chat_id="main";
 
-async function send(){
-let m=document.getElementById("msg").value;
+let currentUser = {
+email:null,
+username:"Guest",
+verified:false
+};
 
-let r=await fetch("/chat",{
+let currentChat = "main";
+
+let chats = {
+"main":[]
+};
+
+function verifiedBadge(){
+
+return `
+<svg class="badge" viewBox="0 0 24 24">
+
+<path
+fill="#ff8c00"
+d="
+M12 2.2
+C13.2 2.2 14 3.5 15 4
+C16 4.5 17.5 4.2 18.4 5
+C19.3 5.8 19.1 7.2 19.6 8.3
+C20.1 9.4 21.4 10.2 21.4 11.5
+C21.4 12.8 20.1 13.6 19.6 14.7
+C19.1 15.8 19.3 17.2 18.4 18
+C17.5 18.8 16 18.5 15 19
+C14 19.5 13.2 20.8 12 20.8
+C10.8 20.8 10 19.5 9 19
+C8 18.5 6.5 18.8 5.6 18
+C4.7 17.2 4.9 15.8 4.4 14.7
+C3.9 13.6 2.6 12.8 2.6 11.5
+C2.6 10.2 3.9 9.4 4.4 8.3
+C4.9 7.2 4.7 5.8 5.6 5
+C6.5 4.2 8 4.5 9 4
+C10 3.5 10.8 2.2 12 2.2
+Z">
+</path>
+
+<path
+d="M8.3 12.2 L10.7 14.4 L15.7 9.2"
+stroke="white"
+stroke-width="2.2"
+fill="none"
+stroke-linecap="round"
+stroke-linejoin="round">
+</path>
+
+</svg>
+`;
+}
+
+function updateUserBox(){
+
+let html = `
+<div class="username">
+${currentUser.username}
+${currentUser.verified ? verifiedBadge() : ""}
+</div>
+`;
+
+document.getElementById("userbox").innerHTML = html;
+}
+
+const savedUser = localStorage.getItem("bloxy_user");
+
+if(savedUser){
+
+currentUser = JSON.parse(savedUser);
+
+document.getElementById("auth").style.display = "none";
+
+updateUserBox();
+}
+
+function signup(){
+
+fetch("/signup",{
 method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({email,chat_id,message:m})
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+email:email.value,
+password:password.value
+})
+})
+.then(r=>r.json())
+.then(d=>{
+
+if(!d.ok){
+alert(d.error);
+return;
+}
+
+alert("Signup successful. Please login.");
+});
+}
+
+function login(){
+
+fetch("/login",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+email:email.value,
+password:password.value
+})
+})
+.then(r=>r.json())
+.then(d=>{
+
+if(!d.ok){
+alert(d.error);
+return;
+}
+
+currentUser = {
+email:d.email,
+username:d.username,
+verified:d.verified
+};
+
+localStorage.setItem(
+"bloxy_user",
+JSON.stringify(currentUser)
+);
+
+document.getElementById("auth").style.display = "none";
+
+updateUserBox();
+});
+}
+
+function newChat(){
+
+let id = "Chat " + (Object.keys(chats).length + 1);
+
+chats[id] = [];
+
+currentChat = id;
+
+renderChats();
+
+render();
+}
+
+function renderChats(){
+
+let box = document.getElementById("chatlist");
+
+box.innerHTML = "";
+
+for(let c in chats){
+
+let wrap = document.createElement("div");
+
+wrap.className = "chatitem";
+
+let title = document.createElement("div");
+
+title.className = "chatname";
+
+title.innerText = c;
+
+title.onclick = ()=>{
+currentChat = c;
+render();
+};
+
+let actions = document.createElement("div");
+
+actions.className = "actions";
+
+let rename = document.createElement("button");
+
+rename.className = "actionbtn";
+
+rename.innerText = "✏";
+
+rename.onclick = ()=>{
+
+let newName = prompt("Rename chat:", c);
+
+if(!newName) return;
+
+chats[newName] = chats[c];
+
+delete chats[c];
+
+if(currentChat === c){
+currentChat = newName;
+}
+
+renderChats();
+};
+
+let del = document.createElement("button");
+
+del.className = "actionbtn";
+
+del.innerText = "🗑";
+
+del.onclick = ()=>{
+
+delete chats[c];
+
+if(Object.keys(chats).length === 0){
+
+chats["main"] = [];
+
+currentChat = "main";
+
+}else{
+
+currentChat = Object.keys(chats)[0];
+}
+
+renderChats();
+render();
+};
+
+actions.appendChild(rename);
+actions.appendChild(del);
+
+wrap.appendChild(title);
+wrap.appendChild(actions);
+
+box.appendChild(wrap);
+}
+}
+
+function send(){
+
+let input = document.getElementById("message");
+
+let msg = input.value.trim();
+
+if(!msg){
+return;
+}
+
+input.value = "";
+
+chats[currentChat].push({
+role:"user",
+content:msg
 });
 
-let d=await r.json();
+render();
 
-document.getElementById("chat").innerHTML +=
-"<div class='msg'>"+m+"</div><div class='msg'>"+d.reply+"</div>";
+fetch("/chat",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+email:currentUser.email,
+chat_id:currentChat,
+message:msg
+})
+})
+.then(r=>r.json())
+.then(d=>{
+
+chats[currentChat].push({
+role:"assistant",
+content:d.reply
+});
+
+render();
+})
+.catch(()=>{
+
+chats[currentChat].push({
+role:"assistant",
+content:"Bloxy-bot connection error."
+});
+
+render();
+});
 }
+
+function render(){
+
+let box = document.getElementById("messages");
+
+box.innerHTML = "";
+
+for(let m of chats[currentChat]){
+
+let d = document.createElement("div");
+
+d.className = "msg";
+
+if(m.role === "user"){
+
+d.innerHTML = `
+<div class="username">
+${currentUser.username}
+${currentUser.verified ? verifiedBadge() : ""}
+</div>
+
+<div style="margin-top:10px;">
+${m.content}
+</div>
+`;
+
+}else{
+
+d.innerHTML = `
+<div class="username">
+Bloxy-bot
+</div>
+
+<div style="margin-top:10px;">
+${m.content}
+</div>
+`;
+}
+
+box.appendChild(d);
+}
+
+box.scrollTop = box.scrollHeight;
+}
+
+renderChats();
+render();
+
 </script>
 
 </body>
 </html>
 """
+
+# =========================================================
+# RUN
+# =========================================================
+
+if __name__ == "__main__":
+
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
