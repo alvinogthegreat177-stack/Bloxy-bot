@@ -135,7 +135,7 @@ def ai(messages):
             json={
                 "model": "llama3-70b-8192",
                 "messages": clean,
-                "temperature": 0.7,
+                "temperature": 1.8,
                 "max_tokens": 1000000
             }
         )
