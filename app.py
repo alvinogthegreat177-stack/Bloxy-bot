@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import requests
 import json
 import os
+import traceback
 
 app = FastAPI()
 
@@ -17,7 +18,7 @@ NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY")
 
 # =========================================================
-# VERIFIED OWNER ACCOUNT
+# OWNER VERIFIED ACCOUNT
 # =========================================================
 
 OWNER_EMAIL = "alvinogthegreat177@gmail.com"
@@ -31,25 +32,21 @@ USERS_FILE = "users.json"
 CHATS_FILE = "chats.json"
 
 # =========================================================
-# LOAD / SAVE
+# HELPERS
 # =========================================================
 
 def load_json(path, default):
 
     try:
-
         with open(path, "r") as f:
             return json.load(f)
-
     except:
         return default
-
 
 def save_json(path, data):
 
     with open(path, "w") as f:
         json.dump(data, f)
-
 
 users = load_json(USERS_FILE, {})
 chat_memory = load_json(CHATS_FILE, {})
@@ -62,14 +59,13 @@ class Auth(BaseModel):
     email: str
     password: str
 
-
 class ChatRequest(BaseModel):
     email: str
     chat_id: str
     message: str
 
 # =========================================================
-# WIKIPEDIA
+# TOOLS
 # =========================================================
 
 def wikipedia_search(query):
@@ -82,57 +78,10 @@ def wikipedia_search(query):
 
         data = r.json()
 
-        if "extract" in data:
-            return data["extract"]
-
-    except:
-        pass
-
-    return ""
-
-# =========================================================
-# NEWS API
-# =========================================================
-
-def news_search(query):
-
-    if not NEWS_API_KEY:
-        return ""
-
-    try:
-
-        r = requests.get(
-            "https://newsapi.org/v2/everything",
-            params={
-                "q": query,
-                "apiKey": NEWS_API_KEY,
-                "pageSize": 3
-            }
-        )
-
-        data = r.json()
-
-        articles = data.get("articles", [])
-
-        if not articles:
-            return ""
-
-        output = []
-
-        for a in articles:
-
-            output.append(
-                f"{a['title']} - {a['source']['name']}"
-            )
-
-        return "\n".join(output)
+        return data.get("extract", "")
 
     except:
         return ""
-
-# =========================================================
-# TAVILY SEARCH
-# =========================================================
 
 def tavily_search(query):
 
@@ -146,29 +95,57 @@ def tavily_search(query):
             json={
                 "api_key": TAVILY_API_KEY,
                 "query": query,
-                "max_results": 3
-            }
+                "max_results": 2
+            },
+            timeout=20
         )
 
         data = r.json()
 
         results = data.get("results", [])
 
-        output = []
+        text = []
 
         for x in results:
-            output.append(
-                x.get("content", "")
-            )
+            text.append(x.get("content", ""))
 
-        return "\n".join(output)
+        return "\n".join(text)
 
     except:
         return ""
 
-# =========================================================
-# WOLFRAM
-# =========================================================
+def news_search(query):
+
+    if not NEWS_API_KEY:
+        return ""
+
+    try:
+
+        r = requests.get(
+            "https://newsapi.org/v2/everything",
+            params={
+                "q": query,
+                "apiKey": NEWS_API_KEY,
+                "pageSize": 2
+            },
+            timeout=20
+        )
+
+        data = r.json()
+
+        articles = data.get("articles", [])
+
+        text = []
+
+        for a in articles:
+            text.append(
+                f"{a['title']} - {a['source']['name']}"
+            )
+
+        return "\n".join(text)
+
+    except:
+        return ""
 
 def wolfram_search(query):
 
@@ -182,7 +159,8 @@ def wolfram_search(query):
             params={
                 "appid": WOLFRAM_API_KEY,
                 "i": query
-            }
+            },
+            timeout=20
         )
 
         return r.text
@@ -191,7 +169,7 @@ def wolfram_search(query):
         return ""
 
 # =========================================================
-# TOOL ROUTER
+# SMART TOOL ROUTER
 # =========================================================
 
 def build_tool_context(prompt):
@@ -200,46 +178,35 @@ def build_tool_context(prompt):
 
     context = []
 
-    # WIKIPEDIA
     if any(x in text for x in [
         "who is",
         "what is",
         "history",
         "country",
-        "city",
-        "person"
+        "city"
     ]):
 
         wiki = wikipedia_search(prompt)
 
         if wiki:
+            context.append(f"WIKIPEDIA:\n{wiki}")
 
-            context.append(
-                f"WIKIPEDIA:\n{wiki}"
-            )
-
-    # NEWS
     if any(x in text for x in [
-        "latest",
         "news",
+        "latest",
         "today",
-        "current",
         "trending"
     ]):
 
         news = news_search(prompt)
 
         if news:
+            context.append(f"NEWS:\n{news}")
 
-            context.append(
-                f"NEWS:\n{news}"
-            )
-
-    # WOLFRAM
     if any(x in text for x in [
         "solve",
-        "equation",
         "calculate",
+        "equation",
         "math",
         "physics"
     ]):
@@ -247,39 +214,35 @@ def build_tool_context(prompt):
         wolfram = wolfram_search(prompt)
 
         if wolfram:
+            context.append(f"WOLFRAM:\n{wolfram}")
 
-            context.append(
-                f"WOLFRAM:\n{wolfram}"
-            )
-
-    # TAVILY
     if any(x in text for x in [
-        "internet",
-        "online",
-        "web",
         "search",
+        "internet",
+        "web",
+        "online",
         "research"
     ]):
 
         tav = tavily_search(prompt)
 
         if tav:
-
-            context.append(
-                f"TAVILY:\n{tav}"
-            )
+            context.append(f"TAVILY:\n{tav}")
 
     return "\n\n".join(context)
 
 # =========================================================
-# GROQ AI
+# AI SYSTEM
 # =========================================================
 
-def ask_groq(messages):
+def ask_ai(messages):
+
+    if not GROQ_API_KEY:
+        return "Groq API key missing."
 
     try:
 
-        r = requests.post(
+        response = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={
                 "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -289,15 +252,18 @@ def ask_groq(messages):
                 "model": "llama3-70b-8192",
                 "messages": messages,
                 "temperature": 0.7,
-                "max_tokens": 1200
+                "max_tokens": 2500
             },
-            timeout=60
+            timeout=90
         )
 
-        if r.status_code != 200:
-            return "Bloxy-bot API connection issue."
+        print("STATUS:", response.status_code)
+        print("TEXT:", response.text)
 
-        data = r.json()
+        if response.status_code != 200:
+            return f"AI Error {response.status_code}"
+
+        data = response.json()
 
         if (
             isinstance(data, dict)
@@ -309,8 +275,11 @@ def ask_groq(messages):
 
         return "Bloxy-bot could not generate a response."
 
-    except:
-        return "Bloxy-bot is temporarily unavailable."
+    except Exception as e:
+
+        print(traceback.format_exc())
+
+        return "Bloxy-bot AI system error."
 
 # =========================================================
 # SIGNUP
@@ -323,7 +292,7 @@ def signup(data: Auth):
 
         return {
             "ok": False,
-            "error": "User already exists"
+            "error": "Account already exists"
         }
 
     users[data.email] = {
@@ -344,7 +313,6 @@ def signup(data: Auth):
 @app.post("/login")
 def login(data: Auth):
 
-    # VERIFIED ACCOUNT
     if data.email == OWNER_EMAIL:
 
         if data.password != OWNER_PASSWORD:
@@ -361,12 +329,11 @@ def login(data: Auth):
             "email": OWNER_EMAIL
         }
 
-    # NORMAL USERS
     if data.email not in users:
 
         return {
             "ok": False,
-            "error": "User not found"
+            "error": "Account not found"
         }
 
     if users[data.email]["password"] != data.password:
@@ -407,11 +374,10 @@ Rules:
 
 - Speak formally and diplomatically
 - Format responses vertically
-- Avoid huge paragraphs
-- Use spacing cleanly
-- Use emojis naturally but not excessively
-- Be intelligent and calm
-- Be modern and helpful
+- Use clean spacing
+- Avoid giant paragraphs
+- Be modern and intelligent
+- Use emojis naturally
 - Never say:
   'As an AI language model'
 
@@ -433,7 +399,7 @@ External Context:
         "content": data.message
     })
 
-    reply = ask_groq(messages)
+    reply = ask_ai(messages)
 
     history.append({
         "role": "user",
@@ -523,12 +489,27 @@ padding:12px;
 background:#1a1a1a;
 border-radius:12px;
 margin-top:8px;
-cursor:pointer;
-transition:0.2s;
+display:flex;
+justify-content:space-between;
+align-items:center;
 }
 
-.chatitem:hover{
-background:#252525;
+.chatname{
+cursor:pointer;
+flex:1;
+}
+
+.actions{
+display:flex;
+gap:5px;
+}
+
+.actionbtn{
+background:transparent;
+border:none;
+color:white;
+cursor:pointer;
+font-size:14px;
 }
 
 .userbox{
@@ -556,8 +537,8 @@ margin-bottom:18px;
 background:#1a1a1a;
 border-radius:16px;
 line-height:1.8;
-animation:fade 0.18s ease;
 white-space:pre-wrap;
+animation:fade 0.2s ease;
 }
 
 @keyframes fade{
@@ -606,43 +587,66 @@ display:flex;
 justify-content:center;
 align-items:center;
 z-index:999;
+backdrop-filter:blur(10px);
 }
 
 .authbox{
-width:350px;
+width:360px;
 background:#171717;
-padding:25px;
-border-radius:20px;
+padding:30px;
+border-radius:22px;
+box-shadow:0 0 40px rgba(0,0,0,0.5);
+}
+
+.authtitle{
+font-size:28px;
+font-weight:bold;
+margin-bottom:18px;
 }
 
 .authinput{
 width:100%;
-padding:15px;
-margin-top:10px;
+padding:16px;
+margin-top:12px;
 border:none;
 outline:none;
-border-radius:12px;
+border-radius:14px;
 background:#222;
 color:white;
+font-size:15px;
 }
 
 .authbtn{
 width:100%;
-padding:15px;
-margin-top:12px;
+padding:16px;
+margin-top:14px;
 border:none;
-border-radius:12px;
+border-radius:14px;
 background:#ff8c00;
 color:white;
 font-weight:bold;
 cursor:pointer;
+font-size:15px;
+transition:0.2s;
+}
+
+.authbtn:hover{
+opacity:0.9;
 }
 
 .badge{
-width:17px;
-height:17px;
+width:18px;
+height:18px;
+display:inline-block;
 vertical-align:middle;
-margin-left:5px;
+margin-left:4px;
+}
+
+.username{
+display:flex;
+align-items:center;
+gap:4px;
+font-weight:bold;
 }
 
 </style>
@@ -654,7 +658,9 @@ margin-left:5px;
 
 <div class="authbox">
 
-<h2>Bloxy-bot</h2>
+<div class="authtitle">
+Bloxy-bot
+</div>
 
 <input
 class="authinput"
@@ -785,11 +791,12 @@ stroke-linejoin="round">
 
 function updateUserBox(){
 
-let html = currentUser.username;
-
-if(currentUser.verified){
-html += verifiedBadge();
-}
+let html = `
+<div class="username">
+${currentUser.username}
+${currentUser.verified ? verifiedBadge() : ""}
+</div>
+`;
 
 document.getElementById("userbox").innerHTML = html;
 }
@@ -825,7 +832,7 @@ alert(d.error);
 return;
 }
 
-alert("Signup successful.");
+alert("Signup successful. Please login.");
 });
 }
 
@@ -868,7 +875,7 @@ updateUserBox();
 
 function newChat(){
 
-let id = "chat_" + Date.now();
+let id = "Chat " + (Object.keys(chats).length + 1);
 
 chats[id] = [];
 
@@ -887,18 +894,80 @@ box.innerHTML = "";
 
 for(let c in chats){
 
-let d = document.createElement("div");
+let wrap = document.createElement("div");
 
-d.className = "chatitem";
+wrap.className = "chatitem";
 
-d.innerText = c;
+let title = document.createElement("div");
 
-d.onclick = ()=>{
+title.className = "chatname";
+
+title.innerText = c;
+
+title.onclick = ()=>{
 currentChat = c;
 render();
 };
 
-box.appendChild(d);
+let actions = document.createElement("div");
+
+actions.className = "actions";
+
+let rename = document.createElement("button");
+
+rename.className = "actionbtn";
+
+rename.innerText = "✏";
+
+rename.onclick = ()=>{
+
+let newName = prompt("Rename chat:", c);
+
+if(!newName) return;
+
+chats[newName] = chats[c];
+
+delete chats[c];
+
+if(currentChat === c){
+currentChat = newName;
+}
+
+renderChats();
+};
+
+let del = document.createElement("button");
+
+del.className = "actionbtn";
+
+del.innerText = "🗑";
+
+del.onclick = ()=>{
+
+delete chats[c];
+
+if(Object.keys(chats).length === 0){
+
+chats["main"] = [];
+
+currentChat = "main";
+
+}else{
+
+currentChat = Object.keys(chats)[0];
+}
+
+renderChats();
+render();
+};
+
+actions.appendChild(rename);
+actions.appendChild(del);
+
+wrap.appendChild(title);
+wrap.appendChild(actions);
+
+box.appendChild(wrap);
 }
 }
 
@@ -941,6 +1010,15 @@ content:d.reply
 });
 
 render();
+})
+.catch(()=>{
+
+chats[currentChat].push({
+role:"assistant",
+content:"Bloxy-bot connection error."
+});
+
+render();
 });
 }
 
@@ -958,24 +1036,27 @@ d.className = "msg";
 
 if(m.role === "user"){
 
-let name = currentUser.username;
-
-if(currentUser.verified){
-name += verifiedBadge();
-}
-
 d.innerHTML = `
-<b>${name}</b>
+<div class="username">
+${currentUser.username}
+${currentUser.verified ? verifiedBadge() : ""}
+</div>
 
+<div style="margin-top:10px;">
 ${m.content}
+</div>
 `;
 
 }else{
 
 d.innerHTML = `
-<b>Bloxy-bot</b>
+<div class="username">
+Bloxy-bot
+</div>
 
+<div style="margin-top:10px;">
 ${m.content}
+</div>
 `;
 }
 
