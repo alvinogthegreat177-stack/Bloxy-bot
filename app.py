@@ -1,280 +1,231 @@
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-import requests
-import json
-import os
-import uuid
+import requests, json, os, traceback
 
 app = FastAPI()
 
-# =========================================================
-# KEYS
-# =========================================================
-
+# ================= KEYS =================
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY")
 
+# ================= OWNER =================
 OWNER_EMAIL = "alvinogthegreat177@gmail.com"
 
+# ================= STORAGE =================
 USERS_FILE = "users.json"
 CHATS_FILE = "chats.json"
 
-# =========================================================
-# SAFE STORAGE (ANTI-CORRUPTION)
-# =========================================================
-
-def load(path, default):
+def load(f, d):
     try:
-        with open(path,"r") as f:
-            return json.load(f)
+        return json.load(open(f))
     except:
-        return default
+        return d
 
-def save(path,data):
-    tmp = path + ".tmp"
-    with open(tmp,"w") as f:
-        json.dump(data,f)
-    os.replace(tmp,path)
+def save(f, d):
+    try:
+        json.dump(d, open(f,"w"))
+    except:
+        pass
 
-users = load(USERS_FILE,{})
-chats = load(CHATS_FILE,{})
+users = load(USERS_FILE, {})
+chats = load(CHATS_FILE, {})
 
-# =========================================================
-# MODELS (SAFE AGAINST 400/422)
-# =========================================================
+# ================= MODELS =================
+class Auth(BaseModel):
+    email: str
+    password: str
 
-class ChatRequest(BaseModel):
-    email: str = "guest"
-    chat_id: str = "main"
-    message: str = ""
+class Chat(BaseModel):
+    email: str
+    chat_id: str
+    message: str
 
-# =========================================================
-# TOOLS
-# =========================================================
-
+# ================= TOOLS =================
 def wiki(q):
     try:
-        r=requests.get(f"https://en.wikipedia.org/api/rest_v1/page/summary/{q}")
-        return r.json().get("extract","")
-    except:
-        return ""
-
-def news(q):
-    try:
-        r=requests.get("https://newsapi.org/v2/everything",
-            params={"q":q,"apiKey":NEWS_API_KEY})
-        return "\n".join([a["title"] for a in r.json().get("articles",[])])
+        return requests.get(
+            "https://en.wikipedia.org/api/rest_v1/page/summary/" + q
+        ).json().get("extract","")
     except:
         return ""
 
 def tavily(q):
     try:
-        r=requests.post("https://api.tavily.com/search",
-            json={"api_key":TAVILY_API_KEY,"query":q,"max_results":2})
-        return "\n".join([x.get("content","") for x in r.json().get("results",[])])
+        if not TAVILY_API_KEY:
+            return ""
+        r = requests.post("https://api.tavily.com/search", json={
+            "api_key": TAVILY_API_KEY,
+            "query": q,
+            "max_results": 2
+        })
+        return "\n".join([i.get("content","") for i in r.json().get("results",[])])
+    except:
+        return ""
+
+def news(q):
+    try:
+        if not NEWS_API_KEY:
+            return ""
+        r = requests.get("https://newsapi.org/v2/everything",
+            params={"q": q, "apiKey": NEWS_API_KEY, "pageSize": 2})
+        return "\n".join([a.get("title","") for a in r.json().get("articles",[])])
     except:
         return ""
 
 def wolfram(q):
     try:
-        r=requests.get("http://api.wolframalpha.com/v1/result",
-            params={"appid":WOLFRAM_API_KEY,"i":q})
-        return r.text
+        if not WOLFRAM_API_KEY:
+            return ""
+        return requests.get(
+            "http://api.wolframalpha.com/v1/result",
+            params={"appid": WOLFRAM_API_KEY, "i": q}
+        ).text
     except:
         return ""
 
-# =========================================================
-# CONTEXT ENGINE
-# =========================================================
-
+# ================= CONTEXT =================
 def context(msg):
-    t=msg.lower()
-    out=[]
+    t = msg.lower()
+    out = []
 
-    if any(x in t for x in ["who is","what is","history","country"]):
-        w=wiki(msg)
+    if any(x in t for x in ["who","what","city","country"]):
+        w = wiki(msg)
         if w: out.append("WIKI:\n"+w)
 
     if "news" in t:
-        w=news(msg)
+        w = news(msg)
         if w: out.append("NEWS:\n"+w)
 
-    if "search" in t:
-        w=tavily(msg)
-        if w: out.append("WEB:\n"+w)
-
     if any(x in t for x in ["math","solve","equation"]):
-        w=wolfram(msg)
+        w = wolfram(msg)
         if w: out.append("MATH:\n"+w)
+
+    if any(x in t for x in ["search","web"]):
+        w = tavily(msg)
+        if w: out.append("WEB:\n"+w)
 
     return "\n\n".join(out)
 
-# =========================================================
-# GROQ STREAM (FIXED PROPERLY)
-# =========================================================
+# ================= GROQ FIX =================
+def ai(messages):
+    if not GROQ_API_KEY:
+        return "Missing API key"
 
-def groq_stream(messages):
+    clean = []
+    for m in messages:
+        if not isinstance(m, dict): continue
+        if "role" not in m or "content" not in m: continue
+        if m["content"] is None: continue
 
-    r=requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={
-            "Authorization":f"Bearer {GROQ_API_KEY}",
-            "Content-Type":"application/json"
-        },
-        json={
-            "model":"llama3-70b-8192",
-            "messages":messages,
-            "temperature":0.7,
-            "stream":True
-        },
-        stream=True
-    )
+        clean.append({
+            "role": str(m["role"]),
+            "content": str(m["content"])
+        })
 
-    for line in r.iter_lines():
-        if not line:
-            continue
-
-        line=line.decode()
-
-        if "content" in line:
-            try:
-                yield line.split('"content":"')[1].split('"')[0]
-            except:
-                pass
-
-# =========================================================
-# CHAT STORAGE ENGINE
-# =========================================================
-
-def ensure_user(email):
-    if email not in chats:
-        chats[email] = {
-            "active":"main",
-            "list":{
-                "main":{
-                    "title":"Main Chat",
-                    "messages":[]
-                }
+    try:
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama3-70b-8192",
+                "messages": clean,
+                "temperature": 0.7,
+                "max_tokens": 1000000
             }
-        }
+        )
 
-# =========================================================
-# CHAT API
-# =========================================================
+        if r.status_code != 200:
+            return f"AI ERROR {r.status_code}"
 
-@app.post("/chat")
-def chat(data:ChatRequest):
+        return r.json()["choices"][0]["message"]["content"]
 
-    email=data.email or "guest"
-    chat_id=data.chat_id or "main"
-    msg=data.message or ""
+    except:
+        return "AI error"
 
-    if msg.strip()=="":
-        return {"reply":"Empty message"}
+# ================= SIGNUP =================
+@app.post("/signup")
+def signup(d: Auth):
+    if d.email in users:
+        return {"ok": False, "error": "exists"}
 
-    ensure_user(email)
-
-    if chat_id not in chats[email]["list"]:
-        chats[email]["list"][chat_id]={
-            "title":"New Chat",
-            "messages":[]
-        }
-
-    history = chats[email]["list"][chat_id]["messages"]
-
-    ctx=context(msg)
-
-    system={
-        "role":"system",
-        "content":"You are Bloxy-bot AI.\n\nContext:\n"+ctx
+    users[d.email] = {
+        "password": d.password,
+        "username": d.email.split("@")[0]
     }
 
-    messages=[system]+history+[{"role":"user","content":msg}]
+    save(USERS_FILE, users)
+    return {"ok": True}
 
-    def stream():
+# ================= LOGIN =================
+@app.post("/login")
+def login(d: Auth):
 
-        full=""
+    if d.email not in users:
+        return {"ok": False}
 
-        for chunk in groq_stream(messages):
-            full+=chunk
-            yield chunk
+    if users[d.email]["password"] != d.password:
+        return {"ok": False}
 
-        history.append({"role":"user","content":msg})
-        history.append({"role":"assistant","content":full})
+    return {
+        "ok": True,
+        "email": d.email,
+        "username": users[d.email]["username"],
+        "verified": d.email == OWNER_EMAIL
+    }
 
-        save(CHATS_FILE,chats)
+# ================= CHAT =================
+@app.post("/chat")
+def chat(d: Chat):
 
-    return StreamingResponse(stream(),media_type="text/plain")
+    if d.email not in chats:
+        chats[d.email] = {}
 
-# =========================================================
-# CHAT MANAGEMENT (SIDEBAR FEATURES)
-# =========================================================
+    if d.chat_id not in chats[d.email]:
+        chats[d.email][d.chat_id] = []
 
-@app.post("/rename")
-def rename(d:dict):
+    history = chats[d.email][d.chat_id]
 
-    email=d.get("email","guest")
-    chat_id=d.get("chat_id")
-    name=d.get("name")
+    system = {
+        "role": "system",
+        "content": "Bloxy-bot enterprise AI\n\n" + context(d.message)
+    }
 
-    ensure_user(email)
+    messages = [system] + history + [
+        {"role":"user","content":d.message}
+    ]
 
-    if chat_id in chats[email]["list"]:
-        chats[email]["list"][chat_id]["title"]=name
+    reply = ai(messages)
 
-    save(CHATS_FILE,chats)
+    history.append({"role":"user","content":d.message})
+    history.append({"role":"assistant","content":reply})
 
-    return {"ok":True}
+    save(CHATS_FILE, chats)
 
-@app.post("/delete")
-def delete(d:dict):
+    return {"reply": reply}
 
-    email=d.get("email","guest")
-    chat_id=d.get("chat_id")
-
-    ensure_user(email)
-
-    if chat_id in chats[email]["list"]:
-        del chats[email]["list"][chat_id]
-
-    save(CHATS_FILE,chats)
-
-    return {"ok":True}
-
-@app.get("/list")
-def list_chats(email:str="guest"):
-
-    ensure_user(email)
-
-    return chats[email]["list"]
-
-# =========================================================
-# UI (FULL SIDEBAR + CHAT + STREAM FIXED)
-# =========================================================
-
+# ================= UI =================
 @app.get("/", response_class=HTMLResponse)
 def home():
     return """
 <!DOCTYPE html>
 <html>
 <head>
-<title>Bloxy-bot v3</title>
+<title>Bloxy-bot v6</title>
 <style>
-body{margin:0;background:#0f0f0f;color:white;font-family:Arial;}
+body{margin:0;font-family:Arial;background:#0f0f0f;color:white;}
 .container{display:flex;height:100vh;}
-.sidebar{width:260px;background:#111;padding:10px;}
+.sidebar{width:280px;background:#111;display:flex;flex-direction:column;}
 .main{flex:1;display:flex;flex-direction:column;}
-.box{flex:1;overflow:auto;padding:20px;}
-.msg{margin:10px;padding:10px;border-radius:10px;}
-.user{background:#2563eb;margin-left:auto;}
-.ai{background:#1f1f1f;}
-.input{display:flex;padding:10px;background:#111;}
+.msg{padding:12px;margin:10px;background:#1a1a1a;border-radius:10px;}
+.input{padding:10px;background:#111;display:flex;}
 input{flex:1;padding:10px;}
-button{padding:10px;background:#2563eb;color:white;}
-.chatitem{padding:8px;background:#1a1a1a;margin:5px;cursor:pointer;}
+button{padding:10px;background:orange;border:none;}
 </style>
 </head>
 <body>
@@ -282,14 +233,12 @@ button{padding:10px;background:#2563eb;color:white;}
 <div class="container">
 
 <div class="sidebar">
-<h3>Chats</h3>
-<div id="list"></div>
-<button onclick="newChat()">+ New</button>
+<h3 style="padding:10px;">Bloxy-bot v6</h3>
 </div>
 
 <div class="main">
 
-<div class="box" id="box"></div>
+<div id="chat"></div>
 
 <div class="input">
 <input id="msg">
@@ -301,84 +250,25 @@ button{padding:10px;background:#2563eb;color:white;}
 </div>
 
 <script>
-
-let email="guest";
-let current="main";
-
-async function load(){
-
-let r=await fetch("/list?email="+email);
-let d=await r.json();
-
-let box=document.getElementById("list");
-box.innerHTML="";
-
-for(let id in d){
-
-let div=document.createElement("div");
-div.className="chatitem";
-div.innerText=d[id].title;
-
-div.onclick=()=>{current=id;render();};
-
-box.appendChild(div);
-}
-}
+let email="test@test.com";
+let chat_id="main";
 
 async function send(){
-
 let m=document.getElementById("msg").value;
-document.getElementById("msg").value="";
-
-let box=document.getElementById("box");
-
-let div=document.createElement("div");
-div.className="msg ai";
-box.appendChild(div);
 
 let r=await fetch("/chat",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
-body:JSON.stringify({email:email,chat_id:current,message:m})
+body:JSON.stringify({email,chat_id,message:m})
 });
 
-const reader=r.body.getReader();
-const decoder=new TextDecoder();
+let d=await r.json();
 
-while(true){
-const {value,done}=await reader.read();
-if(done)break;
-div.innerText+=decoder.decode(value);
+document.getElementById("chat").innerHTML +=
+"<div class='msg'>"+m+"</div><div class='msg'>"+d.reply+"</div>";
 }
-
-load();
-}
-
-function newChat(){
-
-current="chat_"+Date.now();
-
-fetch("/rename",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({email:email,chat_id:current,name:"New Chat"})
-});
-
-load();
-}
-
-load();
-
 </script>
 
 </body>
 </html>
 """
-
-# =========================================================
-# RUN
-# =========================================================
-
-if __name__=="__main__":
-    import uvicorn
-    uvicorn.run(app,host="0.0.0.0",port=8000)
