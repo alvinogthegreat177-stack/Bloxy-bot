@@ -5,6 +5,8 @@ import requests
 import json
 import os
 import traceback
+import uuid
+from datetime import datetime
 
 app = FastAPI()
 
@@ -12,7 +14,7 @@ app = FastAPI()
 # API KEYS
 # =========================================================
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY")
@@ -38,15 +40,20 @@ CHATS_FILE = "chats.json"
 def load_json(path, default):
 
     try:
-        with open(path, "r") as f:
+
+        with open(path, "r", encoding="utf-8") as f:
+
             return json.load(f)
+
     except:
+
         return default
 
 def save_json(path, data):
 
-    with open(path, "w") as f:
-        json.dump(data, f)
+    with open(path, "w", encoding="utf-8") as f:
+
+        json.dump(data, f, indent=2)
 
 users = load_json(USERS_FILE, {})
 chat_memory = load_json(CHATS_FILE, {})
@@ -56,32 +63,45 @@ chat_memory = load_json(CHATS_FILE, {})
 # =========================================================
 
 class Auth(BaseModel):
+
     email: str
     password: str
 
 class ChatRequest(BaseModel):
+
     email: str
     chat_id: str
     message: str
 
 # =========================================================
-# TOOLS
+# WIKIPEDIA
 # =========================================================
 
 def wikipedia_search(query):
 
     try:
 
+        query = query.replace(" ", "_")
+
         r = requests.get(
-            f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}"
+            f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}",
+            timeout=20
         )
+
+        if r.status_code != 200:
+            return ""
 
         data = r.json()
 
         return data.get("extract", "")
 
     except:
+
         return ""
+
+# =========================================================
+# TAVILY
+# =========================================================
 
 def tavily_search(query):
 
@@ -97,8 +117,11 @@ def tavily_search(query):
                 "query": query,
                 "max_results": 2
             },
-            timeout=20
+            timeout=30
         )
+
+        if r.status_code != 200:
+            return ""
 
         data = r.json()
 
@@ -106,13 +129,23 @@ def tavily_search(query):
 
         text = []
 
-        for x in results:
-            text.append(x.get("content", ""))
+        for item in results:
+
+            content = item.get("content", "")
+
+            if content:
+
+                text.append(content)
 
         return "\n".join(text)
 
     except:
+
         return ""
+
+# =========================================================
+# NEWS
+# =========================================================
 
 def news_search(query):
 
@@ -131,6 +164,9 @@ def news_search(query):
             timeout=20
         )
 
+        if r.status_code != 200:
+            return ""
+
         data = r.json()
 
         articles = data.get("articles", [])
@@ -138,14 +174,23 @@ def news_search(query):
         text = []
 
         for a in articles:
-            text.append(
-                f"{a['title']} - {a['source']['name']}"
-            )
+
+            title = a.get("title", "")
+            source = a.get("source", {}).get("name", "")
+
+            if title:
+
+                text.append(f"{title} - {source}")
 
         return "\n".join(text)
 
     except:
+
         return ""
+
+# =========================================================
+# WOLFRAM
+# =========================================================
 
 def wolfram_search(query):
 
@@ -163,13 +208,17 @@ def wolfram_search(query):
             timeout=20
         )
 
+        if r.status_code != 200:
+            return ""
+
         return r.text
 
     except:
+
         return ""
 
 # =========================================================
-# SMART TOOL ROUTER
+# TOOL ROUTER
 # =========================================================
 
 def build_tool_context(prompt):
@@ -189,7 +238,10 @@ def build_tool_context(prompt):
         wiki = wikipedia_search(prompt)
 
         if wiki:
-            context.append(f"WIKIPEDIA:\n{wiki}")
+
+            context.append(
+                f"WIKIPEDIA:\n{wiki}"
+            )
 
     if any(x in text for x in [
         "news",
@@ -201,7 +253,10 @@ def build_tool_context(prompt):
         news = news_search(prompt)
 
         if news:
-            context.append(f"NEWS:\n{news}")
+
+            context.append(
+                f"NEWS:\n{news}"
+            )
 
     if any(x in text for x in [
         "solve",
@@ -214,20 +269,26 @@ def build_tool_context(prompt):
         wolfram = wolfram_search(prompt)
 
         if wolfram:
-            context.append(f"WOLFRAM:\n{wolfram}")
+
+            context.append(
+                f"WOLFRAM:\n{wolfram}"
+            )
 
     if any(x in text for x in [
         "search",
         "internet",
-        "web",
         "online",
-        "research"
+        "research",
+        "web"
     ]):
 
         tav = tavily_search(prompt)
 
         if tav:
-            context.append(f"TAVILY:\n{tav}")
+
+            context.append(
+                f"TAVILY:\n{tav}"
+            )
 
     return "\n\n".join(context)
 
@@ -237,49 +298,97 @@ def build_tool_context(prompt):
 
 def ask_ai(messages):
 
-    if not GROQ_API_KEY:
-        return "Groq API key missing."
+    if not OPENROUTER_API_KEY:
+
+        return "OpenRouter API key missing."
 
     try:
 
+        clean_messages = []
+
+        for m in messages:
+
+            role = str(m.get("role", "user"))
+            content = str(m.get("content", "")).strip()
+
+            if not content:
+                continue
+
+            clean_messages.append({
+                "role": role,
+                "content": content
+            })
+
+        if len(clean_messages) == 0:
+
+            return "No valid messages."
+
         response = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
+            "https://openrouter.ai/api/v1/chat/completions",
+
             headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json"
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://bloxy-bot.ai",
+                "X-Title": "Bloxy-bot"
             },
+
             json={
-                "model": "llama3-70b-8192",
-                "messages": messages,
+
+                "model": "deepseek/deepseek-r1-0528:free",
+
+                "messages": clean_messages,
+
                 "temperature": 0.7,
-                "max_tokens": 2500
+
+                "max_tokens": 2500,
+
+                "top_p": 1,
+
+                "stream": False
             },
-            timeout=90
+
+            timeout=120
         )
 
         print("STATUS:", response.status_code)
         print("TEXT:", response.text)
 
         if response.status_code != 200:
-            return f"AI Error {response.status_code}"
+
+            try:
+
+                err = response.json()
+
+                return f"AI Error: {err}"
+
+            except:
+
+                return f"AI Error {response.status_code}"
 
         data = response.json()
 
-        if (
-            isinstance(data, dict)
-            and "choices" in data
-            and len(data["choices"]) > 0
-        ):
+        choices = data.get("choices")
 
-            return data["choices"][0]["message"]["content"]
+        if not choices:
 
-        return "Bloxy-bot could not generate a response."
+            return "No AI response choices."
+
+        message = choices[0].get("message", {})
+
+        content = message.get("content", "")
+
+        if not content:
+
+            return "Empty AI response."
+
+        return content.strip()
 
     except Exception as e:
 
         print(traceback.format_exc())
 
-        return "Bloxy-bot AI system error."
+        return f"Bloxy-bot AI system error: {str(e)}"
 
 # =========================================================
 # SIGNUP
@@ -288,16 +397,30 @@ def ask_ai(messages):
 @app.post("/signup")
 def signup(data: Auth):
 
-    if data.email in users:
+    email = data.email.strip().lower()
+
+    password = data.password.strip()
+
+    if not email or not password:
+
+        return {
+            "ok": False,
+            "error": "Missing email or password"
+        }
+
+    if email in users:
 
         return {
             "ok": False,
             "error": "Account already exists"
         }
 
-    users[data.email] = {
-        "password": data.password,
-        "username": data.email.split("@")[0]
+    username = email.split("@")[0]
+
+    users[email] = {
+        "password": password,
+        "username": username,
+        "created": str(datetime.now())
     }
 
     save_json(USERS_FILE, users)
@@ -313,9 +436,13 @@ def signup(data: Auth):
 @app.post("/login")
 def login(data: Auth):
 
-    if data.email == OWNER_EMAIL:
+    email = data.email.strip().lower()
 
-        if data.password != OWNER_PASSWORD:
+    password = data.password.strip()
+
+    if email == OWNER_EMAIL:
+
+        if password != OWNER_PASSWORD:
 
             return {
                 "ok": False,
@@ -329,14 +456,14 @@ def login(data: Auth):
             "email": OWNER_EMAIL
         }
 
-    if data.email not in users:
+    if email not in users:
 
         return {
             "ok": False,
             "error": "Account not found"
         }
 
-    if users[data.email]["password"] != data.password:
+    if users[email]["password"] != password:
 
         return {
             "ok": False,
@@ -345,9 +472,9 @@ def login(data: Auth):
 
     return {
         "ok": True,
-        "username": users[data.email]["username"],
+        "username": users[email]["username"],
         "verified": False,
-        "email": data.email
+        "email": email
     }
 
 # =========================================================
@@ -357,32 +484,41 @@ def login(data: Auth):
 @app.post("/chat")
 def chat(data: ChatRequest):
 
-    if data.email not in chat_memory:
-        chat_memory[data.email] = {}
+    email = data.email
+    chat_id = data.chat_id
+    message = data.message
 
-    if data.chat_id not in chat_memory[data.email]:
-        chat_memory[data.email][data.chat_id] = []
+    if email not in chat_memory:
 
-    history = chat_memory[data.email][data.chat_id]
+        chat_memory[email] = {}
 
-    tool_context = build_tool_context(data.message)
+    if chat_id not in chat_memory[email]:
+
+        chat_memory[email][chat_id] = []
+
+    history = chat_memory[email][chat_id]
+
+    tool_context = build_tool_context(message)
 
     system_prompt = f"""
+
 You are Bloxy-bot AI.
 
 Rules:
 
 - Speak formally and diplomatically
-- Format responses vertically
+- Format replies vertically
 - Use clean spacing
-- Avoid giant paragraphs
-- Be modern and intelligent
+- Avoid huge paragraphs
+- Be intelligent and modern
 - Use emojis naturally
+- Sound premium and advanced
 - Never say:
-  'As an AI language model'
+"As an AI language model"
 
 External Context:
 {tool_context}
+
 """
 
     messages = [
@@ -396,14 +532,14 @@ External Context:
 
     messages.append({
         "role": "user",
-        "content": data.message
+        "content": message
     })
 
     reply = ask_ai(messages)
 
     history.append({
         "role": "user",
-        "content": data.message
+        "content": message
     })
 
     history.append({
@@ -425,10 +561,16 @@ External Context:
 def home():
 
     return """
+
 <!DOCTYPE html>
+
 <html>
+
 <head>
+
 <title>Bloxy-bot</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 
@@ -460,6 +602,7 @@ justify-content:space-between;
 
 .side-top{
 padding:12px;
+overflow:auto;
 }
 
 .logo{
@@ -497,6 +640,9 @@ align-items:center;
 .chatname{
 cursor:pointer;
 flex:1;
+overflow:hidden;
+text-overflow:ellipsis;
+white-space:nowrap;
 }
 
 .actions{
@@ -542,14 +688,17 @@ animation:fade 0.2s ease;
 }
 
 @keyframes fade{
+
 from{
 opacity:0;
 transform:translateY(10px);
 }
+
 to{
 opacity:1;
 transform:translateY(0px);
 }
+
 }
 
 .input-area{
@@ -649,7 +798,24 @@ gap:4px;
 font-weight:bold;
 }
 
+@media(max-width:700px){
+
+.sidebar{
+width:90px;
+}
+
+.logo{
+font-size:18px;
+}
+
+.chatname{
+display:none;
+}
+
+}
+
 </style>
+
 </head>
 
 <body>
@@ -815,44 +981,62 @@ updateUserBox();
 function signup(){
 
 fetch("/signup",{
+
 method:"POST",
+
 headers:{
 "Content-Type":"application/json"
 },
+
 body:JSON.stringify({
 email:email.value,
 password:password.value
 })
+
 })
+
 .then(r=>r.json())
+
 .then(d=>{
 
 if(!d.ok){
+
 alert(d.error);
+
 return;
 }
 
 alert("Signup successful. Please login.");
+
 });
+
 }
 
 function login(){
 
 fetch("/login",{
+
 method:"POST",
+
 headers:{
 "Content-Type":"application/json"
 },
+
 body:JSON.stringify({
 email:email.value,
 password:password.value
 })
+
 })
+
 .then(r=>r.json())
+
 .then(d=>{
 
 if(!d.ok){
+
 alert(d.error);
+
 return;
 }
 
@@ -870,7 +1054,9 @@ JSON.stringify(currentUser)
 document.getElementById("auth").style.display = "none";
 
 updateUserBox();
+
 });
+
 }
 
 function newChat(){
@@ -884,6 +1070,7 @@ currentChat = id;
 renderChats();
 
 render();
+
 }
 
 function renderChats(){
@@ -905,8 +1092,11 @@ title.className = "chatname";
 title.innerText = c;
 
 title.onclick = ()=>{
+
 currentChat = c;
+
 render();
+
 };
 
 let actions = document.createElement("div");
@@ -930,10 +1120,12 @@ chats[newName] = chats[c];
 delete chats[c];
 
 if(currentChat === c){
+
 currentChat = newName;
 }
 
 renderChats();
+
 };
 
 let del = document.createElement("button");
@@ -955,29 +1147,37 @@ currentChat = "main";
 }else{
 
 currentChat = Object.keys(chats)[0];
+
 }
 
 renderChats();
+
 render();
+
 };
 
 actions.appendChild(rename);
+
 actions.appendChild(del);
 
 wrap.appendChild(title);
+
 wrap.appendChild(actions);
 
 box.appendChild(wrap);
-}
+
 }
 
-function send(){
+}
+
+async function send(){
 
 let input = document.getElementById("message");
 
 let msg = input.value.trim();
 
 if(!msg){
+
 return;
 }
 
@@ -990,19 +1190,25 @@ content:msg
 
 render();
 
-fetch("/chat",{
+try{
+
+let r = await fetch("/chat",{
+
 method:"POST",
+
 headers:{
 "Content-Type":"application/json"
 },
+
 body:JSON.stringify({
 email:currentUser.email,
 chat_id:currentChat,
 message:msg
 })
-})
-.then(r=>r.json())
-.then(d=>{
+
+});
+
+let d = await r.json();
 
 chats[currentChat].push({
 role:"assistant",
@@ -1010,8 +1216,8 @@ content:d.reply
 });
 
 render();
-})
-.catch(()=>{
+
+}catch(e){
 
 chats[currentChat].push({
 role:"assistant",
@@ -1019,7 +1225,9 @@ content:"Bloxy-bot connection error."
 });
 
 render();
-});
+
+}
+
 }
 
 function render(){
@@ -1058,21 +1266,27 @@ Bloxy-bot
 ${m.content}
 </div>
 `;
+
 }
 
 box.appendChild(d);
+
 }
 
 box.scrollTop = box.scrollHeight;
+
 }
 
 renderChats();
+
 render();
 
 </script>
 
 </body>
+
 </html>
+
 """
 
 # =========================================================
