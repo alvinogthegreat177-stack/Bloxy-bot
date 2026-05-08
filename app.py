@@ -339,9 +339,9 @@ def ask_ai(messages):
 
                 "messages": clean_messages,
 
-                "temperature": 0.7,
+                "temperature": 1.8,
 
-                "max_tokens": 2500,
+                "max_tokens": 18500,
 
                 "top_p": 1,
 
