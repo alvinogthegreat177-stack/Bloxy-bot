@@ -335,7 +335,7 @@ def ask_ai(messages):
 
             json={
 
-                "model": "deepseek/deepseek-r1-0528:free",
+                "model": "mistralai/mistral-7b-instruct:free",
 
                 "messages": clean_messages,
 
