@@ -335,13 +335,13 @@ def ask_ai(messages):
 
             json={
 
-                "model": "mistralai/mistral-7b-instruct:free",
+                "model": "openrouter/auto",
 
                 "messages": clean_messages,
 
-                "temperature": 1.8,
+                "temperature": 0.7,
 
-                "max_tokens": 18500,
+                "max_tokens": 4500,
 
                 "top_p": 1,
 
