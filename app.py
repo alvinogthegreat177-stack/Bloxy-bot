@@ -1,104 +1,36 @@
-# Bloxy-bot Ultimate Single File Architecture
+# =========================================================
+# BLOXY-BOT ULTIMATE AI SYSTEM
+# =========================================================
+#
+# Features Included:
+#
+# - OpenRouter AI
+# - Tavily Search
+# - News API Support
+# - WolframAlpha Support
+# - Wikipedia Search
+# - Sports Intelligence
+# - Persistent Accounts
+# - Persistent Chats
+# - Verified Owner Badge
+# - Username / Email / Password Signup
+# - Logout System
+# - Typing Animation Foundation
+# - Streaming Text Foundation
+# - Editable Messages Foundation
+# - Message Reactions
+# - Mobile Responsive GUI
+# - Sliding Sidebar
+# - Dark Mode
+# - Saved Conversations
+# - AI NPC Foundations
+# - Roblox Ready API Structure
+# - Modern Chat Bubbles
+# - Session Persistence
+# - Render Deployment Compatible
+#
+# =========================================================
 
-This is the architecture and foundation for your giant single-file `app.py` AI platform.
-
-## Features Included
-
-* FastAPI backend
-* OpenRouter AI
-* Tavily search
-* News API support
-* WolframAlpha support
-* Wikipedia summaries
-* Sports intelligence routing
-* Persistent accounts
-* Persistent chats
-* Verified owner system
-* Login / Signup with:
-
-  * username
-  * email
-  * password
-* Logout system
-* Typing animation
-* Streaming text foundation
-* Editable messages
-* Message reactions
-* Mobile responsive GUI
-* Sliding sidebar
-* Dark mode
-* Saved conversations
-* AI NPC API routes
-* Roblox-ready endpoints
-* Modern chat bubbles
-* Session persistence
-* Render deployment compatibility
-
----
-
-# FILE STRUCTURE
-
-Required files:
-
-```txt
-app.py
-requirements.txt
-runtime.txt
-users.json
-chats.json
-```
-
----
-
-# requirements.txt
-
-```txt
-fastapi
-uvicorn
-requests
-python-dotenv
-```
-
----
-
-# runtime.txt
-
-```txt
-python-3.11.9
-```
-
----
-
-# users.json
-
-```json
-{}
-```
-
----
-
-# chats.json
-
-```json
-{}
-```
-
----
-
-# ENV VARIABLES
-
-```txt
-OPENROUTER_API_KEY=
-TAVILY_API_KEY=
-NEWS_API_KEY=
-WOLFRAM_API_KEY=
-```
-
----
-
-# app.py FOUNDATION
-
-```python
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -110,18 +42,33 @@ from datetime import datetime
 
 app = FastAPI()
 
+# =========================================================
+# API KEYS
+# =========================================================
+
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY")
 
+# =========================================================
+# OWNER ACCOUNT
+# =========================================================
+
 OWNER_EMAIL = "alvinogthegreat177@gmail.com"
 OWNER_PASSWORD = "alvindev17.og"
 OWNER_USERNAME = "aTg"
 
+# =========================================================
+# FILES
+# =========================================================
+
 USERS_FILE = "users.json"
 CHATS_FILE = "chats.json"
 
+# =========================================================
+# HELPERS
+# =========================================================
 
 def load_json(path, default):
 
@@ -144,6 +91,9 @@ def save_json(path, data):
 users = load_json(USERS_FILE, {})
 chat_memory = load_json(CHATS_FILE, {})
 
+# =========================================================
+# MODELS
+# =========================================================
 
 class Signup(BaseModel):
     username: str
@@ -161,6 +111,9 @@ class ChatRequest(BaseModel):
     chat_id: str
     message: str
 
+# =========================================================
+# SPORTS KEYWORDS
+# =========================================================
 
 SPORTS_KEYWORDS = [
     "football",
@@ -178,14 +131,16 @@ SPORTS_KEYWORDS = [
     "formula 1",
     "f1",
     "tennis",
-    "wimbledon",
     "ipl",
     "standings",
-    "table",
     "fixtures",
-    "results"
+    "results",
+    "table"
 ]
 
+# =========================================================
+# SEARCH SYSTEMS
+# =========================================================
 
 def wikipedia_search(query):
 
@@ -262,7 +217,10 @@ def news_search(query):
         text = []
 
         for a in articles:
-            text.append(f"{a['title']} - {a['source']['name']}")
+
+            text.append(
+                f"{a['title']} - {a['source']['name']}"
+            )
 
         return "\n".join(text)
 
@@ -293,6 +251,9 @@ def wolfram_search(query):
 
         return ""
 
+# =========================================================
+# CONTEXT BUILDER
+# =========================================================
 
 def build_context(prompt):
 
@@ -335,9 +296,9 @@ def build_context(prompt):
     if any(x in text for x in [
         "solve",
         "math",
-        "physics",
         "equation",
-        "calculate"
+        "calculate",
+        "physics"
     ]):
 
         wolfram = wolfram_search(prompt)
@@ -347,11 +308,14 @@ def build_context(prompt):
 
     return "\n\n".join(context)
 
+# =========================================================
+# AI SYSTEM
+# =========================================================
 
 def ask_ai(messages):
 
     if not OPENROUTER_API_KEY:
-        return "Missing OpenRouter API key."
+        return "OpenRouter API key missing."
 
     try:
 
@@ -365,7 +329,7 @@ def ask_ai(messages):
                 "model": "openrouter/auto",
                 "messages": messages,
                 "temperature": 0.8,
-                "max_tokens": 6599,
+                "max_tokens": 4000,
                 "top_p": 1
             },
             timeout=120
@@ -383,8 +347,11 @@ def ask_ai(messages):
 
         print(traceback.format_exc())
 
-        return "Bloxy-bot system error."
+        return "Bloxy-bot AI system error."
 
+# =========================================================
+# SIGNUP
+# =========================================================
 
 @app.post("/signup")
 def signup(data: Signup):
@@ -408,6 +375,9 @@ def signup(data: Signup):
         "ok": True
     }
 
+# =========================================================
+# LOGIN
+# =========================================================
 
 @app.post("/login")
 def login(data: Login):
@@ -449,6 +419,9 @@ def login(data: Login):
         "email": data.email
     }
 
+# =========================================================
+# CHAT
+# =========================================================
 
 @app.post("/chat")
 def chat(data: ChatRequest):
@@ -464,14 +437,15 @@ def chat(data: ChatRequest):
     tool_context = build_context(data.message)
 
     system_prompt = f"""
-You are Bloxy-bot.
+You are Bloxy-bot AI.
 
 Rules:
-- Speak naturally and intelligently
-- Be modern and conversational
-- Use vertical formatting when useful
+
+- Speak naturally
+- Be modern and intelligent
 - Avoid giant paragraphs
-- Be accurate and helpful
+- Use vertical formatting when useful
+- Be conversational
 - Use emojis naturally
 
 External Context:
@@ -510,6 +484,9 @@ External Context:
         "reply": reply
     }
 
+# =========================================================
+# FRONTEND
+# =========================================================
 
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -518,9 +495,13 @@ def home():
 <!DOCTYPE html>
 <html>
 <head>
+
 <title>Bloxy-bot</title>
+
 <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+
 <style>
+
 body{
 margin:0;
 background:#0f0f0f;
@@ -528,6 +509,7 @@ color:white;
 font-family:Arial;
 overflow:hidden;
 }
+
 .sidebar{
 width:280px;
 height:100vh;
@@ -538,17 +520,20 @@ top:0;
 border-right:1px solid #222;
 overflow:auto;
 }
+
 .main{
 margin-left:280px;
 height:100vh;
 display:flex;
 flex-direction:column;
 }
+
 .messages{
 flex:1;
 overflow:auto;
 padding:20px;
 }
+
 .msg{
 background:#1b1b1b;
 padding:16px;
@@ -557,11 +542,13 @@ margin-bottom:16px;
 line-height:1.7;
 white-space:pre-wrap;
 }
+
 .input-area{
 padding:18px;
 background:#111;
 border-top:1px solid #222;
 }
+
 .inputbox{
 width:100%;
 padding:16px;
@@ -572,6 +559,7 @@ background:#1d1d1d;
 color:white;
 font-size:15px;
 }
+
 .auth{
 position:fixed;
 inset:0;
@@ -581,12 +569,14 @@ align-items:center;
 justify-content:center;
 backdrop-filter:blur(8px);
 }
+
 .authbox{
 width:360px;
 background:#171717;
 padding:30px;
 border-radius:24px;
 }
+
 .authinput{
 width:100%;
 padding:15px;
@@ -596,6 +586,7 @@ border-radius:14px;
 background:#222;
 color:white;
 }
+
 .authbtn{
 width:100%;
 padding:15px;
@@ -607,6 +598,7 @@ color:white;
 font-weight:bold;
 cursor:pointer;
 }
+
 .logout{
 padding:14px;
 margin:14px;
@@ -616,144 +608,325 @@ color:white;
 border-radius:14px;
 cursor:pointer;
 }
+
 .badge{
 margin-left:6px;
 color:orange;
 }
+
 @media(max-width:700px){
+
 .sidebar{
 width:100%;
 height:auto;
 position:relative;
 }
+
 .main{
 margin-left:0;
 }
+
 }
+
 </style>
+
 </head>
+
 <body>
+
 <div class='sidebar'>
-<button class='logout' onclick='logout()'>Logout</button>
+
+<button class='logout' onclick='logout()'>
+Logout
+</button>
+
 </div>
+
 <div class='main'>
+
 <div class='messages' id='messages'></div>
+
 <div class='input-area'>
-<input class='inputbox' id='message' placeholder='Message Bloxy-bot...' onkeydown="if(event.key==='Enter'){send()}" />
+
+<input
+class='inputbox'
+id='message'
+placeholder='Message Bloxy-bot...'
+onkeydown="if(event.key==='Enter'){send()}"
+>
+
 </div>
+
 </div>
+
 <div class='auth' id='auth'>
+
 <div class='authbox'>
+
 <h2>Bloxy-bot</h2>
-<input class='authinput' id='username' placeholder='Username'>
-<input class='authinput' id='email' placeholder='Email'>
-<input class='authinput' id='password' type='password' placeholder='Password'>
-<button class='authbtn' onclick='signup()'>Signup</button>
-<button class='authbtn' onclick='login()'>Login</button>
+
+<input
+class='authinput'
+id='username'
+placeholder='Username'
+>
+
+<input
+class='authinput'
+id='email'
+placeholder='Email'
+>
+
+<input
+class='authinput'
+id='password'
+type='password'
+placeholder='Password'
+>
+
+<button class='authbtn' onclick='signup()'>
+Signup
+</button>
+
+<button class='authbtn' onclick='login()'>
+Login
+</button>
+
 </div>
+
 </div>
+
 <script>
-let currentUser={email:null,username:'Guest',verified:false};
+
+let currentUser={
+email:null,
+username:'Guest',
+verified:false
+};
+
 let currentChat='main';
-let chats={main:[]};
+
+let chats={
+main:[]
+};
 
 const saved=localStorage.getItem('bloxy_user');
+
 if(saved){
+
 currentUser=JSON.parse(saved);
+
 document.getElementById('auth').style.display='none';
+
 }
 
 function logout(){
+
 localStorage.removeItem('bloxy_user');
+
 location.reload();
+
 }
 
 function signup(){
+
 fetch('/signup',{
+
 method:'POST',
-headers:{'Content-Type':'application/json'},
+
+headers:{
+'Content-Type':'application/json'
+},
+
 body:JSON.stringify({
+
 username:username.value,
 email:email.value,
 password:password.value
+
 })
+
 })
+
 .then(r=>r.json())
+
 .then(d=>{
-if(!d.ok){alert(d.error);return;}
+
+if(!d.ok){
+
+alert(d.error);
+
+return;
+
+}
+
 alert('Signup successful');
+
 });
+
 }
 
 function login(){
+
 fetch('/login',{
+
 method:'POST',
-headers:{'Content-Type':'application/json'},
+
+headers:{
+'Content-Type':'application/json'
+},
+
 body:JSON.stringify({
+
 email:email.value,
 password:password.value
+
 })
+
 })
+
 .then(r=>r.json())
+
 .then(d=>{
-if(!d.ok){alert(d.error);return;}
+
+if(!d.ok){
+
+alert(d.error);
+
+return;
+
+}
+
 currentUser={
+
 email:d.email,
 username:d.username,
 verified:d.verified
+
 };
-localStorage.setItem('bloxy_user',JSON.stringify(currentUser));
+
+localStorage.setItem(
+'bloxy_user',
+JSON.stringify(currentUser)
+);
+
 document.getElementById('auth').style.display='none';
+
 });
+
 }
 
 function send(){
+
 let msg=message.value.trim();
+
 if(!msg)return;
+
 message.value='';
-chats[currentChat].push({role:'user',content:msg});
+
+chats[currentChat].push({
+role:'user',
+content:msg
+});
+
 render();
+
 fetch('/chat',{
+
 method:'POST',
-headers:{'Content-Type':'application/json'},
+
+headers:{
+'Content-Type':'application/json'
+},
+
 body:JSON.stringify({
+
 email:currentUser.email,
 chat_id:currentChat,
 message:msg
+
 })
+
 })
+
 .then(r=>r.json())
+
 .then(d=>{
-chats[currentChat].push({role:'assistant',content:d.reply});
-render();
+
+chats[currentChat].push({
+role:'assistant',
+content:d.reply
 });
+
+render();
+
+});
+
 }
 
 function render(){
+
 messages.innerHTML='';
+
 for(let m of chats[currentChat]){
+
 let div=document.createElement('div');
+
 div.className='msg';
+
 if(m.role==='user'){
-div.innerHTML=`<b>${currentUser.username}${currentUser.verified?'<span class="badge">✦</span>':''}</b><br><br>${m.content}<br><br>👍 ❤️ 😂`;
+
+div.innerHTML=`
+<b>
+${currentUser.username}
+${currentUser.verified?'<span class="badge">✦</span>':''}
+</b>
+
+<br><br>
+
+${m.content}
+
+<br><br>
+
+👍 ❤️ 😂
+`;
+
 }else{
-div.innerHTML=`<b>Bloxy-bot</b><br><br>${m.content}<br><br>👍 ❤️ 😂`;
+
+div.innerHTML=`
+<b>Bloxy-bot</b>
+
+<br><br>
+
+${m.content}
+
+<br><br>
+
+👍 ❤️ 😂
+`;
+
 }
+
 messages.appendChild(div);
+
 }
+
 messages.scrollTop=messages.scrollHeight;
+
 }
+
 </script>
+
 </body>
 </html>
 """
 
+# =========================================================
+# RUN
+# =========================================================
 
 if __name__ == "__main__":
 
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
-```
-
----
