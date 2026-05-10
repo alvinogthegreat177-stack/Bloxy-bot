@@ -12,22 +12,22 @@
 # - Sports Intelligence
 # - Persistent Accounts
 # - Persistent Chats
-# - Verified Owner Badge
+# - Verified Owner Badge SVG
 # - Username / Email / Password Signup
+# - Guest Mode
 # - Logout System
-# - Typing Animation Foundation
-# - Streaming Text Foundation
-# - Editable Messages Foundation
-# - Message Reactions
-# - Mobile Responsive GUI
-# - Sliding Sidebar
-# - Dark Mode
 # - Saved Conversations
-# - AI NPC Foundations
-# - Roblox Ready API Structure
+# - Sliding Sidebar
 # - Modern Chat Bubbles
-# - Session Persistence
-# - Render Deployment Compatible
+# - Message Reactions
+# - Editable Message Foundation
+# - Streaming Text Foundation
+# - Typing Animation Foundation
+# - Mobile Responsive GUI
+# - Dark Mode
+# - AI NPC Foundation
+# - Roblox Ready API Structure
+# - Render Compatible
 #
 # =========================================================
 
@@ -119,23 +119,22 @@ SPORTS_KEYWORDS = [
     "football",
     "soccer",
     "premier league",
-    "champions league",
-    "laliga",
-    "serie a",
-    "bundesliga",
     "nba",
     "nfl",
-    "ufc",
     "boxing",
+    "ufc",
     "cricket",
     "formula 1",
     "f1",
     "tennis",
-    "ipl",
     "standings",
-    "fixtures",
     "results",
-    "table"
+    "fixtures",
+    "table",
+    "laliga",
+    "bundesliga",
+    "serie a",
+    "ipl"
 ]
 
 # =========================================================
@@ -266,7 +265,7 @@ def build_context(prompt):
         sports = tavily_search(prompt)
 
         if sports:
-            context.append(f"SPORTS:\n{sports}")
+            context.append(f"SPORTS:\\n{sports}")
 
     if any(x in text for x in [
         "who is",
@@ -279,7 +278,7 @@ def build_context(prompt):
         wiki = wikipedia_search(prompt)
 
         if wiki:
-            context.append(f"WIKIPEDIA:\n{wiki}")
+            context.append(f"WIKIPEDIA:\\n{wiki}")
 
     if any(x in text for x in [
         "latest",
@@ -291,22 +290,22 @@ def build_context(prompt):
         news = news_search(prompt)
 
         if news:
-            context.append(f"NEWS:\n{news}")
+            context.append(f"NEWS:\\n{news}")
 
     if any(x in text for x in [
         "solve",
-        "math",
         "equation",
-        "calculate",
-        "physics"
+        "math",
+        "physics",
+        "calculate"
     ]):
 
         wolfram = wolfram_search(prompt)
 
         if wolfram:
-            context.append(f"WOLFRAM:\n{wolfram}")
+            context.append(f"WOLFRAM:\\n{wolfram}")
 
-    return "\n\n".join(context)
+    return "\\n\\n".join(context)
 
 # =========================================================
 # AI SYSTEM
@@ -329,8 +328,7 @@ def ask_ai(messages):
                 "model": "openrouter/auto",
                 "messages": messages,
                 "temperature": 0.8,
-                "max_tokens": 4000,
-                "top_p": 1
+                "max_tokens": 4000
             },
             timeout=120
         )
@@ -343,7 +341,7 @@ def ask_ai(messages):
 
         return f"AI Error: {data}"
 
-    except Exception as e:
+    except:
 
         print(traceback.format_exc())
 
@@ -426,6 +424,23 @@ def login(data: Login):
 @app.post("/chat")
 def chat(data: ChatRequest):
 
+    if not data.email:
+
+        guest_reply = ask_ai([
+            {
+                "role": "system",
+                "content": "You are Bloxy-bot AI."
+            },
+            {
+                "role": "user",
+                "content": data.message
+            }
+        ])
+
+        return {
+            "reply": guest_reply
+        }
+
     if data.email not in chat_memory:
         chat_memory[data.email] = {}
 
@@ -442,10 +457,9 @@ You are Bloxy-bot AI.
 Rules:
 
 - Speak naturally
-- Be modern and intelligent
 - Avoid giant paragraphs
 - Use vertical formatting when useful
-- Be conversational
+- Be modern and intelligent
 - Use emojis naturally
 
 External Context:
@@ -459,7 +473,7 @@ External Context:
         }
     ]
 
-    messages += history[-12:]
+    messages += history[-10:]
 
     messages.append({
         "role": "user",
@@ -492,8 +506,11 @@ External Context:
 def home():
 
     return """
+
 <!DOCTYPE html>
+
 <html>
+
 <head>
 
 <title>Bloxy-bot</title>
@@ -501,6 +518,10 @@ def home():
 <meta name='viewport' content='width=device-width, initial-scale=1.0'>
 
 <style>
+
+*{
+box-sizing:border-box;
+}
 
 body{
 margin:0;
@@ -518,7 +539,50 @@ position:fixed;
 left:0;
 top:0;
 border-right:1px solid #222;
+display:flex;
+flex-direction:column;
+justify-content:space-between;
+}
+
+.side-top{
+padding:14px;
 overflow:auto;
+}
+
+.logo{
+font-size:24px;
+font-weight:bold;
+margin-bottom:16px;
+}
+
+.newchat{
+width:100%;
+padding:14px;
+border:none;
+border-radius:14px;
+background:#1d1d1d;
+color:white;
+cursor:pointer;
+margin-bottom:14px;
+}
+
+.chatitem{
+padding:13px;
+background:#1a1a1a;
+border-radius:14px;
+margin-bottom:10px;
+cursor:pointer;
+transition:0.2s;
+}
+
+.chatitem:hover{
+background:#232323;
+}
+
+.account{
+padding:18px;
+border-top:1px solid #222;
+background:#101010;
 }
 
 .main{
@@ -531,16 +595,29 @@ flex-direction:column;
 .messages{
 flex:1;
 overflow:auto;
-padding:20px;
+padding:24px;
+scroll-behavior:smooth;
 }
 
 .msg{
-background:#1b1b1b;
-padding:16px;
+background:#1a1a1a;
+padding:18px;
 border-radius:18px;
-margin-bottom:16px;
-line-height:1.7;
+margin-bottom:18px;
+line-height:1.8;
 white-space:pre-wrap;
+animation:fade 0.2s ease;
+}
+
+@keyframes fade{
+from{
+opacity:0;
+transform:translateY(10px);
+}
+to{
+opacity:1;
+transform:translateY(0px);
+}
 }
 
 .input-area{
@@ -560,6 +637,13 @@ color:white;
 font-size:15px;
 }
 
+.notice{
+text-align:center;
+font-size:12px;
+color:#777;
+margin-top:10px;
+}
+
 .auth{
 position:fixed;
 inset:0;
@@ -568,10 +652,11 @@ display:flex;
 align-items:center;
 justify-content:center;
 backdrop-filter:blur(8px);
+z-index:999;
 }
 
 .authbox{
-width:360px;
+width:370px;
 background:#171717;
 padding:30px;
 border-radius:24px;
@@ -599,19 +684,30 @@ font-weight:bold;
 cursor:pointer;
 }
 
-.logout{
-padding:14px;
-margin:14px;
-background:#1e1e1e;
-border:none;
-color:white;
-border-radius:14px;
-cursor:pointer;
+.badge{
+width:18px;
+height:18px;
+display:inline-block;
+vertical-align:middle;
+margin-left:4px;
 }
 
-.badge{
-margin-left:6px;
-color:orange;
+.userline{
+display:flex;
+align-items:center;
+gap:4px;
+font-weight:bold;
+}
+
+.logoutbtn{
+width:100%;
+padding:12px;
+margin-top:14px;
+border:none;
+border-radius:12px;
+background:#1d1d1d;
+color:white;
+cursor:pointer;
 }
 
 @media(max-width:700px){
@@ -636,9 +732,21 @@ margin-left:0;
 
 <div class='sidebar'>
 
-<button class='logout' onclick='logout()'>
-Logout
+<div class='side-top'>
+
+<div class='logo'>
+Bloxy-bot
+</div>
+
+<button class='newchat' onclick='newChat()'>
++ New Chat
 </button>
+
+<div id='chatlist'></div>
+
+</div>
+
+<div class='account' id='accountbox'></div>
 
 </div>
 
@@ -655,6 +763,10 @@ placeholder='Message Bloxy-bot...'
 onkeydown="if(event.key==='Enter'){send()}"
 >
 
+<div class='notice'>
+Bloxy-bot can make mistakes. Double-check important information.
+</div>
+
 </div>
 
 </div>
@@ -664,6 +776,10 @@ onkeydown="if(event.key==='Enter'){send()}"
 <div class='authbox'>
 
 <h2>Bloxy-bot</h2>
+
+<div style='color:#888;margin-bottom:18px;font-size:14px;line-height:1.6;'>
+Welcome to Bloxy-bot AI.
+</div>
 
 <input
 class='authinput'
@@ -692,6 +808,29 @@ Signup
 Login
 </button>
 
+<div
+onclick='guestMode()'
+style='
+margin-top:18px;
+text-align:center;
+font-size:13px;
+color:#888;
+cursor:pointer;
+'>
+Or stay signed out
+</div>
+
+<div style='
+margin-top:10px;
+text-align:center;
+font-size:12px;
+color:#666;
+line-height:1.5;
+'>
+No conversations or chat history
+will be saved in guest mode.
+</div>
+
 </div>
 
 </div>
@@ -700,42 +839,181 @@ Login
 
 let currentUser={
 email:null,
-username:'Guest',
+username:"Guest",
 verified:false
 };
 
-let currentChat='main';
+let currentChat="main";
 
 let chats={
 main:[]
 };
 
-const saved=localStorage.getItem('bloxy_user');
+function verifiedBadge(){
 
-if(saved){
+return `
+<svg class="badge" viewBox="0 0 24 24">
 
-currentUser=JSON.parse(saved);
+<path
+fill="#ff8c00"
+d="
+M12 2.2
+C13.2 2.2 14 3.5 15 4
+C16 4.5 17.5 4.2 18.4 5
+C19.3 5.8 19.1 7.2 19.6 8.3
+C20.1 9.4 21.4 10.2 21.4 11.5
+C21.4 12.8 20.1 13.6 19.6 14.7
+C19.1 15.8 19.3 17.2 18.4 18
+C17.5 18.8 16 18.5 15 19
+C14 19.5 13.2 20.8 12 20.8
+C10.8 20.8 10 19.5 9 19
+C8 18.5 6.5 18.8 5.6 18
+C4.7 17.2 4.9 15.8 4.4 14.7
+C3.9 13.6 2.6 12.8 2.6 11.5
+C2.6 10.2 3.9 9.4 4.4 8.3
+C4.9 7.2 4.7 5.8 5.6 5
+C6.5 4.2 8 4.5 9 4
+C10 3.5 10.8 2.2 12 2.2
+Z">
+</path>
 
-document.getElementById('auth').style.display='none';
+<path
+d="M8.3 12.2 L10.7 14.4 L15.7 9.2"
+stroke="white"
+stroke-width="2.2"
+fill="none"
+stroke-linecap="round"
+stroke-linejoin="round">
+</path>
+
+</svg>
+`;
+
+}
+
+function updateAccountBox(){
+
+let html=`
+
+<div class='userline'>
+
+${currentUser.username}
+
+${currentUser.verified ? verifiedBadge() : ""}
+
+</div>
+
+<div style='margin-top:6px;font-size:12px;color:#777;'>
+
+${currentUser.email || "Guest Mode"}
+
+</div>
+
+`;
+
+if(currentUser.email){
+
+html += `
+<button class='logoutbtn' onclick='logout()'>
+Logout
+</button>
+`;
+
+}else{
+
+html += `
+<div style='margin-top:10px;font-size:12px;color:#777;line-height:1.5;'>
+You are currently signed out.<br>
+Chats will not be saved.
+</div>
+`;
+
+}
+
+document.getElementById("accountbox").innerHTML=html;
+
+}
+
+function renderChats(){
+
+let box=document.getElementById("chatlist");
+
+box.innerHTML="";
+
+for(let c in chats){
+
+let div=document.createElement("div");
+
+div.className="chatitem";
+
+div.innerText=c;
+
+div.onclick=()=>{
+
+currentChat=c;
+
+render();
+
+};
+
+box.appendChild(div);
+
+}
+
+}
+
+function newChat(){
+
+let id="Chat "+(Object.keys(chats).length+1);
+
+chats[id]=[];
+
+currentChat=id;
+
+renderChats();
+
+render();
+
+}
+
+function guestMode(){
+
+document.getElementById("auth").style.display="none";
+
+updateAccountBox();
 
 }
 
 function logout(){
 
-localStorage.removeItem('bloxy_user');
+localStorage.removeItem("bloxy_user");
 
 location.reload();
 
 }
 
+const saved=localStorage.getItem("bloxy_user");
+
+if(saved){
+
+currentUser=JSON.parse(saved);
+
+document.getElementById("auth").style.display="none";
+
+}
+
+updateAccountBox();
+
+renderChats();
+
 function signup(){
 
-fetch('/signup',{
+fetch("/signup",{
 
-method:'POST',
+method:"POST",
 
 headers:{
-'Content-Type':'application/json'
+"Content-Type":"application/json"
 },
 
 body:JSON.stringify({
@@ -760,7 +1038,7 @@ return;
 
 }
 
-alert('Signup successful');
+alert("Signup successful. Please login.");
 
 });
 
@@ -768,12 +1046,12 @@ alert('Signup successful');
 
 function login(){
 
-fetch('/login',{
+fetch("/login",{
 
-method:'POST',
+method:"POST",
 
 headers:{
-'Content-Type':'application/json'
+"Content-Type":"application/json"
 },
 
 body:JSON.stringify({
@@ -806,11 +1084,13 @@ verified:d.verified
 };
 
 localStorage.setItem(
-'bloxy_user',
+"bloxy_user",
 JSON.stringify(currentUser)
 );
 
-document.getElementById('auth').style.display='none';
+document.getElementById("auth").style.display="none";
+
+updateAccountBox();
 
 });
 
@@ -818,25 +1098,27 @@ document.getElementById('auth').style.display='none';
 
 function send(){
 
-let msg=message.value.trim();
+let input=document.getElementById("message");
+
+let msg=input.value.trim();
 
 if(!msg)return;
 
-message.value='';
+input.value="";
 
 chats[currentChat].push({
-role:'user',
+role:"user",
 content:msg
 });
 
 render();
 
-fetch('/chat',{
+fetch("/chat",{
 
-method:'POST',
+method:"POST",
 
 headers:{
-'Content-Type':'application/json'
+"Content-Type":"application/json"
 },
 
 body:JSON.stringify({
@@ -854,8 +1136,19 @@ message:msg
 .then(d=>{
 
 chats[currentChat].push({
-role:'assistant',
+role:"assistant",
 content:d.reply
+});
+
+render();
+
+})
+
+.catch(()=>{
+
+chats[currentChat].push({
+role:"assistant",
+content:"Bloxy-bot connection error."
 });
 
 render();
@@ -866,59 +1159,80 @@ render();
 
 function render(){
 
-messages.innerHTML='';
+let box=document.getElementById("messages");
+
+box.innerHTML="";
 
 for(let m of chats[currentChat]){
 
-let div=document.createElement('div');
+let div=document.createElement("div");
 
-div.className='msg';
+div.className="msg";
 
-if(m.role==='user'){
+if(m.role==="user"){
 
 div.innerHTML=`
-<b>
-${currentUser.username}
-${currentUser.verified?'<span class="badge">✦</span>':''}
-</b>
 
-<br><br>
+<div class='userline'>
+
+${currentUser.username}
+
+${currentUser.verified ? verifiedBadge() : ""}
+
+</div>
+
+<div style='margin-top:12px;'>
 
 ${m.content}
 
-<br><br>
+</div>
+
+<div style='margin-top:14px;color:#888;font-size:13px;'>
 
 👍 ❤️ 😂
+
+</div>
+
 `;
 
 }else{
 
 div.innerHTML=`
-<b>Bloxy-bot</b>
 
-<br><br>
+<div class='userline'>
+Bloxy-bot
+</div>
+
+<div style='margin-top:12px;'>
 
 ${m.content}
 
-<br><br>
+</div>
+
+<div style='margin-top:14px;color:#888;font-size:13px;'>
 
 👍 ❤️ 😂
+
+</div>
+
 `;
 
 }
 
-messages.appendChild(div);
+box.appendChild(div);
 
 }
 
-messages.scrollTop=messages.scrollHeight;
+box.scrollTop=box.scrollHeight;
 
 }
 
 </script>
 
 </body>
+
 </html>
+
 """
 
 # =========================================================
