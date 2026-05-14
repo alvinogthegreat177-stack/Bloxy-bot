@@ -1,61 +1,3 @@
-# Bloxy-bot Ultimate AI — Single File Architecture
-
-This document starts the stable foundation for the giant single-file `app.py` version of Bloxy-bot.
-
-Included systems:
-
-* FastAPI backend
-* Login/signup
-* Guest mode
-* Saved conversations
-* Mobile responsive UI
-* Dynamic sidebar
-* Rename/delete chats
-* Account settings menu
-* Logout system
-* Verified badge system
-* OpenRouter AI
-* Tavily
-* News API
-* Wolfram Alpha
-* Sports routing
-* Typing animation
-* Streaming response effect
-* Editable messages
-* Reactions
-* Responsive layouts
-* Dark mode UI
-* Faster memory system
-
-Required files:
-
-users.json
-{}
-
-chats.json
-{}
-
-requirements.txt
-
-fastapi==0.110.0
-uvicorn==0.29.0
-requests==2.31.0
-pydantic==2.6.4
-
-runtime.txt
-python-3.11.9
-
-Environment Variables:
-OPENROUTER_API_KEY=
-TAVILY_API_KEY=
-NEWS_API_KEY=
-WOLFRAM_API_KEY=
-
----
-
-APP.PY FOUNDATION
-
-```python
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -66,18 +8,33 @@ import traceback
 
 app = FastAPI()
 
+# =========================================================
+# API KEYS
+# =========================================================
+
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY")
 
+# =========================================================
+# OWNER
+# =========================================================
+
 OWNER_EMAIL = "alvinogthegreat177@gmail.com"
 OWNER_PASSWORD = "alvindev17.og"
 OWNER_USERNAME = "aTg"
 
+# =========================================================
+# FILES
+# =========================================================
+
 USERS_FILE = "users.json"
 CHATS_FILE = "chats.json"
 
+# =========================================================
+# HELPERS
+# =========================================================
 
 def load_json(path, default):
 
@@ -100,6 +57,9 @@ def save_json(path, data):
 users = load_json(USERS_FILE, {})
 chat_memory = load_json(CHATS_FILE, {})
 
+# =========================================================
+# MODELS
+# =========================================================
 
 class Signup(BaseModel):
     username: str
@@ -118,10 +78,20 @@ class ChatRequest(BaseModel):
     message: str
 
 
+class RenameChat(BaseModel):
+    email: str
+    old_chat: str
+    new_chat: str
+
+
+class DeleteChat(BaseModel):
+    email: str
+    chat_id: str
+
+
 # =========================================================
 # SEARCH TOOLS
 # =========================================================
-
 
 def wikipedia_search(query):
 
@@ -139,7 +109,6 @@ def wikipedia_search(query):
     except:
 
         return ""
-
 
 
 def tavily_search(query):
@@ -173,7 +142,6 @@ def tavily_search(query):
     except:
 
         return ""
-
 
 
 def news_search(query):
@@ -211,7 +179,6 @@ def news_search(query):
         return ""
 
 
-
 def wolfram_search(query):
 
     if not WOLFRAM_API_KEY:
@@ -234,11 +201,9 @@ def wolfram_search(query):
 
         return ""
 
-
 # =========================================================
 # SMART ROUTER
 # =========================================================
-
 
 def build_context(prompt):
 
@@ -261,8 +226,8 @@ def build_context(prompt):
 
     if any(x in text for x in [
         "news",
-        "today",
         "latest",
+        "today",
         "trending"
     ]):
 
@@ -276,12 +241,11 @@ def build_context(prompt):
         "sports",
         "soccer",
         "nba",
-        "premier league",
         "f1",
-        "ufc",
         "boxing",
         "tennis",
-        "cricket"
+        "cricket",
+        "ufc"
     ]):
 
         sports = tavily_search(prompt)
@@ -304,11 +268,9 @@ def build_context(prompt):
 
     return "\n\n".join(context)
 
-
 # =========================================================
-# AI SYSTEM
+# AI
 # =========================================================
-
 
 def ask_ai(messages):
 
@@ -329,7 +291,7 @@ def ask_ai(messages):
                 "model": "openai/gpt-4o-mini",
                 "messages": messages,
                 "temperature": 0.8,
-                "max_tokens": 3000
+                "max_tokens": 8650
             },
             timeout=60
         )
@@ -347,11 +309,9 @@ def ask_ai(messages):
 
         return "Bloxy-bot AI system error."
 
-
 # =========================================================
 # SIGNUP
 # =========================================================
-
 
 @app.post("/signup")
 def signup(data: Signup):
@@ -374,11 +334,9 @@ def signup(data: Signup):
         "ok": True
     }
 
-
 # =========================================================
 # LOGIN
 # =========================================================
-
 
 @app.post("/login")
 def login(data: Login):
@@ -420,11 +378,9 @@ def login(data: Login):
         "email": data.email
     }
 
-
 # =========================================================
-# CHAT SYSTEM
+# CHAT
 # =========================================================
-
 
 @app.post("/chat")
 def chat(data: ChatRequest):
@@ -447,11 +403,11 @@ Rules:
 
 - Speak naturally
 - Use clean spacing
-- Avoid giant paragraphs
-- Be intelligent
 - Be modern
+- Be intelligent
+- Avoid giant paragraphs
 - Be accurate
-- Use bullets when useful
+- Use emojis naturally
 
 External Context:
 
@@ -466,7 +422,7 @@ External Context:
         }
     ]
 
-    messages += history[-12:]
+    messages += history[-10:]
 
     messages.append({
         "role": "user",
@@ -491,11 +447,50 @@ External Context:
         "reply": reply
     }
 
+# =========================================================
+# RENAME CHAT
+# =========================================================
+
+@app.post("/rename_chat")
+def rename_chat(data: RenameChat):
+
+    if data.email not in chat_memory:
+        return {"ok": False}
+
+    if data.old_chat not in chat_memory[data.email]:
+        return {"ok": False}
+
+    chat_memory[data.email][data.new_chat] = \
+        chat_memory[data.email][data.old_chat]
+
+    del chat_memory[data.email][data.old_chat]
+
+    save_json(CHATS_FILE, chat_memory)
+
+    return {"ok": True}
+
+# =========================================================
+# DELETE CHAT
+# =========================================================
+
+@app.post("/delete_chat")
+def delete_chat(data: DeleteChat):
+
+    if data.email not in chat_memory:
+        return {"ok": False}
+
+    if data.chat_id not in chat_memory[data.email]:
+        return {"ok": False}
+
+    del chat_memory[data.email][data.chat_id]
+
+    save_json(CHATS_FILE, chat_memory)
+
+    return {"ok": True}
 
 # =========================================================
 # FRONTEND
 # =========================================================
-
 
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -505,10 +500,16 @@ def home():
 <!DOCTYPE html>
 <html>
 <head>
+
 <title>Bloxy-bot</title>
-<meta name='viewport' content='width=device-width, initial-scale=1.0'>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
+
+*{
+box-sizing:border-box;
+}
 
 body{
 margin:0;
@@ -518,32 +519,37 @@ color:white;
 overflow:hidden;
 }
 
+.container{
+display:flex;
+height:100vh;
+}
+
 .sidebar{
-position:fixed;
-left:0;
-top:0;
-bottom:0;
 width:280px;
 background:#111;
 border-right:1px solid #222;
 display:flex;
 flex-direction:column;
+transition:0.3s;
 }
 
 .logo{
 font-size:28px;
 font-weight:bold;
 padding:20px;
+color:#00ff88;
+text-shadow:0 0 15px #00ff88;
 }
 
 .newchat{
-margin:15px;
+margin:14px;
 padding:15px;
 border:none;
-border-radius:14px;
-background:#1f1f1f;
+border-radius:16px;
+background:#1d1d1d;
 color:white;
 cursor:pointer;
+font-size:15px;
 }
 
 .chatlist{
@@ -554,24 +560,28 @@ padding:10px;
 
 .chatitem{
 padding:14px;
+background:#1a1a1a;
 border-radius:14px;
-background:#1b1b1b;
 margin-bottom:10px;
 cursor:pointer;
+transition:0.2s;
+}
+
+.chatitem:hover{
+background:#252525;
 }
 
 .userbox{
 padding:16px;
 border-top:1px solid #222;
-background:#101010;
 display:flex;
 justify-content:space-between;
 align-items:center;
+background:#101010;
 }
 
 .main{
-margin-left:280px;
-height:100vh;
+flex:1;
 display:flex;
 flex-direction:column;
 }
@@ -589,12 +599,22 @@ border-radius:18px;
 margin-bottom:18px;
 line-height:1.7;
 white-space:pre-wrap;
+animation:fade 0.2s ease;
+position:relative;
+}
+
+.reactions{
+margin-top:10px;
+display:flex;
+gap:10px;
+font-size:14px;
+opacity:0.7;
 }
 
 .inputarea{
-padding:20px;
-border-top:1px solid #222;
+padding:18px;
 background:#111;
+border-top:1px solid #222;
 }
 
 .inputbox{
@@ -603,25 +623,98 @@ padding:18px;
 border:none;
 outline:none;
 border-radius:18px;
-background:#1c1c1c;
+background:#1e1e1e;
 color:white;
 font-size:15px;
+}
+
+.typing{
+padding:10px;
+font-size:14px;
+opacity:0.7;
+}
+
+.auth{
+position:fixed;
+top:0;
+left:0;
+right:0;
+bottom:0;
+background:#000000cc;
+display:flex;
+justify-content:center;
+align-items:center;
+backdrop-filter:blur(10px);
+z-index:999;
+}
+
+.authbox{
+width:360px;
+background:#171717;
+padding:30px;
+border-radius:24px;
+}
+
+.authinput{
+width:100%;
+padding:16px;
+border:none;
+outline:none;
+border-radius:14px;
+background:#222;
+color:white;
+margin-top:12px;
+}
+
+.authbtn{
+width:100%;
+padding:16px;
+border:none;
+border-radius:14px;
+background:#00ff88;
+margin-top:12px;
+cursor:pointer;
+font-weight:bold;
+}
+
+.guestbtn{
+width:100%;
+padding:14px;
+margin-top:12px;
+background:#222;
+border:none;
+border-radius:14px;
+color:white;
+cursor:pointer;
+}
+
+@keyframes fade{
+from{
+opacity:0;
+transform:translateY(10px);
+}
+to{
+opacity:1;
+transform:translateY(0px);
+}
 }
 
 @media(max-width:700px){
 
 .sidebar{
-transform:translateX(-100%);
-transition:0.3s;
+position:fixed;
+left:-280px;
+top:0;
+bottom:0;
 z-index:999;
 }
 
 .sidebar.open{
-transform:translateX(0);
+left:0;
 }
 
 .main{
-margin-left:0;
+width:100%;
 }
 
 }
@@ -632,51 +725,396 @@ margin-left:0;
 
 <body>
 
-<div class='sidebar'>
+<div class="auth" id="auth">
 
-<div class='logo'>Bloxy-bot</div>
+<div class="authbox">
 
-<button class='newchat'>+ New Chat</button>
+<h2>Bloxy-bot</h2>
 
-<div class='chatlist'></div>
+<input id="username"
+class="authinput"
+placeholder="Username">
 
-<div class='userbox'>
+<input id="email"
+class="authinput"
+placeholder="Email">
 
-<div>aTg</div>
+<input id="password"
+type="password"
+class="authinput"
+placeholder="Password">
 
-<div>⋮</div>
+<button class="authbtn" onclick="signup()">
+Signup
+</button>
+
+<button class="authbtn" onclick="login()">
+Login
+</button>
+
+<button class="guestbtn" onclick="guestMode()">
+Stay Signed Out
+</button>
 
 </div>
 
 </div>
 
-<div class='main'>
+<div class="container">
 
-<div class='messages'></div>
+<div class="sidebar" id="sidebar">
 
-<div class='inputarea'>
-<input class='inputbox' placeholder='Message Bloxy-bot...'>
+<div class="logo">
+Bloxy-bot
+</div>
+
+<button class="newchat" onclick="newChat()">
++ New Chat
+</button>
+
+<div class="chatlist" id="chatlist"></div>
+
+<div class="userbox">
+
+<div id="userbox">
+Guest
+</div>
+
+<div onclick="logout()" style="cursor:pointer;">
+⋮
+</div>
+
+</div>
+
+</div>
+
+<div class="main">
+
+<div class="messages" id="messages"></div>
+
+<div class="typing" id="typing"></div>
+
+<div class="inputarea">
+
+<input
+id="message"
+class="inputbox"
+placeholder="Message Bloxy-bot..."
+onkeydown="if(event.key==='Enter'){send()}">
+
+</div>
+
 </div>
 
 </div>
 
 <script>
 
-// Full frontend state system continues here
-// Dynamic rendering
-// Chat creation
-// Rename/delete
-// Account editing
-// Logout system
-// Guest mode
-// Streaming text
-// Typing animation
-// Reactions
-// Editable messages
-// Mobile sidebar controls
-// Responsive state handling
-// localStorage syncing
-// Persistent sessions
+let currentUser = {
+email:"guest",
+username:"Guest",
+verified:false
+};
+
+let currentChat = "Main";
+
+let chats = {
+"Main":[]
+};
+
+function saveLocal(){
+
+localStorage.setItem(
+"bloxy_user",
+JSON.stringify(currentUser)
+);
+
+localStorage.setItem(
+"bloxy_chats",
+JSON.stringify(chats)
+);
+
+}
+
+function loadLocal(){
+
+let u = localStorage.getItem("bloxy_user");
+
+if(u){
+
+currentUser = JSON.parse(u);
+
+document.getElementById("auth").style.display = "none";
+
+}
+
+let c = localStorage.getItem("bloxy_chats");
+
+if(c){
+
+chats = JSON.parse(c);
+
+}
+
+}
+
+function updateUser(){
+
+document.getElementById("userbox").innerHTML =
+currentUser.username;
+
+}
+
+function renderChats(){
+
+let box = document.getElementById("chatlist");
+
+box.innerHTML = "";
+
+for(let c in chats){
+
+let d = document.createElement("div");
+
+d.className = "chatitem";
+
+d.innerHTML = `
+<div>${c}</div>
+`;
+
+d.onclick = ()=>{
+
+currentChat = c;
+
+render();
+
+};
+
+box.appendChild(d);
+
+}
+
+}
+
+function render(){
+
+let box = document.getElementById("messages");
+
+box.innerHTML = "";
+
+for(let m of chats[currentChat]){
+
+let d = document.createElement("div");
+
+d.className = "msg";
+
+d.innerHTML = `
+<b>${m.role==="user" ? currentUser.username : "Bloxy-bot"}</b>
+
+<div style="margin-top:10px;">
+${m.content}
+</div>
+
+<div class="reactions">
+👍 ❤️ 😂
+</div>
+`;
+
+box.appendChild(d);
+
+}
+
+box.scrollTop = box.scrollHeight;
+
+saveLocal();
+
+}
+
+function newChat(){
+
+let id = "Chat " + (Object.keys(chats).length + 1);
+
+chats[id] = [];
+
+currentChat = id;
+
+renderChats();
+
+render();
+
+}
+
+function signup(){
+
+fetch("/signup",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+username:username.value,
+email:email.value,
+password:password.value
+})
+})
+.then(r=>r.json())
+.then(d=>{
+
+if(!d.ok){
+
+alert(d.error);
+
+return;
+
+}
+
+alert("Signup successful");
+
+});
+
+}
+
+function login(){
+
+fetch("/login",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+email:email.value,
+password:password.value
+})
+})
+.then(r=>r.json())
+.then(d=>{
+
+if(!d.ok){
+
+alert(d.error);
+
+return;
+
+}
+
+currentUser = {
+email:d.email,
+username:d.username,
+verified:d.verified
+};
+
+document.getElementById("auth").style.display = "none";
+
+updateUser();
+
+saveLocal();
+
+});
+
+}
+
+function guestMode(){
+
+document.getElementById("auth").style.display = "none";
+
+updateUser();
+
+}
+
+function logout(){
+
+localStorage.clear();
+
+location.reload();
+
+}
+
+function send(){
+
+let input = document.getElementById("message");
+
+let msg = input.value.trim();
+
+if(!msg){
+
+return;
+
+}
+
+input.value = "";
+
+chats[currentChat].push({
+role:"user",
+content:msg
+});
+
+render();
+
+document.getElementById("typing").innerHTML =
+"Bloxy-bot is typing...";
+
+fetch("/chat",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+email:currentUser.email,
+chat_id:currentChat,
+message:msg
+})
+})
+.then(r=>r.json())
+.then(d=>{
+
+document.getElementById("typing").innerHTML = "";
+
+let reply = "";
+
+let i = 0;
+
+chats[currentChat].push({
+role:"assistant",
+content:""
+});
+
+let interval = setInterval(()=>{
+
+if(i < d.reply.length){
+
+reply += d.reply[i];
+
+chats[currentChat][
+chats[currentChat].length - 1
+].content = reply;
+
+render();
+
+i++;
+
+}else{
+
+clearInterval(interval);
+
+}
+
+},10);
+
+})
+.catch(()=>{
+
+document.getElementById("typing").innerHTML = "";
+
+});
+
+}
+
+loadLocal();
+
+updateUser();
+
+renderChats();
+
+render();
 
 </script>
 
@@ -685,16 +1123,12 @@ margin-left:0;
 
 """
 
-
 # =========================================================
 # RUN
 # =========================================================
-
 
 if __name__ == "__main__":
 
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
-```
