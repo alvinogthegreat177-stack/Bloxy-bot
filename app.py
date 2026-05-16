@@ -1,10 +1,39 @@
+# =========================================================
+# BLOXY-BOT ULTIMATE APP.PY
+# =========================================================
+# REQUIREMENTS.TXT
+#
+# fastapi==0.110.0
+# uvicorn==0.29.0
+# requests==2.31.0
+# pydantic==2.6.4
+# python-multipart==0.0.9
+#
+# =========================================================
+# RUNTIME.TXT
+#
+# python-3.11.9
+#
+# =========================================================
+# USERS.JSON
+#
+# {}
+#
+# =========================================================
+# CHATS.JSON
+#
+# {}
+#
+# =========================================================
+
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import requests
+import traceback
 import json
 import os
-import traceback
+import time
 
 app = FastAPI()
 
@@ -89,8 +118,18 @@ class DeleteChat(BaseModel):
     chat_id: str
 
 
+class EditAccount(BaseModel):
+    old_email: str
+    username: str
+    email: str
+    password: str
+
+
+class DeleteAccount(BaseModel):
+    email: str
+
 # =========================================================
-# SEARCH TOOLS
+# SEARCH SYSTEMS
 # =========================================================
 
 def wikipedia_search(query):
@@ -123,7 +162,7 @@ def tavily_search(query):
             json={
                 "api_key": TAVILY_API_KEY,
                 "query": query,
-                "max_results": 3
+                "max_results": 5
             },
             timeout=20
         )
@@ -156,7 +195,7 @@ def news_search(query):
             params={
                 "q": query,
                 "apiKey": NEWS_API_KEY,
-                "pageSize": 3
+                "pageSize": 5
             },
             timeout=20
         )
@@ -168,6 +207,7 @@ def news_search(query):
         text = []
 
         for a in articles:
+
             text.append(
                 f"{a['title']} - {a['source']['name']}"
             )
@@ -202,7 +242,7 @@ def wolfram_search(query):
         return ""
 
 # =========================================================
-# SMART ROUTER
+# SMART CONTEXT ROUTER
 # =========================================================
 
 def build_context(prompt):
@@ -222,49 +262,64 @@ def build_context(prompt):
         wiki = wikipedia_search(prompt)
 
         if wiki:
+
             context.append(f"WIKIPEDIA:\n{wiki}")
 
     if any(x in text for x in [
         "news",
-        "latest",
         "today",
+        "latest",
         "trending"
     ]):
 
         news = news_search(prompt)
 
         if news:
+
             context.append(f"NEWS:\n{news}")
 
     if any(x in text for x in [
-        "football",
         "sports",
+        "football",
         "soccer",
+        "basketball",
         "nba",
         "f1",
+        "formula 1",
         "boxing",
-        "tennis",
+        "ufc",
         "cricket",
-        "ufc"
+        "tennis",
+        "rugby",
+        "golf",
+        "olympics"
     ]):
 
         sports = tavily_search(prompt)
 
         if sports:
+
             context.append(f"SPORTS:\n{sports}")
 
     if any(x in text for x in [
-        "solve",
-        "equation",
         "math",
+        "equation",
+        "physics",
         "calculate",
-        "physics"
+        "solve"
     ]):
 
         wolf = wolfram_search(prompt)
 
         if wolf:
+
             context.append(f"WOLFRAM:\n{wolf}")
+
+    web = tavily_search(prompt)
+
+    if web:
+
+        context.append(f"WEB:\n{web}")
 
     return "\n\n".join(context)
 
@@ -275,6 +330,7 @@ def build_context(prompt):
 def ask_ai(messages):
 
     if not OPENROUTER_API_KEY:
+
         return "OpenRouter API key missing."
 
     try:
@@ -291,7 +347,7 @@ def ask_ai(messages):
                 "model": "openai/gpt-4o-mini",
                 "messages": messages,
                 "temperature": 0.8,
-                "max_tokens": 8650
+                "max_tokens": 3000
             },
             timeout=60
         )
@@ -299,6 +355,7 @@ def ask_ai(messages):
         data = response.json()
 
         if "choices" in data:
+
             return data["choices"][0]["message"]["content"]
 
         return f"AI Error: {data}"
@@ -379,6 +436,64 @@ def login(data: Login):
     }
 
 # =========================================================
+# EDIT ACCOUNT
+# =========================================================
+
+@app.post("/edit_account")
+def edit_account(data: EditAccount):
+
+    if data.old_email not in users:
+
+        return {
+            "ok": False
+        }
+
+    user = users[data.old_email]
+
+    del users[data.old_email]
+
+    users[data.email] = {
+        "username": data.username,
+        "password": data.password
+    }
+
+    if data.old_email in chat_memory:
+
+        chat_memory[data.email] = \
+            chat_memory[data.old_email]
+
+        del chat_memory[data.old_email]
+
+    save_json(USERS_FILE, users)
+    save_json(CHATS_FILE, chat_memory)
+
+    return {
+        "ok": True
+    }
+
+# =========================================================
+# DELETE ACCOUNT
+# =========================================================
+
+@app.post("/delete_account")
+def delete_account(data: DeleteAccount):
+
+    if data.email in users:
+
+        del users[data.email]
+
+    if data.email in chat_memory:
+
+        del chat_memory[data.email]
+
+    save_json(USERS_FILE, users)
+    save_json(CHATS_FILE, chat_memory)
+
+    return {
+        "ok": True
+    }
+
+# =========================================================
 # CHAT
 # =========================================================
 
@@ -386,9 +501,11 @@ def login(data: Login):
 def chat(data: ChatRequest):
 
     if data.email not in chat_memory:
+
         chat_memory[data.email] = {}
 
     if data.chat_id not in chat_memory[data.email]:
+
         chat_memory[data.email][data.chat_id] = []
 
     history = chat_memory[data.email][data.chat_id]
@@ -401,13 +518,18 @@ You are Bloxy-bot AI.
 
 Rules:
 
-- Speak naturally
-- Use clean spacing
 - Be modern
 - Be intelligent
+- Be helpful
+- Use spacing
 - Avoid giant paragraphs
-- Be accurate
-- Use emojis naturally
+- Use bullets when useful
+- Use current web context
+- Sound natural
+- Be conversational
+
+Current Date:
+May 2026
 
 External Context:
 
@@ -455,9 +577,11 @@ External Context:
 def rename_chat(data: RenameChat):
 
     if data.email not in chat_memory:
+
         return {"ok": False}
 
     if data.old_chat not in chat_memory[data.email]:
+
         return {"ok": False}
 
     chat_memory[data.email][data.new_chat] = \
@@ -467,7 +591,9 @@ def rename_chat(data: RenameChat):
 
     save_json(CHATS_FILE, chat_memory)
 
-    return {"ok": True}
+    return {
+        "ok": True
+    }
 
 # =========================================================
 # DELETE CHAT
@@ -477,16 +603,20 @@ def rename_chat(data: RenameChat):
 def delete_chat(data: DeleteChat):
 
     if data.email not in chat_memory:
+
         return {"ok": False}
 
     if data.chat_id not in chat_memory[data.email]:
+
         return {"ok": False}
 
     del chat_memory[data.email][data.chat_id]
 
     save_json(CHATS_FILE, chat_memory)
 
-    return {"ok": True}
+    return {
+        "ok": True
+    }
 
 # =========================================================
 # FRONTEND
@@ -499,11 +629,13 @@ def home():
 
 <!DOCTYPE html>
 <html>
+
 <head>
 
 <title>Bloxy-bot</title>
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
 
 <style>
 
@@ -534,16 +666,16 @@ transition:0.3s;
 }
 
 .logo{
-font-size:28px;
-font-weight:bold;
 padding:20px;
+font-size:30px;
+font-weight:bold;
 color:#00ff88;
-text-shadow:0 0 15px #00ff88;
+text-shadow:0 0 18px #00ff88;
 }
 
 .newchat{
-margin:14px;
-padding:15px;
+margin:15px;
+padding:16px;
 border:none;
 border-radius:16px;
 background:#1d1d1d;
@@ -559,16 +691,24 @@ padding:10px;
 }
 
 .chatitem{
-padding:14px;
-background:#1a1a1a;
-border-radius:14px;
+padding:15px;
+border-radius:16px;
+background:#1b1b1b;
 margin-bottom:10px;
 cursor:pointer;
 transition:0.2s;
+position:relative;
 }
 
 .chatitem:hover{
 background:#252525;
+}
+
+.chatmenu{
+position:absolute;
+right:15px;
+top:15px;
+cursor:pointer;
 }
 
 .userbox{
@@ -595,16 +735,23 @@ padding:25px;
 .msg{
 background:#1a1a1a;
 padding:18px;
-border-radius:18px;
+border-radius:20px;
 margin-bottom:18px;
 line-height:1.7;
 white-space:pre-wrap;
 animation:fade 0.2s ease;
-position:relative;
+}
+
+.assistant{
+border-left:4px solid #00ff88;
+}
+
+.user{
+border-left:4px solid #ff8800;
 }
 
 .reactions{
-margin-top:10px;
+margin-top:12px;
 display:flex;
 gap:10px;
 font-size:14px;
@@ -623,13 +770,20 @@ padding:18px;
 border:none;
 outline:none;
 border-radius:18px;
-background:#1e1e1e;
+background:#1d1d1d;
 color:white;
 font-size:15px;
 }
 
+.helper{
+font-size:12px;
+opacity:0.4;
+margin-top:10px;
+padding-left:5px;
+}
+
 .typing{
-padding:10px;
+padding:10px 25px;
 font-size:14px;
 opacity:0.7;
 }
@@ -640,12 +794,12 @@ top:0;
 left:0;
 right:0;
 bottom:0;
-background:#000000cc;
+background:#000000dd;
 display:flex;
 justify-content:center;
 align-items:center;
-backdrop-filter:blur(10px);
 z-index:999;
+backdrop-filter:blur(10px);
 }
 
 .authbox{
@@ -660,7 +814,7 @@ width:100%;
 padding:16px;
 border:none;
 outline:none;
-border-radius:14px;
+border-radius:16px;
 background:#222;
 color:white;
 margin-top:12px;
@@ -670,21 +824,66 @@ margin-top:12px;
 width:100%;
 padding:16px;
 border:none;
-border-radius:14px;
+border-radius:16px;
 background:#00ff88;
-margin-top:12px;
-cursor:pointer;
 font-weight:bold;
+cursor:pointer;
+margin-top:12px;
 }
 
 .guestbtn{
 width:100%;
-padding:14px;
-margin-top:12px;
-background:#222;
+padding:15px;
 border:none;
-border-radius:14px;
+border-radius:16px;
+background:#222;
 color:white;
+cursor:pointer;
+margin-top:12px;
+}
+
+.verified{
+display:inline-flex;
+align-items:center;
+justify-content:center;
+width:18px;
+height:18px;
+background:#ff8800;
+border-radius:50%;
+margin-left:6px;
+font-size:11px;
+font-weight:bold;
+}
+
+.accountmenu{
+position:fixed;
+bottom:80px;
+left:20px;
+background:#1d1d1d;
+border-radius:16px;
+padding:10px;
+display:none;
+flex-direction:column;
+gap:10px;
+z-index:999;
+}
+
+.accountbtn{
+padding:12px;
+background:#252525;
+border-radius:12px;
+cursor:pointer;
+}
+
+.mobilemenu{
+display:none;
+position:fixed;
+top:15px;
+left:15px;
+background:#1d1d1d;
+padding:12px;
+border-radius:12px;
+z-index:999;
 cursor:pointer;
 }
 
@@ -701,20 +900,20 @@ transform:translateY(0px);
 
 @media(max-width:700px){
 
+.mobilemenu{
+display:block;
+}
+
 .sidebar{
 position:fixed;
 left:-280px;
 top:0;
 bottom:0;
-z-index:999;
+z-index:998;
 }
 
 .sidebar.open{
 left:0;
-}
-
-.main{
-width:100%;
 }
 
 }
@@ -725,34 +924,48 @@ width:100%;
 
 <body>
 
+<div class="mobilemenu"
+onclick="toggleSidebar()">
+☰
+</div>
+
 <div class="auth" id="auth">
 
 <div class="authbox">
 
 <h2>Bloxy-bot</h2>
 
-<input id="username"
+<input
+id="username"
 class="authinput"
 placeholder="Username">
 
-<input id="email"
+<input
+id="email"
 class="authinput"
 placeholder="Email">
 
-<input id="password"
+<input
+id="password"
 type="password"
 class="authinput"
 placeholder="Password">
 
-<button class="authbtn" onclick="signup()">
+<button
+class="authbtn"
+onclick="signup()">
 Signup
 </button>
 
-<button class="authbtn" onclick="login()">
+<button
+class="authbtn"
+onclick="login()">
 Login
 </button>
 
-<button class="guestbtn" onclick="guestMode()">
+<button
+class="guestbtn"
+onclick="guestMode()">
 Stay Signed Out
 </button>
 
@@ -760,19 +973,45 @@ Stay Signed Out
 
 </div>
 
+<div class="accountmenu"
+id="accountmenu">
+
+<div class="accountbtn"
+onclick="editAccount()">
+Edit Account
+</div>
+
+<div class="accountbtn"
+onclick="deleteAccount()">
+Delete Account
+</div>
+
+<div class="accountbtn"
+onclick="logout()">
+Logout
+</div>
+
+</div>
+
 <div class="container">
 
-<div class="sidebar" id="sidebar">
+<div class="sidebar"
+id="sidebar">
 
 <div class="logo">
 Bloxy-bot
 </div>
 
-<button class="newchat" onclick="newChat()">
+<button
+class="newchat"
+onclick="newChat()">
 + New Chat
 </button>
 
-<div class="chatlist" id="chatlist"></div>
+<div
+class="chatlist"
+id="chatlist">
+</div>
 
 <div class="userbox">
 
@@ -780,7 +1019,9 @@ Bloxy-bot
 Guest
 </div>
 
-<div onclick="logout()" style="cursor:pointer;">
+<div
+style="cursor:pointer;"
+onclick="toggleAccountMenu()">
 ⋮
 </div>
 
@@ -790,9 +1031,15 @@ Guest
 
 <div class="main">
 
-<div class="messages" id="messages"></div>
+<div
+class="messages"
+id="messages">
+</div>
 
-<div class="typing" id="typing"></div>
+<div
+class="typing"
+id="typing">
+</div>
 
 <div class="inputarea">
 
@@ -801,6 +1048,10 @@ id="message"
 class="inputbox"
 placeholder="Message Bloxy-bot..."
 onkeydown="if(event.key==='Enter'){send()}">
+
+<div class="helper">
+Bloxy-bot can make mistakes. Verify important information.
+</div>
 
 </div>
 
@@ -858,10 +1109,44 @@ chats = JSON.parse(c);
 
 }
 
+function toggleSidebar(){
+
+document.getElementById("sidebar")
+.classList.toggle("open");
+
+}
+
+function toggleAccountMenu(){
+
+let m = document.getElementById("accountmenu");
+
+if(m.style.display==="flex"){
+
+m.style.display="none";
+
+}else{
+
+m.style.display="flex";
+
+}
+
+}
+
 function updateUser(){
 
-document.getElementById("userbox").innerHTML =
-currentUser.username;
+let html = currentUser.username;
+
+if(currentUser.verified){
+
+html += `
+<span class="verified">
+✓
+</span>
+`;
+
+}
+
+document.getElementById("userbox").innerHTML = html;
 
 }
 
@@ -879,6 +1164,11 @@ d.className = "chatitem";
 
 d.innerHTML = `
 <div>${c}</div>
+
+<div class="chatmenu"
+onclick="chatOptions('${c}')">
+⋮
+</div>
 `;
 
 d.onclick = ()=>{
@@ -890,6 +1180,50 @@ render();
 };
 
 box.appendChild(d);
+
+}
+
+saveLocal();
+
+}
+
+function chatOptions(chat){
+
+let option = prompt(
+"Type: rename or delete"
+);
+
+if(option==="rename"){
+
+let n = prompt("New chat name");
+
+if(!n) return;
+
+chats[n] = chats[chat];
+
+delete chats[chat];
+
+currentChat = n;
+
+renderChats();
+render();
+
+}
+
+if(option==="delete"){
+
+delete chats[chat];
+
+if(Object.keys(chats).length===0){
+
+chats["Main"] = [];
+
+}
+
+currentChat = Object.keys(chats)[0];
+
+renderChats();
+render();
 
 }
 
@@ -905,17 +1239,24 @@ for(let m of chats[currentChat]){
 
 let d = document.createElement("div");
 
-d.className = "msg";
+d.className = "msg " +
+(m.role==="assistant"
+? "assistant"
+: "user");
 
 d.innerHTML = `
-<b>${m.role==="user" ? currentUser.username : "Bloxy-bot"}</b>
+<b>
+${m.role==="assistant"
+? "Bloxy-bot"
+: currentUser.username}
+</b>
 
 <div style="margin-top:10px;">
 ${m.content}
 </div>
 
 <div class="reactions">
-👍 ❤️ 😂
+👍 ❤️ 😂 🔥
 </div>
 `;
 
@@ -931,14 +1272,15 @@ saveLocal();
 
 function newChat(){
 
-let id = "Chat " + (Object.keys(chats).length + 1);
+let id =
+"Chat " +
+(Object.keys(chats).length + 1);
 
 chats[id] = [];
 
 currentChat = id;
 
 renderChats();
-
 render();
 
 }
@@ -1002,7 +1344,8 @@ username:d.username,
 verified:d.verified
 };
 
-document.getElementById("auth").style.display = "none";
+document.getElementById("auth")
+.style.display = "none";
 
 updateUser();
 
@@ -1014,9 +1357,93 @@ saveLocal();
 
 function guestMode(){
 
-document.getElementById("auth").style.display = "none";
+document.getElementById("auth")
+.style.display = "none";
 
 updateUser();
+
+}
+
+function editAccount(){
+
+let username =
+prompt(
+"New Username",
+currentUser.username
+);
+
+if(!username) return;
+
+let email =
+prompt(
+"New Email",
+currentUser.email
+);
+
+if(!email) return;
+
+let password =
+prompt(
+"New Password"
+);
+
+if(!password) return;
+
+fetch("/edit_account",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+old_email:currentUser.email,
+username:username,
+email:email,
+password:password
+})
+})
+.then(r=>r.json())
+.then(d=>{
+
+if(d.ok){
+
+currentUser.username=username;
+currentUser.email=email;
+
+updateUser();
+
+alert("Account updated");
+
+}
+
+});
+
+}
+
+function deleteAccount(){
+
+let sure = confirm(
+"All the conversations and chats you have had with Bloxy-bot will be erased permanently."
+);
+
+if(!sure) return;
+
+fetch("/delete_account",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+email:currentUser.email
+})
+})
+.then(r=>r.json())
+.then(d=>{
+
+localStorage.clear();
+
+location.reload();
+
+});
 
 }
 
@@ -1030,7 +1457,8 @@ location.reload();
 
 function send(){
 
-let input = document.getElementById("message");
+let input =
+document.getElementById("message");
 
 let msg = input.value.trim();
 
@@ -1049,7 +1477,8 @@ content:msg
 
 render();
 
-document.getElementById("typing").innerHTML =
+document.getElementById("typing")
+.innerHTML =
 "Bloxy-bot is typing...";
 
 fetch("/chat",{
@@ -1066,7 +1495,8 @@ message:msg
 .then(r=>r.json())
 .then(d=>{
 
-document.getElementById("typing").innerHTML = "";
+document.getElementById("typing")
+.innerHTML = "";
 
 let reply = "";
 
@@ -1084,7 +1514,7 @@ if(i < d.reply.length){
 reply += d.reply[i];
 
 chats[currentChat][
-chats[currentChat].length - 1
+chats[currentChat].length-1
 ].content = reply;
 
 render();
@@ -1097,12 +1527,13 @@ clearInterval(interval);
 
 }
 
-},10);
+},8);
 
 })
 .catch(()=>{
 
-document.getElementById("typing").innerHTML = "";
+document.getElementById("typing")
+.innerHTML = "";
 
 });
 
@@ -1131,4 +1562,8 @@ if __name__ == "__main__":
 
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000
+    )
