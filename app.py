@@ -1,5 +1,5 @@
 # =========================================================
-# BLOXY-BOT ULTIMATE 2026 FULL SCRIPT
+# BLOXY-BOT 2026 COMPLETE FULL SCRIPT
 # =========================================================
 
 from fastapi import FastAPI
@@ -9,12 +9,11 @@ import requests
 import traceback
 import json
 import os
-import time
 
 app = FastAPI()
 
 # =========================================================
-# API KEYS
+# ENV VARIABLES
 # =========================================================
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -23,9 +22,10 @@ GNEWS_API_KEY = os.getenv("GNEWS_API_KEY")
 WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY")
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 THESPORTSDB_API_KEY = os.getenv("THESPORTSDB_API_KEY")
+EXA_API_KEY = os.getenv("EXA_API_KEY")
 
 # =========================================================
-# OWNER
+# OWNER VERIFIED ACCOUNT
 # =========================================================
 
 OWNER_EMAIL = "alvinogthegreat177@gmail.com"
@@ -33,7 +33,7 @@ OWNER_PASSWORD = "alvindev17.og"
 OWNER_USERNAME = "aTg"
 
 # =========================================================
-# FILES
+# STORAGE FILES
 # =========================================================
 
 USERS_FILE = "users.json"
@@ -99,9 +99,49 @@ class DeleteChat(BaseModel):
 class DeleteAccount(BaseModel):
     email: str
 
+
+class EditProfile(BaseModel):
+    email: str
+    username: str
+    password: str
+
 # =========================================================
-# LIVE INFORMATION SYSTEMS
+# LIVE SOURCES
 # =========================================================
+
+def tavily_search(query):
+
+    if not TAVILY_API_KEY:
+        return ""
+
+    try:
+
+        r = requests.post(
+            "https://api.tavily.com/search",
+            json={
+                "api_key": TAVILY_API_KEY,
+                "query": query,
+                "max_results": 5
+            },
+            timeout=20
+        )
+
+        data = r.json()
+
+        text = []
+
+        for x in data.get("results", []):
+
+            text.append(
+                x.get("content", "")
+            )
+
+        return "\n".join(text)
+
+    except:
+
+        return ""
+
 
 def gnews_search(query):
 
@@ -125,52 +165,15 @@ def gnews_search(query):
 
         text = []
 
-        for a in data.get("articles", []):
-
-            title = a.get("title", "")
-            desc = a.get("description", "")
+        for x in data.get("articles", []):
 
             text.append(
-                f"{title}\n{desc}"
+                x.get("title", "") +
+                "\n" +
+                x.get("description", "")
             )
 
         return "\n\n".join(text)
-
-    except:
-
-        return ""
-
-
-def tavily_search(query):
-
-    if not TAVILY_API_KEY:
-        return ""
-
-    try:
-
-        r = requests.post(
-            "https://api.tavily.com/search",
-            json={
-                "api_key": TAVILY_API_KEY,
-                "query": query,
-                "max_results": 6
-            },
-            timeout=20
-        )
-
-        data = r.json()
-
-        results = data.get("results", [])
-
-        text = []
-
-        for x in results:
-
-            text.append(
-                x.get("content", "")
-            )
-
-        return "\n".join(text)
 
     except:
 
@@ -200,6 +203,24 @@ def wolfram_search(query):
         return ""
 
 
+def wikipedia_search(query):
+
+    try:
+
+        r = requests.get(
+            "https://en.wikipedia.org/api/rest_v1/page/summary/" + query,
+            timeout=20
+        )
+
+        data = r.json()
+
+        return data.get("extract", "")
+
+    except:
+
+        return ""
+
+
 def sports_search(query):
 
     if not THESPORTSDB_API_KEY:
@@ -215,14 +236,14 @@ def sports_search(query):
             timeout=20
         )
 
-        return r.text[:3000]
+        return r.text[:4000]
 
     except:
 
         return ""
 
 
-def finance_search(query):
+def finance_search():
 
     if not FINNHUB_API_KEY:
         return ""
@@ -254,8 +275,35 @@ def finance_search(query):
 
         return ""
 
+
+def exa_search(query):
+
+    if not EXA_API_KEY:
+        return ""
+
+    try:
+
+        r = requests.post(
+            "https://api.exa.ai/search",
+            headers={
+                "x-api-key": EXA_API_KEY,
+                "Content-Type": "application/json"
+            },
+            json={
+                "query": query,
+                "numResults": 5
+            },
+            timeout=20
+        )
+
+        return r.text[:4000]
+
+    except:
+
+        return ""
+
 # =========================================================
-# CONTEXT ROUTER
+# CONTEXT BUILDER
 # =========================================================
 
 def build_context(prompt):
@@ -264,58 +312,67 @@ def build_context(prompt):
 
     context = []
 
-    web = tavily_search(prompt)
+    live = tavily_search(prompt)
 
-    if web:
+    if live:
 
-        context.append(f"WEB:\n{web}")
+        context.append("LIVE WEB:\n" + live)
 
     news = gnews_search(prompt)
 
     if news:
 
-        context.append(f"NEWS:\n{news}")
+        context.append("NEWS:\n" + news)
+
+    wiki = wikipedia_search(prompt)
+
+    if wiki:
+
+        context.append("WIKIPEDIA:\n" + wiki)
+
+    exa = exa_search(prompt)
+
+    if exa:
+
+        context.append("EXA:\n" + exa)
 
     if any(x in text for x in [
         "football",
         "sports",
-        "nba",
-        "ufc",
-        "f1",
         "premier league",
-        "laliga",
-        "bundesliga",
-        "tennis",
+        "nba",
+        "f1",
         "boxing",
-        "cricket"
+        "ufc",
+        "cricket",
+        "tennis"
     ]):
 
         sports = sports_search(prompt)
 
         if sports:
 
-            context.append(f"SPORTS:\n{sports}")
+            context.append("SPORTS:\n" + sports)
 
     if any(x in text for x in [
-        "stock",
-        "crypto",
-        "economy",
         "economics",
-        "market",
-        "bitcoin"
+        "stock",
+        "bitcoin",
+        "crypto",
+        "market"
     ]):
 
-        finance = finance_search(prompt)
+        finance = finance_search()
 
         if finance:
 
-            context.append(f"FINANCE:\n{finance}")
+            context.append("FINANCE:\n" + finance)
 
     if any(x in text for x in [
-        "solve",
         "math",
-        "equation",
         "calculate",
+        "equation",
+        "solve",
         "physics"
     ]):
 
@@ -323,37 +380,43 @@ def build_context(prompt):
 
         if wolf:
 
-            context.append(f"WOLFRAM:\n{wolf}")
+            context.append("WOLFRAM:\n" + wolf)
 
     return "\n\n".join(context)
 
 # =========================================================
-# AI
+# AI RESPONSE
 # =========================================================
 
 def ask_ai(messages):
 
     try:
 
-        response = requests.post(
+        r = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={
                 "Authorization":
                 f"Bearer {OPENROUTER_API_KEY}",
-
                 "Content-Type":
                 "application/json"
             },
             json={
-                "model": "openai/gpt-4o-mini",
-                "messages": messages,
-                "temperature": 0.8,
-                "max_tokens": 6500
+                "model":
+                "openai/gpt-4o-mini",
+
+                "messages":
+                messages,
+
+                "temperature":
+                0.8,
+
+                "max_tokens":
+                8799
             },
             timeout=60
         )
 
-        data = response.json()
+        data = r.json()
 
         if "choices" in data:
 
@@ -434,6 +497,28 @@ def login(data: Login):
         "username": users[data.email]["username"],
         "verified": False,
         "email": data.email
+    }
+
+# =========================================================
+# EDIT PROFILE
+# =========================================================
+
+@app.post("/edit_profile")
+def edit_profile(data: EditProfile):
+
+    if data.email not in users:
+
+        return {
+            "ok": False
+        }
+
+    users[data.email]["username"] = data.username
+    users[data.email]["password"] = data.password
+
+    save_json(USERS_FILE, users)
+
+    return {
+        "ok": True
     }
 
 # =========================================================
@@ -532,16 +617,16 @@ You are Bloxy-bot AI.
 
 Rules:
 
-- Use clean spacing
-- Use current live information
-- Prioritize 2026 context
-- Sports standings must be current
-- Breaking news must use live search
+- Use clean formatting
+- Use current 2026 context
+- Sports tables must be live
+- Use live search results
+- Use bullet points
 - Avoid giant paragraphs
-- Be modern
 - Be intelligent
+- Be modern
 
-External Context:
+Context:
 
 {context}
 
@@ -656,19 +741,9 @@ border-radius:16px;
 background:#1b1b1b;
 margin-bottom:10px;
 cursor:pointer;
-transition:0.2s;
 display:flex;
 justify-content:space-between;
 align-items:center;
-}
-
-.chatitem:hover{
-background:#252525;
-}
-
-.chatmenu{
-cursor:pointer;
-font-size:18px;
 }
 
 .userbox{
@@ -699,7 +774,6 @@ border-radius:20px;
 margin-bottom:18px;
 line-height:1.7;
 white-space:pre-wrap;
-animation:fade 0.2s ease;
 }
 
 .assistant{
@@ -707,7 +781,7 @@ border-left:4px solid #00ff88;
 }
 
 .user{
-border-left:4px solid #ff8800;
+border-left:4px solid orange;
 }
 
 .inputarea{
@@ -735,12 +809,6 @@ text-align:center;
 width:100%;
 }
 
-.typing{
-padding:10px 25px;
-font-size:14px;
-opacity:0.7;
-}
-
 .auth{
 position:fixed;
 top:0;
@@ -752,7 +820,6 @@ display:flex;
 justify-content:center;
 align-items:center;
 z-index:999;
-backdrop-filter:blur(10px);
 }
 
 .authbox{
@@ -804,8 +871,8 @@ vertical-align:middle;
 }
 
 .verified svg{
-width:18px;
-height:18px;
+width:20px;
+height:20px;
 filter:drop-shadow(0 0 8px orange);
 }
 
@@ -829,15 +896,10 @@ border-radius:12px;
 cursor:pointer;
 }
 
-@keyframes fade{
-from{
-opacity:0;
-transform:translateY(10px);
-}
-to{
-opacity:1;
-transform:translateY(0px);
-}
+.typing{
+padding:10px 25px;
+font-size:14px;
+opacity:0.7;
 }
 
 @media(max-width:700px){
@@ -864,36 +926,30 @@ font-size:18px;
 
 <h2>Bloxy-bot</h2>
 
-<input
-id="username"
+<input id="username"
 class="authinput"
 placeholder="Username">
 
-<input
-id="email"
+<input id="email"
 class="authinput"
 placeholder="Email">
 
-<input
-id="password"
+<input id="password"
 type="password"
 class="authinput"
 placeholder="Password">
 
-<button
-class="authbtn"
+<button class="authbtn"
 onclick="signup()">
 Signup
 </button>
 
-<button
-class="authbtn"
+<button class="authbtn"
 onclick="login()">
 Login
 </button>
 
-<button
-class="guestbtn"
+<button class="guestbtn"
 onclick="guestMode()">
 Stay Signed Out
 </button>
@@ -902,7 +958,13 @@ Stay Signed Out
 
 </div>
 
-<div class="accountmenu" id="accountmenu">
+<div class="accountmenu"
+id="accountmenu">
+
+<div class="accountbtn"
+onclick="editProfile()">
+Edit Profile
+</div>
 
 <div class="accountbtn"
 onclick="deleteAccount()">
@@ -924,14 +986,12 @@ Logout
 Bloxy-bot
 </div>
 
-<button
-class="newchat"
+<button class="newchat"
 onclick="newChat()">
 + New Chat
 </button>
 
-<div
-class="chatlist"
+<div class="chatlist"
 id="chatlist">
 </div>
 
@@ -943,7 +1003,7 @@ Guest
 
 <div
 style="cursor:pointer;"
-onclick="toggleAccountMenu()">
+onclick="toggleMenu()">
 ⋮
 </div>
 
@@ -953,13 +1013,11 @@ onclick="toggleAccountMenu()">
 
 <div class="main">
 
-<div
-class="messages"
+<div class="messages"
 id="messages">
 </div>
 
-<div
-class="typing"
+<div class="typing"
 id="typing">
 </div>
 
@@ -1049,31 +1107,29 @@ return `
 <svg viewBox="0 0 24 24">
 
 <path
-fill="#f6a800"
-stroke="#d98a00"
-stroke-width="1"
+fill="#f6a000"
 
 d="
-M12 0
-L15 3
-L19 2
-L20 6
-L24 8
-L22 12
-L24 16
-L20 18
-L19 22
-L15 21
-L12 24
-L9 21
-L5 22
-L4 18
-L0 16
-L2 12
-L0 8
-L4 6
-L5 2
-L9 3
+M12 1
+L14.5 4
+L18.5 3
+L19.5 7
+L23 9
+L21 13
+L23 17
+L19.5 19
+L18.5 23
+L14.5 22
+L12 25
+L9.5 22
+L5.5 23
+L4.5 19
+L1 17
+L3 13
+L1 9
+L4.5 7
+L5.5 3
+L9.5 4
 Z"/>
 
 <path
@@ -1081,8 +1137,8 @@ fill="white"
 
 d="
 M10 16
-L6 12
-L7.5 10.5
+L6.5 12.5
+L8 11
 L10 13
 L16.5 6.5
 L18 8
@@ -1099,22 +1155,17 @@ return "";
 
 }
 
-function toggleAccountMenu(){
+function toggleMenu(){
 
 let menu =
 document.getElementById(
 "accountmenu"
 );
 
-if(menu.style.display==="flex"){
-
-menu.style.display="none";
-
-}else{
-
-menu.style.display="flex";
-
-}
+menu.style.display =
+menu.style.display==="flex"
+? "none"
+: "flex";
 
 }
 
@@ -1148,9 +1199,7 @@ d.className = "chatitem";
 d.innerHTML = `
 <div>${c}</div>
 
-<div
-class="chatmenu"
-onclick="
+<div onclick="
 event.stopPropagation();
 chatOptions('${c}')
 ">
@@ -1371,9 +1420,55 @@ updateUser();
 
 }
 
+function editProfile(){
+
+let newName =
+prompt(
+"New Username",
+currentUser.username
+);
+
+if(!newName) return;
+
+let newPass =
+prompt(
+"New Password"
+);
+
+if(!newPass) return;
+
+fetch("/edit_profile",{
+method:"POST",
+headers:{
+"Content-Type":
+"application/json"
+},
+body:JSON.stringify({
+email:currentUser.email,
+username:newName,
+password:newPass
+})
+})
+.then(r=>r.json())
+.then(d=>{
+
+currentUser.username =
+newName;
+
+updateUser();
+
+saveLocal();
+
+alert("Profile updated");
+
+});
+
+}
+
 function deleteAccount(){
 
-let sure = confirm(
+let sure =
+confirm(
 "All the conversations and chats you have had with Bloxy-bot will be erased permanently."
 );
 
