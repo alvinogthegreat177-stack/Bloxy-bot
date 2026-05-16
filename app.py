@@ -1,5 +1,5 @@
 # =========================================================
-# BLOXY-BOT FULL REWRITE
+# BLOXY-BOT ULTIMATE 2026 FULL SCRIPT
 # =========================================================
 
 from fastapi import FastAPI
@@ -9,6 +9,7 @@ import requests
 import traceback
 import json
 import os
+import time
 
 app = FastAPI()
 
@@ -20,6 +21,8 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 GNEWS_API_KEY = os.getenv("GNEWS_API_KEY")
 WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY")
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
+THESPORTSDB_API_KEY = os.getenv("THESPORTSDB_API_KEY")
 
 # =========================================================
 # OWNER
@@ -81,8 +84,23 @@ class ChatRequest(BaseModel):
     chat_id: str
     message: str
 
+
+class RenameChat(BaseModel):
+    email: str
+    old_chat: str
+    new_chat: str
+
+
+class DeleteChat(BaseModel):
+    email: str
+    chat_id: str
+
+
+class DeleteAccount(BaseModel):
+    email: str
+
 # =========================================================
-# LIVE SEARCH
+# LIVE INFORMATION SYSTEMS
 # =========================================================
 
 def gnews_search(query):
@@ -135,7 +153,7 @@ def tavily_search(query):
             json={
                 "api_key": TAVILY_API_KEY,
                 "query": query,
-                "max_results": 5
+                "max_results": 6
             },
             timeout=20
         )
@@ -181,6 +199,61 @@ def wolfram_search(query):
 
         return ""
 
+
+def sports_search(query):
+
+    if not THESPORTSDB_API_KEY:
+        return ""
+
+    try:
+
+        r = requests.get(
+            f"https://www.thesportsdb.com/api/v1/json/{THESPORTSDB_API_KEY}/searchteams.php",
+            params={
+                "t": query
+            },
+            timeout=20
+        )
+
+        return r.text[:3000]
+
+    except:
+
+        return ""
+
+
+def finance_search(query):
+
+    if not FINNHUB_API_KEY:
+        return ""
+
+    try:
+
+        r = requests.get(
+            "https://finnhub.io/api/v1/news",
+            params={
+                "category": "general",
+                "token": FINNHUB_API_KEY
+            },
+            timeout=20
+        )
+
+        data = r.json()
+
+        text = []
+
+        for x in data[:5]:
+
+            text.append(
+                x.get("headline", "")
+            )
+
+        return "\n".join(text)
+
+    except:
+
+        return ""
+
 # =========================================================
 # CONTEXT ROUTER
 # =========================================================
@@ -191,23 +264,58 @@ def build_context(prompt):
 
     context = []
 
-    news = gnews_search(prompt)
-
-    if news:
-
-        context.append(f"NEWS:\n{news}")
-
     web = tavily_search(prompt)
 
     if web:
 
         context.append(f"WEB:\n{web}")
 
+    news = gnews_search(prompt)
+
+    if news:
+
+        context.append(f"NEWS:\n{news}")
+
     if any(x in text for x in [
-        "math",
-        "calculate",
-        "equation",
+        "football",
+        "sports",
+        "nba",
+        "ufc",
+        "f1",
+        "premier league",
+        "laliga",
+        "bundesliga",
+        "tennis",
+        "boxing",
+        "cricket"
+    ]):
+
+        sports = sports_search(prompt)
+
+        if sports:
+
+            context.append(f"SPORTS:\n{sports}")
+
+    if any(x in text for x in [
+        "stock",
+        "crypto",
+        "economy",
+        "economics",
+        "market",
+        "bitcoin"
+    ]):
+
+        finance = finance_search(prompt)
+
+        if finance:
+
+            context.append(f"FINANCE:\n{finance}")
+
+    if any(x in text for x in [
         "solve",
+        "math",
+        "equation",
+        "calculate",
         "physics"
     ]):
 
@@ -240,7 +348,7 @@ def ask_ai(messages):
                 "model": "openai/gpt-4o-mini",
                 "messages": messages,
                 "temperature": 0.8,
-                "max_tokens": 8999
+                "max_tokens": 6500
             },
             timeout=60
         )
@@ -249,8 +357,7 @@ def ask_ai(messages):
 
         if "choices" in data:
 
-            return data["choices"][0] \
-                ["message"]["content"]
+            return data["choices"][0]["message"]["content"]
 
         return str(data)
 
@@ -271,7 +378,7 @@ def signup(data: Signup):
 
         return {
             "ok": False,
-            "error": "Account exists"
+            "error": "Account already exists"
         }
 
     users[data.email] = {
@@ -315,8 +422,7 @@ def login(data: Login):
             "error": "Account not found"
         }
 
-    if users[data.email]["password"] \
-        != data.password:
+    if users[data.email]["password"] != data.password:
 
         return {
             "ok": False,
@@ -325,10 +431,80 @@ def login(data: Login):
 
     return {
         "ok": True,
-        "username":
-        users[data.email]["username"],
+        "username": users[data.email]["username"],
         "verified": False,
         "email": data.email
+    }
+
+# =========================================================
+# DELETE ACCOUNT
+# =========================================================
+
+@app.post("/delete_account")
+def delete_account(data: DeleteAccount):
+
+    if data.email in users:
+
+        del users[data.email]
+
+    if data.email in chat_memory:
+
+        del chat_memory[data.email]
+
+    save_json(USERS_FILE, users)
+    save_json(CHATS_FILE, chat_memory)
+
+    return {
+        "ok": True
+    }
+
+# =========================================================
+# RENAME CHAT
+# =========================================================
+
+@app.post("/rename_chat")
+def rename_chat(data: RenameChat):
+
+    if data.email not in chat_memory:
+
+        return {"ok": False}
+
+    if data.old_chat not in chat_memory[data.email]:
+
+        return {"ok": False}
+
+    chat_memory[data.email][data.new_chat] = \
+        chat_memory[data.email][data.old_chat]
+
+    del chat_memory[data.email][data.old_chat]
+
+    save_json(CHATS_FILE, chat_memory)
+
+    return {
+        "ok": True
+    }
+
+# =========================================================
+# DELETE CHAT
+# =========================================================
+
+@app.post("/delete_chat")
+def delete_chat(data: DeleteChat):
+
+    if data.email not in chat_memory:
+
+        return {"ok": False}
+
+    if data.chat_id not in chat_memory[data.email]:
+
+        return {"ok": False}
+
+    del chat_memory[data.email][data.chat_id]
+
+    save_json(CHATS_FILE, chat_memory)
+
+    return {
+        "ok": True
     }
 
 # =========================================================
@@ -342,14 +518,11 @@ def chat(data: ChatRequest):
 
         chat_memory[data.email] = {}
 
-    if data.chat_id not in \
-        chat_memory[data.email]:
+    if data.chat_id not in chat_memory[data.email]:
 
-        chat_memory[data.email] \
-            [data.chat_id] = []
+        chat_memory[data.email][data.chat_id] = []
 
-    history = \
-        chat_memory[data.email][data.chat_id]
+    history = chat_memory[data.email][data.chat_id]
 
     context = build_context(data.message)
 
@@ -360,15 +533,15 @@ You are Bloxy-bot AI.
 Rules:
 
 - Use clean spacing
-- Be intelligent
-- Be modern
-- Use current 2026 context
-- Sports tables should be accurate
-- Breaking news should use live data
-- Use bullet points when useful
+- Use current live information
+- Prioritize 2026 context
+- Sports standings must be current
+- Breaking news must use live search
 - Avoid giant paragraphs
+- Be modern
+- Be intelligent
 
-Context:
+External Context:
 
 {context}
 
@@ -484,10 +657,18 @@ background:#1b1b1b;
 margin-bottom:10px;
 cursor:pointer;
 transition:0.2s;
+display:flex;
+justify-content:space-between;
+align-items:center;
 }
 
 .chatitem:hover{
 background:#252525;
+}
+
+.chatmenu{
+cursor:pointer;
+font-size:18px;
 }
 
 .userbox{
@@ -618,29 +799,34 @@ margin-top:12px;
 display:inline-flex;
 align-items:center;
 justify-content:center;
-width:18px;
-height:18px;
 margin-left:6px;
-filter:drop-shadow(0 0 6px #ff8800);
-animation:pulse 2s infinite;
 vertical-align:middle;
 }
 
 .verified svg{
 width:18px;
 height:18px;
+filter:drop-shadow(0 0 8px orange);
 }
 
-@keyframes pulse{
-0%{
-transform:scale(1);
+.accountmenu{
+position:fixed;
+bottom:80px;
+left:20px;
+background:#1d1d1d;
+padding:10px;
+border-radius:16px;
+display:none;
+flex-direction:column;
+gap:10px;
+z-index:999;
 }
-50%{
-transform:scale(1.08);
-}
-100%{
-transform:scale(1);
-}
+
+.accountbtn{
+padding:12px;
+background:#252525;
+border-radius:12px;
+cursor:pointer;
 }
 
 @keyframes fade{
@@ -657,7 +843,11 @@ transform:translateY(0px);
 @media(max-width:700px){
 
 .sidebar{
-display:none;
+width:85px;
+}
+
+.logo{
+font-size:18px;
 }
 
 }
@@ -712,6 +902,20 @@ Stay Signed Out
 
 </div>
 
+<div class="accountmenu" id="accountmenu">
+
+<div class="accountbtn"
+onclick="deleteAccount()">
+Delete Account
+</div>
+
+<div class="accountbtn"
+onclick="logout()">
+Logout
+</div>
+
+</div>
+
 <div class="container">
 
 <div class="sidebar">
@@ -737,7 +941,9 @@ id="chatlist">
 Guest
 </div>
 
-<div>
+<div
+style="cursor:pointer;"
+onclick="toggleAccountMenu()">
 ⋮
 </div>
 
@@ -766,8 +972,7 @@ placeholder="Message Bloxy-bot..."
 onkeydown="if(event.key==='Enter'){send()}">
 
 <div class="helper">
-Bloxy-bot can make mistakes.
-Verify important information.
+Bloxy-bot can make mistakes. Verify important information.
 </div>
 
 </div>
@@ -840,35 +1045,76 @@ if(currentUser.verified){
 
 return `
 <span class="verified">
-<svg viewBox="0 0 24 24"
-fill="#ff8800">
 
-<path d="
+<svg viewBox="0 0 24 24">
+
+<path
+fill="#f6a800"
+stroke="#d98a00"
+stroke-width="1"
+
+d="
 M12 0
-L14.8 4.5
-L20 4
-L19.5 9.2
-L24 12
-L19.5 14.8
-L20 20
-L14.8 19.5
+L15 3
+L19 2
+L20 6
+L24 8
+L22 12
+L24 16
+L20 18
+L19 22
+L15 21
 L12 24
-L9.2 19.5
-L4 20
-L4.5 14.8
-L0 12
-L4.5 9.2
-L4 4
-L9.2 4.5
+L9 21
+L5 22
+L4 18
+L0 16
+L2 12
+L0 8
+L4 6
+L5 2
+L9 3
+Z"/>
+
+<path
+fill="white"
+
+d="
+M10 16
+L6 12
+L7.5 10.5
+L10 13
+L16.5 6.5
+L18 8
 Z"/>
 
 </svg>
+
 </span>
 `;
 
 }
 
 return "";
+
+}
+
+function toggleAccountMenu(){
+
+let menu =
+document.getElementById(
+"accountmenu"
+);
+
+if(menu.style.display==="flex"){
+
+menu.style.display="none";
+
+}else{
+
+menu.style.display="flex";
+
+}
 
 }
 
@@ -899,7 +1145,18 @@ document.createElement("div");
 
 d.className = "chatitem";
 
-d.innerHTML = c;
+d.innerHTML = `
+<div>${c}</div>
+
+<div
+class="chatmenu"
+onclick="
+event.stopPropagation();
+chatOptions('${c}')
+">
+⋮
+</div>
+`;
 
 d.onclick = ()=>{
 
@@ -910,6 +1167,55 @@ render();
 };
 
 box.appendChild(d);
+
+}
+
+saveLocal();
+
+}
+
+function chatOptions(chat){
+
+let action =
+prompt(
+"rename or delete"
+);
+
+if(action==="rename"){
+
+let n =
+prompt(
+"New chat name"
+);
+
+if(!n) return;
+
+chats[n] = chats[chat];
+
+delete chats[chat];
+
+currentChat = n;
+
+renderChats();
+render();
+
+}
+
+if(action==="delete"){
+
+delete chats[chat];
+
+if(Object.keys(chats).length===0){
+
+chats["Main"] = [];
+
+}
+
+currentChat =
+Object.keys(chats)[0];
+
+renderChats();
+render();
 
 }
 
@@ -1065,6 +1371,43 @@ updateUser();
 
 }
 
+function deleteAccount(){
+
+let sure = confirm(
+"All the conversations and chats you have had with Bloxy-bot will be erased permanently."
+);
+
+if(!sure) return;
+
+fetch("/delete_account",{
+method:"POST",
+headers:{
+"Content-Type":
+"application/json"
+},
+body:JSON.stringify({
+email:currentUser.email
+})
+})
+.then(r=>r.json())
+.then(d=>{
+
+localStorage.clear();
+
+location.reload();
+
+});
+
+}
+
+function logout(){
+
+localStorage.clear();
+
+location.reload();
+
+}
+
 function send(){
 
 let input =
@@ -1128,7 +1471,8 @@ wrapper.className =
 wrapper.innerHTML = `
 <b>Bloxy-bot</b>
 
-<div id="streamingText"
+<div
+id="streamingText"
 style="margin-top:10px;">
 </div>
 `;
