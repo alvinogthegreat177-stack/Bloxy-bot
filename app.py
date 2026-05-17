@@ -1,5 +1,6 @@
 # =========================================================
-# BLOXY-BOT 2026 COMPLETE FULL SCRIPT
+# BLOXY-BOT 2026 ULTIMATE AI
+# NOW USING GROQ + LIVE APIs
 # =========================================================
 
 from fastapi import FastAPI
@@ -16,12 +17,18 @@ app = FastAPI()
 # ENV VARIABLES
 # =========================================================
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+
 GNEWS_API_KEY = os.getenv("GNEWS_API_KEY")
+
 WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY")
+
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
+
 THESPORTSDB_API_KEY = os.getenv("THESPORTSDB_API_KEY")
+
 EXA_API_KEY = os.getenv("EXA_API_KEY")
 
 # =========================================================
@@ -29,14 +36,17 @@ EXA_API_KEY = os.getenv("EXA_API_KEY")
 # =========================================================
 
 OWNER_EMAIL = "alvinogthegreat177@gmail.com"
+
 OWNER_PASSWORD = "alvindev17.og"
+
 OWNER_USERNAME = "aTg"
 
 # =========================================================
-# STORAGE FILES
+# FILES
 # =========================================================
 
 USERS_FILE = "users.json"
+
 CHATS_FILE = "chats.json"
 
 # =========================================================
@@ -48,6 +58,7 @@ def load_json(path, default):
     try:
 
         with open(path, "r", encoding="utf-8") as f:
+
             return json.load(f)
 
     except:
@@ -58,10 +69,12 @@ def load_json(path, default):
 def save_json(path, data):
 
     with open(path, "w", encoding="utf-8") as f:
+
         json.dump(data, f, indent=2)
 
 
 users = load_json(USERS_FILE, {})
+
 chat_memory = load_json(CHATS_FILE, {})
 
 # =========================================================
@@ -69,49 +82,44 @@ chat_memory = load_json(CHATS_FILE, {})
 # =========================================================
 
 class Signup(BaseModel):
+
     username: str
     email: str
     password: str
 
 
 class Login(BaseModel):
+
     email: str
     password: str
 
 
 class ChatRequest(BaseModel):
+
     email: str
     chat_id: str
     message: str
 
 
-class RenameChat(BaseModel):
-    email: str
-    old_chat: str
-    new_chat: str
-
-
-class DeleteChat(BaseModel):
-    email: str
-    chat_id: str
-
-
-class DeleteAccount(BaseModel):
-    email: str
-
-
 class EditProfile(BaseModel):
+
     email: str
     username: str
     password: str
 
+
+class DeleteAccount(BaseModel):
+
+    email: str
+
 # =========================================================
-# LIVE SOURCES
+# LIVE APIs
 # =========================================================
 
 def tavily_search(query):
 
     if not TAVILY_API_KEY:
+
         return ""
 
     try:
@@ -121,9 +129,9 @@ def tavily_search(query):
             json={
                 "api_key": TAVILY_API_KEY,
                 "query": query,
-                "max_results": 5
+                "max_results": 2
             },
-            timeout=20
+            timeout=15
         )
 
         data = r.json()
@@ -146,6 +154,7 @@ def tavily_search(query):
 def gnews_search(query):
 
     if not GNEWS_API_KEY:
+
         return ""
 
     try:
@@ -156,9 +165,9 @@ def gnews_search(query):
                 "q": query,
                 "token": GNEWS_API_KEY,
                 "lang": "en",
-                "max": 5
+                "max": 2
             },
-            timeout=20
+            timeout=15
         )
 
         data = r.json()
@@ -168,35 +177,10 @@ def gnews_search(query):
         for x in data.get("articles", []):
 
             text.append(
-                x.get("title", "") +
-                "\n" +
-                x.get("description", "")
+                x.get("title", "")
             )
 
-        return "\n\n".join(text)
-
-    except:
-
-        return ""
-
-
-def wolfram_search(query):
-
-    if not WOLFRAM_API_KEY:
-        return ""
-
-    try:
-
-        r = requests.get(
-            "http://api.wolframalpha.com/v1/result",
-            params={
-                "appid": WOLFRAM_API_KEY,
-                "i": query
-            },
-            timeout=20
-        )
-
-        return r.text
+        return "\n".join(text)
 
     except:
 
@@ -209,7 +193,7 @@ def wikipedia_search(query):
 
         r = requests.get(
             "https://en.wikipedia.org/api/rest_v1/page/summary/" + query,
-            timeout=20
+            timeout=15
         )
 
         data = r.json()
@@ -221,9 +205,34 @@ def wikipedia_search(query):
         return ""
 
 
+def wolfram_search(query):
+
+    if not WOLFRAM_API_KEY:
+
+        return ""
+
+    try:
+
+        r = requests.get(
+            "http://api.wolframalpha.com/v1/result",
+            params={
+                "appid": WOLFRAM_API_KEY,
+                "i": query
+            },
+            timeout=15
+        )
+
+        return r.text
+
+    except:
+
+        return ""
+
+
 def sports_search(query):
 
     if not THESPORTSDB_API_KEY:
+
         return ""
 
     try:
@@ -233,10 +242,10 @@ def sports_search(query):
             params={
                 "t": query
             },
-            timeout=20
+            timeout=15
         )
 
-        return r.text[:4000]
+        return r.text[:2500]
 
     except:
 
@@ -246,6 +255,7 @@ def sports_search(query):
 def finance_search():
 
     if not FINNHUB_API_KEY:
+
         return ""
 
     try:
@@ -256,14 +266,14 @@ def finance_search():
                 "category": "general",
                 "token": FINNHUB_API_KEY
             },
-            timeout=20
+            timeout=15
         )
 
         data = r.json()
 
         text = []
 
-        for x in data[:5]:
+        for x in data[:3]:
 
             text.append(
                 x.get("headline", "")
@@ -279,6 +289,7 @@ def finance_search():
 def exa_search(query):
 
     if not EXA_API_KEY:
+
         return ""
 
     try:
@@ -291,12 +302,12 @@ def exa_search(query):
             },
             json={
                 "query": query,
-                "numResults": 5
+                "numResults": 2
             },
-            timeout=20
+            timeout=15
         )
 
-        return r.text[:4000]
+        return r.text[:2500]
 
     except:
 
@@ -312,17 +323,17 @@ def build_context(prompt):
 
     context = []
 
-    live = tavily_search(prompt)
+    tavily = tavily_search(prompt)
 
-    if live:
+    if tavily:
 
-        context.append("LIVE WEB:\n" + live)
+        context.append("LIVE WEB:\n" + tavily)
 
-    news = gnews_search(prompt)
+    gnews = gnews_search(prompt)
 
-    if news:
+    if gnews:
 
-        context.append("NEWS:\n" + news)
+        context.append("NEWS:\n" + gnews)
 
     wiki = wikipedia_search(prompt)
 
@@ -339,13 +350,12 @@ def build_context(prompt):
     if any(x in text for x in [
         "football",
         "sports",
-        "premier league",
         "nba",
         "f1",
-        "boxing",
-        "ufc",
+        "premier league",
         "cricket",
-        "tennis"
+        "ufc",
+        "boxing"
     ]):
 
         sports = sports_search(prompt)
@@ -355,11 +365,10 @@ def build_context(prompt):
             context.append("SPORTS:\n" + sports)
 
     if any(x in text for x in [
-        "economics",
         "stock",
         "bitcoin",
         "crypto",
-        "market"
+        "economy"
     ]):
 
         finance = finance_search()
@@ -370,9 +379,9 @@ def build_context(prompt):
 
     if any(x in text for x in [
         "math",
-        "calculate",
-        "equation",
         "solve",
+        "equation",
+        "calculate",
         "physics"
     ]):
 
@@ -385,7 +394,7 @@ def build_context(prompt):
     return "\n\n".join(context)
 
 # =========================================================
-# AI RESPONSE
+# GROQ AI
 # =========================================================
 
 def ask_ai(messages):
@@ -393,25 +402,26 @@ def ask_ai(messages):
     try:
 
         r = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
+            "https://api.groq.com/openai/v1/chat/completions",
             headers={
                 "Authorization":
-                f"Bearer {OPENROUTER_API_KEY}",
+                f"Bearer {GROQ_API_KEY}",
+
                 "Content-Type":
                 "application/json"
             },
             json={
                 "model":
-                "openai/gpt-4o-mini",
+                "llama-3.3-70b-versatile",
 
                 "messages":
                 messages,
 
                 "temperature":
-                0.8,
+                0.7,
 
                 "max_tokens":
-                8799
+                12000
             },
             timeout=60
         )
@@ -467,8 +477,7 @@ def login(data: Login):
         if data.password != OWNER_PASSWORD:
 
             return {
-                "ok": False,
-                "error": "Wrong password"
+                "ok": False
             }
 
         return {
@@ -481,15 +490,13 @@ def login(data: Login):
     if data.email not in users:
 
         return {
-            "ok": False,
-            "error": "Account not found"
+            "ok": False
         }
 
     if users[data.email]["password"] != data.password:
 
         return {
-            "ok": False,
-            "error": "Wrong password"
+            "ok": False
         }
 
     return {
@@ -513,6 +520,7 @@ def edit_profile(data: EditProfile):
         }
 
     users[data.email]["username"] = data.username
+
     users[data.email]["password"] = data.password
 
     save_json(USERS_FILE, users)
@@ -537,54 +545,6 @@ def delete_account(data: DeleteAccount):
         del chat_memory[data.email]
 
     save_json(USERS_FILE, users)
-    save_json(CHATS_FILE, chat_memory)
-
-    return {
-        "ok": True
-    }
-
-# =========================================================
-# RENAME CHAT
-# =========================================================
-
-@app.post("/rename_chat")
-def rename_chat(data: RenameChat):
-
-    if data.email not in chat_memory:
-
-        return {"ok": False}
-
-    if data.old_chat not in chat_memory[data.email]:
-
-        return {"ok": False}
-
-    chat_memory[data.email][data.new_chat] = \
-        chat_memory[data.email][data.old_chat]
-
-    del chat_memory[data.email][data.old_chat]
-
-    save_json(CHATS_FILE, chat_memory)
-
-    return {
-        "ok": True
-    }
-
-# =========================================================
-# DELETE CHAT
-# =========================================================
-
-@app.post("/delete_chat")
-def delete_chat(data: DeleteChat):
-
-    if data.email not in chat_memory:
-
-        return {"ok": False}
-
-    if data.chat_id not in chat_memory[data.email]:
-
-        return {"ok": False}
-
-    del chat_memory[data.email][data.chat_id]
 
     save_json(CHATS_FILE, chat_memory)
 
@@ -617,14 +577,18 @@ You are Bloxy-bot AI.
 
 Rules:
 
-- Use clean formatting
-- Use current 2026 context
-- Sports tables must be live
-- Use live search results
+- Use live 2026 information
+- Be modern
+- Be intelligent
+- Use live web context
 - Use bullet points
 - Avoid giant paragraphs
-- Be intelligent
-- Be modern
+- Keep responses readable
+- Sports tables must be current
+- Breaking news must be recent
+- Know all about any sport
+- Use easily understandable words
+- Use occasional emojis where necessary
 
 Context:
 
@@ -639,7 +603,7 @@ Context:
         }
     ]
 
-    messages += history[-10:]
+    messages += history[-4:]
 
     messages.append({
         "role": "user",
@@ -674,6 +638,7 @@ def home():
     return """
 
 <!DOCTYPE html>
+
 <html>
 
 <head>
@@ -684,10 +649,6 @@ def home():
 content="width=device-width, initial-scale=1.0">
 
 <style>
-
-*{
-box-sizing:border-box;
-}
 
 body{
 margin:0;
@@ -703,15 +664,15 @@ height:100vh;
 }
 
 .sidebar{
-width:280px;
+width:270px;
 background:#111;
-border-right:1px solid #222;
 display:flex;
 flex-direction:column;
+border-right:1px solid #222;
 }
 
 .logo{
-padding:20px;
+padding:22px;
 font-size:30px;
 font-weight:bold;
 color:#00ff88;
@@ -726,7 +687,6 @@ border-radius:16px;
 background:#1d1d1d;
 color:white;
 cursor:pointer;
-font-size:15px;
 }
 
 .chatlist{
@@ -737,13 +697,10 @@ padding:10px;
 
 .chatitem{
 padding:15px;
-border-radius:16px;
 background:#1b1b1b;
+border-radius:16px;
 margin-bottom:10px;
 cursor:pointer;
-display:flex;
-justify-content:space-between;
-align-items:center;
 }
 
 .userbox{
@@ -768,20 +725,20 @@ padding:25px;
 }
 
 .msg{
-background:#1a1a1a;
 padding:18px;
-border-radius:20px;
+background:#1a1a1a;
+border-radius:18px;
 margin-bottom:18px;
 line-height:1.7;
 white-space:pre-wrap;
 }
 
-.assistant{
-border-left:4px solid #00ff88;
-}
-
 .user{
 border-left:4px solid orange;
+}
+
+.assistant{
+border-left:4px solid #00ff88;
 }
 
 .inputarea{
@@ -798,15 +755,13 @@ outline:none;
 border-radius:18px;
 background:#1d1d1d;
 color:white;
-font-size:15px;
 }
 
 .helper{
-font-size:12px;
-opacity:0.45;
 margin-top:10px;
 text-align:center;
-width:100%;
+opacity:0.4;
+font-size:12px;
 }
 
 .auth{
@@ -820,6 +775,7 @@ display:flex;
 justify-content:center;
 align-items:center;
 z-index:999;
+backdrop-filter:blur(10px);
 }
 
 .authbox{
@@ -862,20 +818,6 @@ cursor:pointer;
 margin-top:12px;
 }
 
-.verified{
-display:inline-flex;
-align-items:center;
-justify-content:center;
-margin-left:6px;
-vertical-align:middle;
-}
-
-.verified svg{
-width:20px;
-height:20px;
-filter:drop-shadow(0 0 8px orange);
-}
-
 .accountmenu{
 position:fixed;
 bottom:80px;
@@ -898,8 +840,19 @@ cursor:pointer;
 
 .typing{
 padding:10px 25px;
-font-size:14px;
 opacity:0.7;
+}
+
+.verified{
+display:inline-flex;
+margin-left:6px;
+vertical-align:middle;
+}
+
+.verified svg{
+width:20px;
+height:20px;
+filter:drop-shadow(0 0 8px orange);
 }
 
 @media(max-width:700px){
@@ -920,7 +873,8 @@ font-size:18px;
 
 <body>
 
-<div class="auth" id="auth">
+<div class="auth"
+id="auth">
 
 <div class="authbox">
 
@@ -1053,50 +1007,6 @@ let chats = {
 "Main":[]
 };
 
-function saveLocal(){
-
-localStorage.setItem(
-"bloxy_user",
-JSON.stringify(currentUser)
-);
-
-localStorage.setItem(
-"bloxy_chats",
-JSON.stringify(chats)
-);
-
-}
-
-function loadLocal(){
-
-let u =
-localStorage.getItem(
-"bloxy_user"
-);
-
-if(u){
-
-currentUser = JSON.parse(u);
-
-document.getElementById(
-"auth"
-).style.display = "none";
-
-}
-
-let c =
-localStorage.getItem(
-"bloxy_chats"
-);
-
-if(c){
-
-chats = JSON.parse(c);
-
-}
-
-}
-
 function verifiedBadge(){
 
 if(currentUser.verified){
@@ -1155,6 +1065,17 @@ return "";
 
 }
 
+function updateUser(){
+
+document.getElementById(
+"userbox"
+).innerHTML = `
+${currentUser.username}
+${verifiedBadge()}
+`;
+
+}
+
 function toggleMenu(){
 
 let menu =
@@ -1169,14 +1090,47 @@ menu.style.display==="flex"
 
 }
 
-function updateUser(){
+function saveLocal(){
+
+localStorage.setItem(
+"bloxy_user",
+JSON.stringify(currentUser)
+);
+
+localStorage.setItem(
+"bloxy_chats",
+JSON.stringify(chats)
+);
+
+}
+
+function loadLocal(){
+
+let u =
+localStorage.getItem(
+"bloxy_user"
+);
+
+if(u){
+
+currentUser = JSON.parse(u);
 
 document.getElementById(
-"userbox"
-).innerHTML = `
-${currentUser.username}
-${verifiedBadge()}
-`;
+"auth"
+).style.display = "none";
+
+}
+
+let c =
+localStorage.getItem(
+"bloxy_chats"
+);
+
+if(c){
+
+chats = JSON.parse(c);
+
+}
 
 }
 
@@ -1196,16 +1150,7 @@ document.createElement("div");
 
 d.className = "chatitem";
 
-d.innerHTML = `
-<div>${c}</div>
-
-<div onclick="
-event.stopPropagation();
-chatOptions('${c}')
-">
-⋮
-</div>
-`;
+d.innerHTML = c;
 
 d.onclick = ()=>{
 
@@ -1220,53 +1165,6 @@ box.appendChild(d);
 }
 
 saveLocal();
-
-}
-
-function chatOptions(chat){
-
-let action =
-prompt(
-"rename or delete"
-);
-
-if(action==="rename"){
-
-let n =
-prompt(
-"New chat name"
-);
-
-if(!n) return;
-
-chats[n] = chats[chat];
-
-delete chats[chat];
-
-currentChat = n;
-
-renderChats();
-render();
-
-}
-
-if(action==="delete"){
-
-delete chats[chat];
-
-if(Object.keys(chats).length===0){
-
-chats["Main"] = [];
-
-}
-
-currentChat =
-Object.keys(chats)[0];
-
-renderChats();
-render();
-
-}
 
 }
 
@@ -1386,7 +1284,7 @@ password:password.value
 
 if(!d.ok){
 
-alert(d.error);
+alert("Login failed");
 
 return;
 
@@ -1458,8 +1356,6 @@ newName;
 updateUser();
 
 saveLocal();
-
-alert("Profile updated");
 
 });
 
@@ -1611,7 +1507,7 @@ saveLocal();
 
 }
 
-},8);
+},6);
 
 })
 .catch(()=>{
@@ -1635,6 +1531,7 @@ render();
 </script>
 
 </body>
+
 </html>
 
 """
