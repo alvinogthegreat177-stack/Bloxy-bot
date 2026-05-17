@@ -421,7 +421,7 @@ def ask_ai(messages):
                 0.7,
 
                 "max_tokens":
-                12000
+                2000
             },
             timeout=60
         )
