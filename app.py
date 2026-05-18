@@ -552,10 +552,10 @@ def ask_ai(messages):
                 messages,
 
                 "temperature":
-                0.7,
+                0.8,
 
                 "max_tokens":
-                2000
+                1500
             },
             timeout=60
         )
