@@ -116,11 +116,7 @@ if sportmonks:
 # MODERN GREEN/BLACK UI
 # CENTERED FADED TEXT
 # MULTI API SPORTS INTELLIGENCE
-in goalserve where do i get my api key
 
-Go to:
-
-GoalServe
 
 # =========================================================
 # OWNER VERIFIED ACCOUNT
