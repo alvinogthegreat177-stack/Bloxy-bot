@@ -1,6 +1,6 @@
 # =========================================================
-# BLOXY-BOT ULTIMATE 2026 AI
-# FULL GROQ + LIVE SPORTS + LIVE NEWS VERSION
+# BLOXY-BOT ULTIMATE AI 2026
+# COMPLETE SINGLE FILE APP.PY
 # =========================================================
 
 from fastapi import FastAPI
@@ -8,8 +8,10 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import requests
 import traceback
+import uvicorn
 import json
 import os
+import secrets
 
 app = FastAPI()
 
@@ -17,19 +19,29 @@ app = FastAPI()
 # ENV VARIABLES
 # =========================================================
 
+SECRET_API_KEY = os.getenv("SECRET_API_KEY")
+
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
 GNEWS_API_KEY = os.getenv("GNEWS_API_KEY")
 
+NEWS_API_KEY = os.getenv("NEWS_API_KEY")
+
 WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY")
+
+WOLFRAM_APP_ID = os.getenv("WOLFRAM_APP_ID")
 
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 
-THESPORTSDB_API_KEY = os.getenv("THESPORTSDB_API_KEY")
-
 EXA_API_KEY = os.getenv("EXA_API_KEY")
+
+FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
+
+THESPORTSDB_API_KEY = os.getenv("THESPORTSDB_API_KEY")
 
 ALLSPORTS_API_KEY = os.getenv("ALLSPORTS_API_KEY")
 
@@ -37,96 +49,9 @@ ODDS_API_KEY = os.getenv("ODDS_API_KEY")
 
 APISPORTS_API_KEY = os.getenv("APISPORTS_API_KEY")
 
-SPORTMONKS_API_KEY = os.getenv("SPORTMONKS_API_KEY")
+SPORTMONK_API_KEY = os.getenv("SPORTMONK_API_KEY")
 
-
-def sportmonks_search():
-
-    if not SPORTMONKS_API_KEY:
-
-        return ""
-
-    try:
-
-        r = requests.get(
-            "https://api.sportmonks.com/v3/football/livescores",
-            params={
-                "api_token": SPORTMONKS_API_KEY
-            },
-            timeout=15
-        )
-
-        return r.text[:2000]
-
-    except:
-
-        return ""
-
-# =========================================================
-# ADD INSIDE SPORTS SECTION
-# =========================================================
-
-sportmonks = sportmonks_search()
-
-if sportmonks:
-
-    context.append(
-        "SPORTMONKS:\\n" + sportmonks
-    )
-
-# =========================================================
-# FULL SPORTS STACK NOW INCLUDED
-# =========================================================
-
-# API-SPORTS
-# ALLSPORTSAPI
-# THESPORTSDB
-# SPORTMONKS
-# SPORTRADAR
-# GOALSERVE
-# ODDS API
-
-# =========================================================
-# FULL FEATURES INCLUDED
-# =========================================================
-
-# SPIKY ORANGE VERIFIED BADGE
-# VERIFIED BADGE BESIDE USERNAME
-# VERIFIED BADGE INSIDE CHATS
-# ORANGE SEND BUTTON
-# ENTER TO SEND
-# MOBILE RESPONSIVE UI
-# LIVE SPORTS
-# LIVE NEWS
-# LIVE WEB SEARCH
-# LIVE FINANCE
-# LIVE SEARCH FALLBACKS
-# STREAMING RESPONSES
-# PIN CONVERSATION
-# DELETE CONVERSATION
-# RENAME CONVERSATION
-# ACCOUNT EDIT
-# ACCOUNT DELETE
-# SIDEBAR CHAT SYSTEM
-# GUEST MODE
-# LOGIN/SIGNUP POPUP
-# FAST RESPONSE OPTIMIZATION
-# SAVED CONVERSATIONS
-# LOCAL STORAGE MEMORY
-# MODERN GREEN/BLACK UI
-# CENTERED FADED TEXT
-# MULTI API SPORTS INTELLIGENCE
-
-
-# =========================================================
-# OWNER VERIFIED ACCOUNT
-# =========================================================
-
-OWNER_EMAIL = "alvinogthegreat177@gmail.com"
-
-OWNER_PASSWORD = "alvindev17.og"
-
-OWNER_USERNAME = "aTg"
+SPORTRADAR_API_KEY = os.getenv("SPORTRADAR_API_KEY")
 
 # =========================================================
 # FILES
@@ -137,7 +62,7 @@ USERS_FILE = "users.json"
 CHATS_FILE = "chats.json"
 
 # =========================================================
-# HELPERS
+# LOAD/SAVE
 # =========================================================
 
 def load_json(path, default):
@@ -159,10 +84,19 @@ def save_json(path, data):
 
         json.dump(data, f, indent=2)
 
-
 users = load_json(USERS_FILE, {})
 
 chat_memory = load_json(CHATS_FILE, {})
+
+# =========================================================
+# OWNER
+# =========================================================
+
+OWNER_EMAIL = "alvinogthegreat177@gmail.com"
+
+OWNER_PASSWORD = "alvindev17.og"
+
+OWNER_USERNAME = "aTg"
 
 # =========================================================
 # MODELS
@@ -187,13 +121,6 @@ class ChatRequest(BaseModel):
     chat_id: str
     message: str
 
-
-class EditProfile(BaseModel):
-
-    email: str
-    username: str
-    password: str
-
 # =========================================================
 # LIVE SEARCH
 # =========================================================
@@ -213,20 +140,10 @@ def tavily_search(query):
                 "query": query,
                 "max_results": 2
             },
-            timeout=15
+            timeout=20
         )
 
-        data = r.json()
-
-        text = []
-
-        for x in data.get("results", []):
-
-            text.append(
-                x.get("content", "")
-            )
-
-        return "\n".join(text)
+        return r.text[:2000]
 
     except:
 
@@ -247,22 +164,37 @@ def gnews_search(query):
                 "q": query,
                 "token": GNEWS_API_KEY,
                 "lang": "en",
-                "max": 2
+                "max": 3
             },
-            timeout=15
+            timeout=20
         )
 
-        data = r.json()
+        return r.text[:2000]
 
-        text = []
+    except:
 
-        for x in data.get("articles", []):
+        return ""
 
-            text.append(
-                x.get("title", "")
-            )
 
-        return "\n".join(text)
+def newsapi_search(query):
+
+    if not NEWS_API_KEY:
+
+        return ""
+
+    try:
+
+        r = requests.get(
+            "https://newsapi.org/v2/everything",
+            params={
+                "q": query,
+                "apiKey": NEWS_API_KEY,
+                "pageSize": 3
+            },
+            timeout=20
+        )
+
+        return r.text[:2000]
 
     except:
 
@@ -287,21 +219,75 @@ def wikipedia_search(query):
         return ""
 
 
-def wolfram_search(query):
+def exa_search(query):
 
-    if not WOLFRAM_API_KEY:
+    if not EXA_API_KEY:
+
+        return ""
+
+    try:
+
+        r = requests.post(
+            "https://api.exa.ai/search",
+            headers={
+                "x-api-key": EXA_API_KEY,
+                "Content-Type": "application/json"
+            },
+            json={
+                "query": query,
+                "numResults": 2
+            },
+            timeout=20
+        )
+
+        return r.text[:2000]
+
+    except:
+
+        return ""
+
+
+def finance_search():
+
+    if not FINNHUB_API_KEY:
 
         return ""
 
     try:
 
         r = requests.get(
+            "https://finnhub.io/api/v1/news",
+            params={
+                "category": "general",
+                "token": FINNHUB_API_KEY
+            },
+            timeout=20
+        )
+
+        return r.text[:2000]
+
+    except:
+
+        return ""
+
+
+def wolfram_search(query):
+
+    if not WOLFRAM_API_KEY and not WOLFRAM_APP_ID:
+
+        return ""
+
+    try:
+
+        key = WOLFRAM_API_KEY or WOLFRAM_APP_ID
+
+        r = requests.get(
             "http://api.wolframalpha.com/v1/result",
             params={
-                "appid": WOLFRAM_API_KEY,
+                "appid": key,
                 "i": query
             },
-            timeout=15
+            timeout=20
         )
 
         return r.text
@@ -310,8 +296,11 @@ def wolfram_search(query):
 
         return ""
 
+# =========================================================
+# SPORTS
+# =========================================================
 
-def sportsdb_search(team):
+def thesportsdb_search(team):
 
     if not THESPORTSDB_API_KEY:
 
@@ -324,7 +313,54 @@ def sportsdb_search(team):
             params={
                 "t": team
             },
-            timeout=15
+            timeout=20
+        )
+
+        return r.text[:2000]
+
+    except:
+
+        return ""
+
+
+def allsports_search():
+
+    if not ALLSPORTS_API_KEY:
+
+        return ""
+
+    try:
+
+        r = requests.get(
+            "https://apiv2.allsportsapi.com/football/",
+            params={
+                "met": "Livescore",
+                "APIkey": ALLSPORTS_API_KEY
+            },
+            timeout=20
+        )
+
+        return r.text[:2000]
+
+    except:
+
+        return ""
+
+
+def odds_search():
+
+    if not ODDS_API_KEY:
+
+        return ""
+
+    try:
+
+        r = requests.get(
+            "https://api.the-odds-api.com/v4/sports/",
+            params={
+                "apiKey": ODDS_API_KEY
+            },
+            timeout=20
         )
 
         return r.text[:2000]
@@ -351,7 +387,7 @@ def apisports_search():
             params={
                 "live": "all"
             },
-            timeout=15
+            timeout=20
         )
 
         return r.text[:2000]
@@ -361,21 +397,21 @@ def apisports_search():
         return ""
 
 
-def allsports_search():
+def sportmonk_search():
 
-    if not ALLSPORTS_API_KEY:
+    if not SPORTMONK_API_KEY:
 
         return ""
 
     try:
 
         r = requests.get(
-            "https://apiv2.allsportsapi.com/football/",
+            "https://api.sportmonks.com/v3/football/livescores",
             params={
-                "met": "Livescore",
-                "APIkey": ALLSPORTS_API_KEY
+                "api_token":
+                SPORTMONK_API_KEY
             },
-            timeout=15
+            timeout=20
         )
 
         return r.text[:2000]
@@ -385,82 +421,17 @@ def allsports_search():
         return ""
 
 
-def odds_search():
+def sportradar_search():
 
-    if not ODDS_API_KEY:
-
-        return ""
-
-    try:
-
-        r = requests.get(
-            "https://api.the-odds-api.com/v4/sports/",
-            params={
-                "apiKey": ODDS_API_KEY
-            },
-            timeout=15
-        )
-
-        return r.text[:1500]
-
-    except:
-
-        return ""
-
-
-def finance_search():
-
-    if not FINNHUB_API_KEY:
+    if not SPORTRADAR_API_KEY:
 
         return ""
 
     try:
 
         r = requests.get(
-            "https://finnhub.io/api/v1/news",
-            params={
-                "category": "general",
-                "token": FINNHUB_API_KEY
-            },
-            timeout=15
-        )
-
-        data = r.json()
-
-        text = []
-
-        for x in data[:3]:
-
-            text.append(
-                x.get("headline", "")
-            )
-
-        return "\n".join(text)
-
-    except:
-
-        return ""
-
-
-def exa_search(query):
-
-    if not EXA_API_KEY:
-
-        return ""
-
-    try:
-
-        r = requests.post(
-            "https://api.exa.ai/search",
-            headers={
-                "x-api-key": EXA_API_KEY,
-                "Content-Type": "application/json"
-            },
-            json={
-                "query": query,
-                "numResults": 2
-            },
-            timeout=15
+            f"https://api.sportradar.com/soccer/trial/v4/en/schedules/live/schedule.json?api_key={SPORTRADAR_API_KEY}",
+            timeout=20
         )
 
         return r.text[:2000]
@@ -475,118 +446,87 @@ def exa_search(query):
 
 def build_context(prompt):
 
-    text = prompt.lower()
-
     context = []
 
-    tavily = tavily_search(prompt)
+    t = tavily_search(prompt)
 
-    if tavily:
+    if t:
 
-        context.append(
-            "LIVE WEB:\n" + tavily
-        )
+        context.append("TAVILY:\\n" + t)
 
-    gnews = gnews_search(prompt)
+    g = gnews_search(prompt)
 
-    if gnews:
+    if g:
 
-        context.append(
-            "NEWS:\n" + gnews
-        )
+        context.append("GNEWS:\\n" + g)
 
-    wiki = wikipedia_search(prompt)
+    n = newsapi_search(prompt)
 
-    if wiki:
+    if n:
 
-        context.append(
-            "WIKIPEDIA:\n" + wiki
-        )
+        context.append("NEWSAPI:\\n" + n)
 
-    exa = exa_search(prompt)
+    w = wikipedia_search(prompt)
 
-    if exa:
+    if w:
 
-        context.append(
-            "EXA:\n" + exa
-        )
+        context.append("WIKIPEDIA:\\n" + w)
 
-    if any(x in text for x in [
-        "sports",
-        "football",
-        "premier league",
-        "nba",
-        "cricket",
-        "horse",
-        "ufc",
-        "boxing",
-        "tennis",
-        "f1"
-    ]):
+    e = exa_search(prompt)
 
-        sportsdb = sportsdb_search(prompt)
+    if e:
 
-        if sportsdb:
+        context.append("EXA:\\n" + e)
 
-            context.append(
-                "SPORTSDB:\n" + sportsdb
-            )
+    f = finance_search()
 
-        api_sports = apisports_search()
+    if f:
 
-        if api_sports:
+        context.append("FINANCE:\\n" + f)
 
-            context.append(
-                "API SPORTS:\n" + api_sports
-            )
+    wa = wolfram_search(prompt)
 
-        allsports = allsports_search()
+    if wa:
 
-        if allsports:
+        context.append("WOLFRAM:\\n" + wa)
 
-            context.append(
-                "ALL SPORTS:\n" + allsports
-            )
+    s1 = thesportsdb_search(prompt)
 
-        odds = odds_search()
+    if s1:
 
-        if odds:
+        context.append("SPORTSDB:\\n" + s1)
 
-            context.append(
-                "ODDS:\n" + odds
-            )
+    s2 = allsports_search()
 
-    if any(x in text for x in [
-        "bitcoin",
-        "stocks",
-        "crypto",
-        "economy"
-    ]):
+    if s2:
 
-        finance = finance_search()
+        context.append("ALLSPORTS:\\n" + s2)
 
-        if finance:
+    s3 = odds_search()
 
-            context.append(
-                "FINANCE:\n" + finance
-            )
+    if s3:
 
-    if any(x in text for x in [
-        "math",
-        "equation",
-        "solve",
-        "calculate"
-    ]):
+        context.append("ODDS:\\n" + s3)
 
-        wolf = wolfram_search(prompt)
+    s4 = apisports_search()
 
-        if wolf:
+    if s4:
 
-            context.append(
-                "WOLFRAM:\n" + wolf
-            )
+        context.append("APISPORTS:\\n" + s4)
 
-    return "\n\n".join(context)
+    s5 = sportmonk_search()
+
+    if s5:
+
+        context.append("SPORTMONKS:\\n" + s5)
+
+    s6 = sportradar_search()
+
+    if s6:
+
+        context.append("SPORTRADAR:\\n" + s6)
+
+    return "\\n\\n".join(context)
 
 # =========================================================
 # AI
@@ -601,7 +541,6 @@ def ask_ai(messages):
             headers={
                 "Authorization":
                 f"Bearer {GROQ_API_KEY}",
-
                 "Content-Type":
                 "application/json"
             },
@@ -616,7 +555,7 @@ def ask_ai(messages):
                 0.7,
 
                 "max_tokens":
-                1900
+                2000
             },
             timeout=60
         )
@@ -720,29 +659,19 @@ def chat(data: ChatRequest):
 
 You are Bloxy-bot AI.
 
-Rules:
+Use live information.
+Use sports APIs.
+Use web search.
+Use current knowledge.
+Avoid hallucinations.
+Know everything in the world.
+Say factual things.
+Be punctual and have correct spelling of words.
+Be polite.
+Use emojis in every conversation.
+Give correct information.
+Know everything on every topic.
 
-- Use live information
-- Use sports APIs
-- Use current data
-- Be modern
-- Be intelligent
-- Use bullet points
-- Avoid giant paragraphs
-- Use all APIs
-- Your owner is called aTg
-- Use emojis in every conversation
-- Be formal
-- Be polite 
-- Know all 2026 information
-- know all past information
-- Know all live information
-- Be punctual
-- Have correct spelling of words
-- Avoid glitching
-- Be neat
-- Be organised
-- Stay on the concept that the user is talking about
 
 Context:
 
@@ -757,7 +686,7 @@ Context:
         }
     ]
 
-    messages += history[-4:]
+    messages += history[-6:]
 
     messages.append({
         "role": "user",
@@ -819,14 +748,14 @@ height:100vh;
 
 .sidebar{
 width:280px;
-background:#111;
+background:#101010;
 border-right:1px solid #222;
 display:flex;
 flex-direction:column;
 }
 
 .logo{
-padding:22px;
+padding:24px;
 font-size:30px;
 font-weight:bold;
 color:#00ff88;
@@ -837,7 +766,7 @@ text-shadow:0 0 18px #00ff88;
 margin:15px;
 padding:16px;
 border:none;
-border-radius:16px;
+border-radius:18px;
 background:#1d1d1d;
 color:white;
 cursor:pointer;
@@ -846,14 +775,14 @@ cursor:pointer;
 .chatlist{
 flex:1;
 overflow:auto;
-padding:10px;
+padding:12px;
 }
 
 .chatitem{
-padding:15px;
+padding:16px;
 background:#1a1a1a;
-border-radius:16px;
-margin-bottom:10px;
+border-radius:18px;
+margin-bottom:12px;
 display:flex;
 justify-content:space-between;
 align-items:center;
@@ -875,7 +804,6 @@ border-top:1px solid #222;
 display:flex;
 justify-content:space-between;
 align-items:center;
-background:#101010;
 }
 
 .main{
@@ -946,6 +874,18 @@ opacity:0.4;
 font-size:12px;
 }
 
+.verified{
+display:inline-flex;
+margin-left:6px;
+vertical-align:middle;
+}
+
+.verified svg{
+width:18px;
+height:18px;
+filter:drop-shadow(0 0 6px orange);
+}
+
 .auth{
 position:fixed;
 top:0;
@@ -997,23 +937,6 @@ background:#222;
 color:white;
 cursor:pointer;
 margin-top:12px;
-}
-
-.verified{
-display:inline-flex;
-margin-left:6px;
-vertical-align:middle;
-}
-
-.verified svg{
-width:18px;
-height:18px;
-filter:drop-shadow(0 0 6px orange);
-}
-
-.typing{
-padding:10px 25px;
-opacity:0.7;
 }
 
 @media(max-width:700px){
@@ -1096,7 +1019,7 @@ id="chatlist">
 Guest
 </div>
 
-<div style="cursor:pointer;">
+<div>
 ⋮
 </div>
 
@@ -1108,10 +1031,6 @@ Guest
 
 <div class="messages"
 id="messages">
-</div>
-
-<div class="typing"
-id="typing">
 </div>
 
 <div class="inputarea">
@@ -1209,58 +1128,22 @@ return "";
 
 }
 
-function saveLocal(){
+function newChat(){
 
-localStorage.setItem(
-"bloxy_user",
-JSON.stringify(currentUser)
+let name =
+prompt(
+"Conversation name"
 );
 
-localStorage.setItem(
-"bloxy_chats",
-JSON.stringify(chats)
-);
+if(!name) return;
 
-}
+chats[name] = [];
 
-function loadLocal(){
+currentChat = name;
 
-let u =
-localStorage.getItem(
-"bloxy_user"
-);
+renderChats();
 
-if(u){
-
-currentUser = JSON.parse(u);
-
-document.getElementById(
-"auth"
-).style.display = "none";
-
-}
-
-let c =
-localStorage.getItem(
-"bloxy_chats"
-);
-
-if(c){
-
-chats = JSON.parse(c);
-
-}
-
-}
-
-function updateUser(){
-
-document.getElementById(
-"userbox"
-).innerHTML = `
-${currentUser.username}
-${verifiedBadge()}
-`;
+render();
 
 }
 
@@ -1275,13 +1158,11 @@ box.innerHTML = "";
 
 for(let c in chats){
 
-let pinned =
-c.startsWith("📌 ");
-
 let d =
 document.createElement("div");
 
-d.className = "chatitem";
+d.className =
+"chatitem";
 
 d.innerHTML = `
 <div>${c}</div>
@@ -1327,23 +1208,21 @@ box.appendChild(d);
 
 }
 
-saveLocal();
-
 }
 
-function renameChat(chat){
+function renameChat(c){
 
 let n =
 prompt(
-"Rename conversation",
-chat
+"Rename chat",
+c
 );
 
 if(!n) return;
 
-chats[n] = chats[chat];
+chats[n] = chats[c];
 
-delete chats[chat];
+delete chats[c];
 
 currentChat = n;
 
@@ -1351,22 +1230,21 @@ renderChats();
 
 }
 
-function pinChat(chat){
+function pinChat(c){
 
-if(chat.startsWith("📌 ")) return;
+if(c.startsWith("📌 ")) return;
 
-chats["📌 " + chat] =
-chats[chat];
+chats["📌 " + c] = chats[c];
 
-delete chats[chat];
+delete chats[c];
 
 renderChats();
 
 }
 
-function deleteChat(chat){
+function deleteChat(c){
 
-delete chats[chat];
+delete chats[c];
 
 if(Object.keys(chats).length===0){
 
@@ -1430,24 +1308,6 @@ box.appendChild(d);
 
 box.scrollTop =
 box.scrollHeight;
-
-saveLocal();
-
-}
-
-function newChat(){
-
-let id =
-"Chat " +
-(Object.keys(chats).length+1);
-
-chats[id] = [];
-
-currentChat = id;
-
-renderChats();
-
-render();
 
 }
 
@@ -1516,9 +1376,10 @@ document.getElementById(
 "auth"
 ).style.display = "none";
 
-updateUser();
-
-saveLocal();
+document.getElementById(
+"userbox"
+).innerHTML =
+d.username + verifiedBadge();
 
 });
 
@@ -1529,8 +1390,6 @@ function guestMode(){
 document.getElementById(
 "auth"
 ).style.display = "none";
-
-updateUser();
 
 }
 
@@ -1544,11 +1403,7 @@ document.getElementById(
 let msg =
 input.value.trim();
 
-if(!msg){
-
-return;
-
-}
+if(!msg) return;
 
 input.value = "";
 
@@ -1558,11 +1413,6 @@ content:msg
 });
 
 render();
-
-document.getElementById(
-"typing"
-).innerHTML =
-"Bloxy-bot is typing...";
 
 fetch("/chat",{
 method:"POST",
@@ -1579,85 +1429,16 @@ message:msg
 .then(r=>r.json())
 .then(d=>{
 
-document.getElementById(
-"typing"
-).innerHTML = "";
-
-let box =
-document.getElementById(
-"messages"
-);
-
-let wrapper =
-document.createElement("div");
-
-wrapper.className =
-"msg assistant";
-
-wrapper.innerHTML = `
-<b>Bloxy-bot</b>
-
-<div
-id="streamingText"
-style="margin-top:10px;">
-</div>
-`;
-
-box.appendChild(wrapper);
-
-let stream =
-document.getElementById(
-"streamingText"
-);
-
-let reply = "";
-
-let i = 0;
-
-let interval =
-setInterval(()=>{
-
-if(i < d.reply.length){
-
-reply += d.reply[i];
-
-stream.innerHTML =
-reply.replace(/\\n/g,"<br>");
-
-box.scrollTop =
-box.scrollHeight;
-
-i++;
-
-}else{
-
-clearInterval(interval);
-
 chats[currentChat].push({
 role:"assistant",
-content:reply
+content:d.reply
 });
 
-saveLocal();
-
-}
-
-},6);
-
-})
-.catch(()=>{
-
-document.getElementById(
-"typing"
-).innerHTML = "";
+render();
 
 });
 
 }
-
-loadLocal();
-
-updateUser();
 
 renderChats();
 
@@ -1676,8 +1457,6 @@ render();
 # =========================================================
 
 if __name__ == "__main__":
-
-    import uvicorn
 
     uvicorn.run(
         app,
