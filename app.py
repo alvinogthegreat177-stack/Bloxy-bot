@@ -1,6 +1,6 @@
 # =========================================================
 # BLOXY-BOT ULTIMATE AI 2026
-# COMPLETE SINGLE FILE APP.PY
+# COMPLETE APP.PY
 # =========================================================
 
 from fastapi import FastAPI
@@ -11,7 +11,8 @@ import traceback
 import uvicorn
 import json
 import os
-import secrets
+import random
+import time
 
 app = FastAPI()
 
@@ -25,21 +26,23 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+KIMI_API_KEY = os.getenv("KIMI_API_KEY")
+
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
 GNEWS_API_KEY = os.getenv("GNEWS_API_KEY")
 
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 
-WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY")
-
-WOLFRAM_APP_ID = os.getenv("WOLFRAM_APP_ID")
+EXA_API_KEY = os.getenv("EXA_API_KEY")
 
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 
-EXA_API_KEY = os.getenv("EXA_API_KEY")
+WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY")
 
-FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
+WOLFRAM_APP_ID = os.getenv("WOLFRAM_APP_ID")
 
 THESPORTSDB_API_KEY = os.getenv("THESPORTSDB_API_KEY")
 
@@ -62,7 +65,7 @@ USERS_FILE = "users.json"
 CHATS_FILE = "chats.json"
 
 # =========================================================
-# LOAD / SAVE
+# LOAD
 # =========================================================
 
 def load_json(path, default):
@@ -99,7 +102,50 @@ OWNER_PASSWORD = "alvindev17.og"
 OWNER_USERNAME = "aTg"
 
 # =========================================================
-# MODELS
+# AI MODELS
+# =========================================================
+
+AI_MODELS = [
+
+    {
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile"
+    },
+
+    {
+        "provider": "openrouter",
+        "model": "qwen/qwen3-32b"
+    },
+
+    {
+        "provider": "openrouter",
+        "model": "deepseek/deepseek-chat-v3-0324:free"
+    },
+
+    {
+        "provider": "openrouter",
+        "model": "mistralai/mistral-large"
+    },
+
+    {
+        "provider": "openrouter",
+        "model": "anthropic/claude-3.5-sonnet"
+    },
+
+    {
+        "provider": "openrouter",
+        "model": "moonshotai/kimi-k2"
+    },
+
+    {
+        "provider": "openrouter",
+        "model": "openai/gpt-5"
+    }
+
+]
+
+# =========================================================
+# Pydantic
 # =========================================================
 
 class Signup(BaseModel):
@@ -138,12 +184,12 @@ def tavily_search(query):
             json={
                 "api_key": TAVILY_API_KEY,
                 "query": query,
-                "max_results": 2
+                "max_results": 3
             },
             timeout=20
         )
 
-        return r.text[:1800]
+        return r.text[:2000]
 
     except:
 
@@ -164,12 +210,12 @@ def gnews_search(query):
                 "q": query,
                 "token": GNEWS_API_KEY,
                 "lang": "en",
-                "max": 3
+                "max": 4
             },
             timeout=20
         )
 
-        return r.text[:1800]
+        return r.text[:2000]
 
     except:
 
@@ -189,12 +235,12 @@ def newsapi_search(query):
             params={
                 "q": query,
                 "apiKey": NEWS_API_KEY,
-                "pageSize": 3
+                "pageSize": 4
             },
             timeout=20
         )
 
-        return r.text[:1800]
+        return r.text[:2000]
 
     except:
 
@@ -210,9 +256,7 @@ def wikipedia_search(query):
             timeout=20
         )
 
-        data = r.json()
-
-        return data.get("extract", "")
+        return r.json().get("extract", "")
 
     except:
 
@@ -230,17 +274,16 @@ def exa_search(query):
         r = requests.post(
             "https://api.exa.ai/search",
             headers={
-                "x-api-key": EXA_API_KEY,
-                "Content-Type": "application/json"
+                "x-api-key": EXA_API_KEY
             },
             json={
                 "query": query,
-                "numResults": 2
+                "numResults": 3
             },
             timeout=20
         )
 
-        return r.text[:1800]
+        return r.text[:2000]
 
     except:
 
@@ -264,7 +307,7 @@ def finance_search():
             timeout=20
         )
 
-        return r.text[:1800]
+        return r.text[:2000]
 
     except:
 
@@ -300,145 +343,122 @@ def wolfram_search(query):
 # SPORTS
 # =========================================================
 
-def sportsdb_search(team):
+def sports_context(query):
 
-    if not THESPORTSDB_API_KEY:
-
-        return ""
+    context = []
 
     try:
 
-        r = requests.get(
-            f"https://www.thesportsdb.com/api/v1/json/{THESPORTSDB_API_KEY}/searchteams.php",
-            params={
-                "t": team
-            },
-            timeout=20
-        )
+        if THESPORTSDB_API_KEY:
 
-        return r.text[:1800]
+            r = requests.get(
+                f"https://www.thesportsdb.com/api/v1/json/{THESPORTSDB_API_KEY}/searchteams.php",
+                params={
+                    "t": query
+                },
+                timeout=20
+            )
+
+            context.append(r.text[:1200])
 
     except:
 
-        return ""
-
-
-def allsports_search():
-
-    if not ALLSPORTS_API_KEY:
-
-        return ""
+        pass
 
     try:
 
-        r = requests.get(
-            "https://apiv2.allsportsapi.com/football/",
-            params={
-                "met": "Livescore",
-                "APIkey": ALLSPORTS_API_KEY
-            },
-            timeout=20
-        )
+        if ALLSPORTS_API_KEY:
 
-        return r.text[:1800]
+            r = requests.get(
+                "https://apiv2.allsportsapi.com/football/",
+                params={
+                    "met": "Livescore",
+                    "APIkey": ALLSPORTS_API_KEY
+                },
+                timeout=20
+            )
+
+            context.append(r.text[:1200])
 
     except:
 
-        return ""
-
-
-def odds_search():
-
-    if not ODDS_API_KEY:
-
-        return ""
+        pass
 
     try:
 
-        r = requests.get(
-            "https://api.the-odds-api.com/v4/sports/",
-            params={
-                "apiKey": ODDS_API_KEY
-            },
-            timeout=20
-        )
+        if ODDS_API_KEY:
 
-        return r.text[:1800]
+            r = requests.get(
+                "https://api.the-odds-api.com/v4/sports/",
+                params={
+                    "apiKey": ODDS_API_KEY
+                },
+                timeout=20
+            )
+
+            context.append(r.text[:1200])
 
     except:
 
-        return ""
-
-
-def apisports_search():
-
-    if not APISPORTS_API_KEY:
-
-        return ""
+        pass
 
     try:
 
-        r = requests.get(
-            "https://v3.football.api-sports.io/fixtures",
-            headers={
-                "x-apisports-key":
-                APISPORTS_API_KEY
-            },
-            params={
-                "live": "all"
-            },
-            timeout=20
-        )
+        if APISPORTS_API_KEY:
 
-        return r.text[:1800]
+            r = requests.get(
+                "https://v3.football.api-sports.io/fixtures",
+                headers={
+                    "x-apisports-key":
+                    APISPORTS_API_KEY
+                },
+                params={
+                    "live": "all"
+                },
+                timeout=20
+            )
+
+            context.append(r.text[:1200])
 
     except:
 
-        return ""
-
-
-def sportmonks_search():
-
-    if not SPORTMONK_API_KEY:
-
-        return ""
+        pass
 
     try:
 
-        r = requests.get(
-            "https://api.sportmonks.com/v3/football/livescores",
-            params={
-                "api_token":
-                SPORTMONK_API_KEY
-            },
-            timeout=20
-        )
+        if SPORTMONK_API_KEY:
 
-        return r.text[:1800]
+            r = requests.get(
+                "https://api.sportmonks.com/v3/football/livescores",
+                params={
+                    "api_token":
+                    SPORTMONK_API_KEY
+                },
+                timeout=20
+            )
+
+            context.append(r.text[:1200])
 
     except:
 
-        return ""
-
-
-def sportradar_search():
-
-    if not SPORTRADAR_API_KEY:
-
-        return ""
+        pass
 
     try:
 
-        r = requests.get(
-            f"https://api.sportradar.com/soccer/trial/v4/en/schedules/live/schedule.json?api_key={SPORTRADAR_API_KEY}",
-            timeout=20
-        )
+        if SPORTRADAR_API_KEY:
 
-        return r.text[:1800]
+            r = requests.get(
+                f"https://api.sportradar.com/soccer/trial/v4/en/schedules/live/schedule.json?api_key={SPORTRADAR_API_KEY}",
+                timeout=20
+            )
+
+            context.append(r.text[:1200])
 
     except:
 
-        return ""
+        pass
+
+    return "\n\n".join(context)
 
 # =========================================================
 # CONTEXT
@@ -446,9 +466,7 @@ def sportradar_search():
 
 def build_context(prompt):
 
-    context = []
-
-    sources = [
+    items = [
 
         tavily_search(prompt),
 
@@ -464,117 +482,109 @@ def build_context(prompt):
 
         wolfram_search(prompt),
 
-        sportsdb_search(prompt),
-
-        allsports_search(),
-
-        odds_search(),
-
-        apisports_search(),
-
-        sportmonks_search(),
-
-        sportradar_search()
+        sports_context(prompt)
 
     ]
 
-    for s in sources:
-
-        if s:
-
-            context.append(s)
-
-    return "\n\n".join(context)
+    return "\n\n".join([x for x in items if x])
 
 # =========================================================
 # AI
 # =========================================================
 
+def groq_chat(model, messages):
+
+    r = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={
+            "Authorization":
+            f"Bearer {GROQ_API_KEY}",
+            "Content-Type":
+            "application/json"
+        },
+        json={
+            "model":
+            model,
+
+            "messages":
+            messages,
+
+            "temperature":
+            0.7,
+
+            "max_tokens":
+            850
+        },
+        timeout=60
+    )
+
+    data = r.json()
+
+    return data["choices"][0]["message"]["content"]
+
+
+def openrouter_chat(model, messages):
+
+    r = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization":
+            f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type":
+            "application/json"
+        },
+        json={
+            "model":
+            model,
+
+            "messages":
+            messages,
+
+            "temperature":
+            0.7,
+
+            "max_tokens":
+            850
+        },
+        timeout=60
+    )
+
+    data = r.json()
+
+    return data["choices"][0]["message"]["content"]
+
+
 def ask_ai(messages):
 
-    # =====================================================
-    # GROQ
-    # =====================================================
+    shuffled = AI_MODELS.copy()
 
-    try:
+    random.shuffle(shuffled)
 
-        r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization":
-                f"Bearer {GROQ_API_KEY}",
+    for model in shuffled:
 
-                "Content-Type":
-                "application/json"
-            },
-            json={
-                "model":
-                "llama-3.3-70b-versatile",
+        try:
 
-                "messages":
-                messages,
+            if model["provider"] == "groq":
 
-                "temperature":
-                0.7,
+                return groq_chat(
+                    model["model"],
+                    messages
+                )
 
-                "max_tokens":
-                700
-            },
-            timeout=60
-        )
+            if model["provider"] == "openrouter":
 
-        data = r.json()
+                return openrouter_chat(
+                    model["model"],
+                    messages
+                )
 
-        if "choices" in data:
+        except Exception:
 
-            return data["choices"][0]["message"]["content"]
+            print(traceback.format_exc())
 
-    except:
+            continue
 
-        pass
-
-    # =====================================================
-    # OPENROUTER FALLBACK
-    # =====================================================
-
-    try:
-
-        r = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization":
-                f"Bearer {OPENROUTER_API_KEY}",
-
-                "Content-Type":
-                "application/json"
-            },
-            json={
-                "model":
-                "deepseek/deepseek-chat-v3-0324:free",
-
-                "messages":
-                messages,
-
-                "temperature":
-                0.7,
-
-                "max_tokens":
-                707
-            },
-            timeout=60
-        )
-
-        data = r.json()
-
-        if "choices" in data:
-
-            return data["choices"][0]["message"]["content"]
-
-    except:
-
-        pass
-
-    return "Bloxy-bot AI providers are temporarily overloaded."
+    return "Bloxy-bot AI systems are overloaded."
 
 # =========================================================
 # AUTH
@@ -590,9 +600,16 @@ def signup(data: Signup):
         }
 
     users[data.email] = {
-        "username": data.username,
-        "password": data.password,
-        "verified": False
+
+        "username":
+        data.username,
+
+        "password":
+        data.password,
+
+        "created":
+        time.time()
+
     }
 
     save_json(USERS_FILE, users)
@@ -614,10 +631,19 @@ def login(data: Login):
             }
 
         return {
-            "ok": True,
-            "username": OWNER_USERNAME,
-            "verified": True,
-            "email": OWNER_EMAIL
+
+            "ok":
+            True,
+
+            "username":
+            OWNER_USERNAME,
+
+            "verified":
+            True,
+
+            "email":
+            OWNER_EMAIL
+
         }
 
     if data.email not in users:
@@ -633,10 +659,19 @@ def login(data: Login):
         }
 
     return {
-        "ok": True,
-        "username": users[data.email]["username"],
-        "verified": False,
-        "email": data.email
+
+        "ok":
+        True,
+
+        "username":
+        users[data.email]["username"],
+
+        "verified":
+        False,
+
+        "email":
+        data.email
+
     }
 
 # =========================================================
@@ -665,12 +700,12 @@ You are Bloxy-bot AI.
 Use:
 - live web info
 - live sports
+- live finance
 - live news
 - current events
 - current knowledge
-
-Be intelligent.
-Avoid hallucinations.
+- reasoning
+- all APIs
 
 Context:
 
@@ -687,13 +722,15 @@ Context:
 
     ]
 
-    messages += history[-6:]
+    messages += history[-8:]
 
     messages.append({
 
-        "role": "user",
+        "role":
+        "user",
 
-        "content": data.message
+        "content":
+        data.message
 
     })
 
@@ -701,17 +738,21 @@ Context:
 
     history.append({
 
-        "role": "user",
+        "role":
+        "user",
 
-        "content": data.message
+        "content":
+        data.message
 
     })
 
     history.append({
 
-        "role": "assistant",
+        "role":
+        "assistant",
 
-        "content": reply
+        "content":
+        reply
 
     })
 
@@ -719,7 +760,8 @@ Context:
 
     return {
 
-        "reply": reply
+        "reply":
+        reply
 
     }
 
@@ -747,7 +789,7 @@ content="width=device-width, initial-scale=1.0">
 
 body{
 margin:0;
-background:#0f0f0f;
+background:#0d0d0d;
 font-family:Arial;
 color:white;
 overflow:hidden;
@@ -760,7 +802,7 @@ height:100vh;
 
 .sidebar{
 width:280px;
-background:#101010;
+background:#111;
 border-right:1px solid #222;
 display:flex;
 flex-direction:column;
@@ -768,10 +810,9 @@ flex-direction:column;
 
 .logo{
 padding:24px;
-font-size:30px;
+font-size:28px;
 font-weight:bold;
 color:#00ff88;
-text-shadow:0 0 18px #00ff88;
 }
 
 .newchat{
@@ -779,7 +820,7 @@ margin:15px;
 padding:16px;
 border:none;
 border-radius:18px;
-background:#1d1d1d;
+background:#1e1e1e;
 color:white;
 cursor:pointer;
 }
@@ -798,24 +839,7 @@ margin-bottom:12px;
 display:flex;
 justify-content:space-between;
 align-items:center;
-}
-
-.chatbuttons{
-display:flex;
-gap:8px;
-}
-
-.chatoption{
 cursor:pointer;
-opacity:0.7;
-}
-
-.userbox{
-padding:16px;
-border-top:1px solid #222;
-display:flex;
-justify-content:space-between;
-align-items:center;
 }
 
 .main{
@@ -835,8 +859,8 @@ padding:18px;
 background:#1a1a1a;
 border-radius:18px;
 margin-bottom:18px;
-line-height:1.7;
 white-space:pre-wrap;
+line-height:1.7;
 }
 
 .user{
@@ -849,8 +873,8 @@ border-left:4px solid #00ff88;
 
 .inputarea{
 padding:18px;
-background:#111;
 border-top:1px solid #222;
+background:#111;
 }
 
 .inputrow{
@@ -874,15 +898,15 @@ border:none;
 border-radius:18px;
 background:orange;
 color:white;
-font-size:18px;
+font-size:20px;
 cursor:pointer;
 font-weight:bold;
 }
 
 .helper{
-margin-top:10px;
 text-align:center;
 opacity:0.4;
+margin-top:10px;
 font-size:12px;
 }
 
@@ -940,29 +964,6 @@ cursor:pointer;
 margin-top:12px;
 }
 
-.guestbtn{
-width:100%;
-padding:15px;
-border:none;
-border-radius:16px;
-background:#222;
-color:white;
-cursor:pointer;
-margin-top:12px;
-}
-
-@media(max-width:700px){
-
-.sidebar{
-width:90px;
-}
-
-.logo{
-font-size:18px;
-}
-
-}
-
 </style>
 
 </head>
@@ -999,11 +1000,6 @@ onclick="login()">
 Login
 </button>
 
-<button class="guestbtn"
-onclick="guestMode()">
-Stay Signed Out
-</button>
-
 </div>
 
 </div>
@@ -1023,18 +1019,6 @@ onclick="newChat()">
 
 <div class="chatlist"
 id="chatlist">
-</div>
-
-<div class="userbox">
-
-<div id="userbox">
-Guest
-</div>
-
-<div>
-⋮
-</div>
-
 </div>
 
 </div>
@@ -1100,33 +1084,33 @@ fill="#ff9900"
 
 d="
 M12 2
-L14.7 5.1
-L18.8 4.4
-L19.6 8.4
-L23 10.9
-L20.9 14.4
-L22 18.5
-L17.9 19.6
-L15.4 23
-L11.9 20.9
-L7.8 22
-L6.7 17.9
-L3.3 15.4
-L5.4 11.9
-L4.3 7.8
-L8.4 6.7
+L15 5
+L19 4
+L20 8
+L23 12
+L20 16
+L19 20
+L15 19
+L12 22
+L9 19
+L5 20
+L4 16
+L1 12
+L4 8
+L5 4
+L9 5
 Z"/>
 
 <path
 fill="white"
 
 d="
-M10.2 15.8
-L6.9 12.5
-L8.3 11.1
-L10.2 13
-L15.9 7.3
-L17.3 8.7
+M10 15
+L7 12
+L8.5 10.5
+L10 12
+L15.5 6.5
+L17 8
 Z"/>
 
 </svg>
@@ -1142,16 +1126,13 @@ return "";
 
 function newChat(){
 
-let name =
-prompt(
-"Conversation name"
-);
+let n = prompt("Chat name");
 
-if(!name) return;
+if(!n) return;
 
-chats[name] = [];
+chats[n] = [];
 
-currentChat = name;
+currentChat = n;
 
 renderChats();
 
@@ -1162,9 +1143,7 @@ render();
 function renderChats(){
 
 let box =
-document.getElementById(
-"chatlist"
-);
+document.getElementById("chatlist");
 
 box.innerHTML = "";
 
@@ -1173,37 +1152,22 @@ for(let c in chats){
 let d =
 document.createElement("div");
 
-d.className =
-"chatitem";
+d.className = "chatitem";
 
 d.innerHTML = `
 <div>${c}</div>
 
-<div class="chatbuttons">
+<div>
 
-<div class="chatoption"
-onclick="
+<span onclick="
 event.stopPropagation();
 renameChat('${c}')
-">
-✏️
-</div>
+">✏️</span>
 
-<div class="chatoption"
-onclick="
-event.stopPropagation();
-pinChat('${c}')
-">
-📌
-</div>
-
-<div class="chatoption"
-onclick="
+<span onclick="
 event.stopPropagation();
 deleteChat('${c}')
-">
-🗑️
-</div>
+">🗑️</span>
 
 </div>
 `;
@@ -1225,10 +1189,7 @@ box.appendChild(d);
 function renameChat(c){
 
 let n =
-prompt(
-"Rename chat",
-c
-);
+prompt("Rename", c);
 
 if(!n) return;
 
@@ -1237,18 +1198,6 @@ chats[n] = chats[c];
 delete chats[c];
 
 currentChat = n;
-
-renderChats();
-
-}
-
-function pinChat(c){
-
-if(c.startsWith("📌 ")) return;
-
-chats["📌 " + c] = chats[c];
-
-delete chats[c];
 
 renderChats();
 
@@ -1276,9 +1225,7 @@ render();
 function render(){
 
 let box =
-document.getElementById(
-"messages"
-);
+document.getElementById("messages");
 
 box.innerHTML = "";
 
@@ -1304,10 +1251,7 @@ m.role==="user"
 : "";
 
 d.innerHTML = `
-<b>
-${name}
-${badge}
-</b>
+<b>${name}${badge}</b>
 
 <div style="margin-top:10px;">
 ${m.content.replace(/\\n/g,"<br>")}
@@ -1388,20 +1332,7 @@ document.getElementById(
 "auth"
 ).style.display = "none";
 
-document.getElementById(
-"userbox"
-).innerHTML =
-d.username + verifiedBadge();
-
 });
-
-}
-
-function guestMode(){
-
-document.getElementById(
-"auth"
-).style.display = "none";
 
 }
 
