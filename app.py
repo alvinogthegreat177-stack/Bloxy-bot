@@ -62,7 +62,7 @@ USERS_FILE = "users.json"
 CHATS_FILE = "chats.json"
 
 # =========================================================
-# LOAD/SAVE
+# LOAD / SAVE
 # =========================================================
 
 def load_json(path, default):
@@ -143,7 +143,7 @@ def tavily_search(query):
             timeout=20
         )
 
-        return r.text[:2000]
+        return r.text[:1800]
 
     except:
 
@@ -169,7 +169,7 @@ def gnews_search(query):
             timeout=20
         )
 
-        return r.text[:2000]
+        return r.text[:1800]
 
     except:
 
@@ -194,7 +194,7 @@ def newsapi_search(query):
             timeout=20
         )
 
-        return r.text[:2000]
+        return r.text[:1800]
 
     except:
 
@@ -207,7 +207,7 @@ def wikipedia_search(query):
 
         r = requests.get(
             "https://en.wikipedia.org/api/rest_v1/page/summary/" + query,
-            timeout=15
+            timeout=20
         )
 
         data = r.json()
@@ -240,7 +240,7 @@ def exa_search(query):
             timeout=20
         )
 
-        return r.text[:2000]
+        return r.text[:1800]
 
     except:
 
@@ -264,7 +264,7 @@ def finance_search():
             timeout=20
         )
 
-        return r.text[:2000]
+        return r.text[:1800]
 
     except:
 
@@ -273,13 +273,13 @@ def finance_search():
 
 def wolfram_search(query):
 
-    if not WOLFRAM_API_KEY and not WOLFRAM_APP_ID:
+    key = WOLFRAM_API_KEY or WOLFRAM_APP_ID
+
+    if not key:
 
         return ""
 
     try:
-
-        key = WOLFRAM_API_KEY or WOLFRAM_APP_ID
 
         r = requests.get(
             "http://api.wolframalpha.com/v1/result",
@@ -300,7 +300,7 @@ def wolfram_search(query):
 # SPORTS
 # =========================================================
 
-def thesportsdb_search(team):
+def sportsdb_search(team):
 
     if not THESPORTSDB_API_KEY:
 
@@ -316,7 +316,7 @@ def thesportsdb_search(team):
             timeout=20
         )
 
-        return r.text[:2000]
+        return r.text[:1800]
 
     except:
 
@@ -340,7 +340,7 @@ def allsports_search():
             timeout=20
         )
 
-        return r.text[:2000]
+        return r.text[:1800]
 
     except:
 
@@ -363,7 +363,7 @@ def odds_search():
             timeout=20
         )
 
-        return r.text[:2000]
+        return r.text[:1800]
 
     except:
 
@@ -390,14 +390,14 @@ def apisports_search():
             timeout=20
         )
 
-        return r.text[:2000]
+        return r.text[:1800]
 
     except:
 
         return ""
 
 
-def sportmonk_search():
+def sportmonks_search():
 
     if not SPORTMONK_API_KEY:
 
@@ -414,7 +414,7 @@ def sportmonk_search():
             timeout=20
         )
 
-        return r.text[:2000]
+        return r.text[:1800]
 
     except:
 
@@ -434,7 +434,7 @@ def sportradar_search():
             timeout=20
         )
 
-        return r.text[:2000]
+        return r.text[:1800]
 
     except:
 
@@ -448,91 +448,53 @@ def build_context(prompt):
 
     context = []
 
-    t = tavily_search(prompt)
+    sources = [
 
-    if t:
+        tavily_search(prompt),
 
-        context.append("TAVILY:\\n" + t)
+        gnews_search(prompt),
 
-    g = gnews_search(prompt)
+        newsapi_search(prompt),
 
-    if g:
+        wikipedia_search(prompt),
 
-        context.append("GNEWS:\\n" + g)
+        exa_search(prompt),
 
-    n = newsapi_search(prompt)
+        finance_search(),
 
-    if n:
+        wolfram_search(prompt),
 
-        context.append("NEWSAPI:\\n" + n)
+        sportsdb_search(prompt),
 
-    w = wikipedia_search(prompt)
+        allsports_search(),
 
-    if w:
+        odds_search(),
 
-        context.append("WIKIPEDIA:\\n" + w)
+        apisports_search(),
 
-    e = exa_search(prompt)
+        sportmonks_search(),
 
-    if e:
+        sportradar_search()
 
-        context.append("EXA:\\n" + e)
+    ]
 
-    f = finance_search()
+    for s in sources:
 
-    if f:
+        if s:
 
-        context.append("FINANCE:\\n" + f)
+            context.append(s)
 
-    wa = wolfram_search(prompt)
-
-    if wa:
-
-        context.append("WOLFRAM:\\n" + wa)
-
-    s1 = thesportsdb_search(prompt)
-
-    if s1:
-
-        context.append("SPORTSDB:\\n" + s1)
-
-    s2 = allsports_search()
-
-    if s2:
-
-        context.append("ALLSPORTS:\\n" + s2)
-
-    s3 = odds_search()
-
-    if s3:
-
-        context.append("ODDS:\\n" + s3)
-
-    s4 = apisports_search()
-
-    if s4:
-
-        context.append("APISPORTS:\\n" + s4)
-
-    s5 = sportmonk_search()
-
-    if s5:
-
-        context.append("SPORTMONKS:\\n" + s5)
-
-    s6 = sportradar_search()
-
-    if s6:
-
-        context.append("SPORTRADAR:\\n" + s6)
-
-    return "\\n\\n".join(context)
+    return "\n\n".join(context)
 
 # =========================================================
 # AI
 # =========================================================
 
 def ask_ai(messages):
+
+    # =====================================================
+    # GROQ
+    # =====================================================
 
     try:
 
@@ -541,6 +503,7 @@ def ask_ai(messages):
             headers={
                 "Authorization":
                 f"Bearer {GROQ_API_KEY}",
+
                 "Content-Type":
                 "application/json"
             },
@@ -552,10 +515,10 @@ def ask_ai(messages):
                 messages,
 
                 "temperature":
-                0.8,
+                0.7,
 
                 "max_tokens":
-                1500
+                700
             },
             timeout=60
         )
@@ -566,13 +529,52 @@ def ask_ai(messages):
 
             return data["choices"][0]["message"]["content"]
 
-        return str(data)
+    except:
 
-    except Exception:
+        pass
 
-        print(traceback.format_exc())
+    # =====================================================
+    # OPENROUTER FALLBACK
+    # =====================================================
 
-        return "Bloxy-bot AI error."
+    try:
+
+        r = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization":
+                f"Bearer {OPENROUTER_API_KEY}",
+
+                "Content-Type":
+                "application/json"
+            },
+            json={
+                "model":
+                "deepseek/deepseek-chat-v3-0324:free",
+
+                "messages":
+                messages,
+
+                "temperature":
+                0.7,
+
+                "max_tokens":
+                707
+            },
+            timeout=60
+        )
+
+        data = r.json()
+
+        if "choices" in data:
+
+            return data["choices"][0]["message"]["content"]
+
+    except:
+
+        pass
+
+    return "Bloxy-bot AI providers are temporarily overloaded."
 
 # =========================================================
 # AUTH
@@ -589,7 +591,8 @@ def signup(data: Signup):
 
     users[data.email] = {
         "username": data.username,
-        "password": data.password
+        "password": data.password,
+        "verified": False
     }
 
     save_json(USERS_FILE, users)
@@ -659,19 +662,15 @@ def chat(data: ChatRequest):
 
 You are Bloxy-bot AI.
 
-Use live information.
-Use sports APIs.
-Use web search.
-Use current knowledge.
-Avoid hallucinations.
-Know everything in the world.
-Say factual things.
-Be punctual and have correct spelling of words.
-Be polite.
-Use emojis in every conversation.
-Give correct information.
-Know everything on every topic.
+Use:
+- live web info
+- live sports
+- live news
+- current events
+- current knowledge
 
+Be intelligent.
+Avoid hallucinations.
 
 Context:
 
@@ -680,39 +679,52 @@ Context:
 """
 
     messages = [
+
         {
             "role": "system",
             "content": system_prompt
         }
+
     ]
 
     messages += history[-6:]
 
     messages.append({
+
         "role": "user",
+
         "content": data.message
+
     })
 
     reply = ask_ai(messages)
 
     history.append({
+
         "role": "user",
+
         "content": data.message
+
     })
 
     history.append({
+
         "role": "assistant",
+
         "content": reply
+
     })
 
     save_json(CHATS_FILE, chat_memory)
 
     return {
+
         "reply": reply
+
     }
 
 # =========================================================
-# UI
+# FRONTEND
 # =========================================================
 
 @app.get("/", response_class=HTMLResponse)
