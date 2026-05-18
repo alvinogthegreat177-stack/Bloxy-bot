@@ -1,6 +1,6 @@
 # =========================================================
 # BLOXY-BOT ULTIMATE AI 2026
-# COMPLETE APP.PY
+# FULL APP.PY
 # =========================================================
 
 from fastapi import FastAPI
@@ -11,7 +11,6 @@ import traceback
 import uvicorn
 import json
 import os
-import random
 import time
 
 app = FastAPI()
@@ -25,10 +24,6 @@ SECRET_API_KEY = os.getenv("SECRET_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-KIMI_API_KEY = os.getenv("KIMI_API_KEY")
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
@@ -65,7 +60,7 @@ USERS_FILE = "users.json"
 CHATS_FILE = "chats.json"
 
 # =========================================================
-# LOAD
+# LOAD JSON
 # =========================================================
 
 def load_json(path, default):
@@ -102,50 +97,35 @@ OWNER_PASSWORD = "alvindev17.og"
 OWNER_USERNAME = "aTg"
 
 # =========================================================
-# AI MODELS
+# MODELS
 # =========================================================
 
 AI_MODELS = [
 
-    {
-        "provider": "groq",
-        "model": "llama-3.3-70b-versatile"
-    },
+{
+"provider":"groq",
+"model":"llama-3.3-70b-versatile"
+},
 
-    {
-        "provider": "openrouter",
-        "model": "qwen/qwen3-32b"
-    },
+{
+"provider":"openrouter",
+"model":"deepseek/deepseek-chat-v3-0324:free"
+},
 
-    {
-        "provider": "openrouter",
-        "model": "deepseek/deepseek-chat-v3-0324:free"
-    },
+{
+"provider":"openrouter",
+"model":"qwen/qwen3-32b"
+},
 
-    {
-        "provider": "openrouter",
-        "model": "mistralai/mistral-large"
-    },
-
-    {
-        "provider": "openrouter",
-        "model": "anthropic/claude-3.5-sonnet"
-    },
-
-    {
-        "provider": "openrouter",
-        "model": "moonshotai/kimi-k2"
-    },
-
-    {
-        "provider": "openrouter",
-        "model": "openai/gpt-5"
-    }
+{
+"provider":"openrouter",
+"model":"moonshotai/kimi-k2"
+}
 
 ]
 
 # =========================================================
-# Pydantic
+# REQUEST MODELS
 # =========================================================
 
 class Signup(BaseModel):
@@ -186,10 +166,10 @@ def tavily_search(query):
                 "query": query,
                 "max_results": 3
             },
-            timeout=20
+            timeout=10
         )
 
-        return r.text[:2000]
+        return r.text[:1500]
 
     except:
 
@@ -210,12 +190,12 @@ def gnews_search(query):
                 "q": query,
                 "token": GNEWS_API_KEY,
                 "lang": "en",
-                "max": 4
+                "max": 3
             },
-            timeout=20
+            timeout=10
         )
 
-        return r.text[:2000]
+        return r.text[:1500]
 
     except:
 
@@ -235,12 +215,12 @@ def newsapi_search(query):
             params={
                 "q": query,
                 "apiKey": NEWS_API_KEY,
-                "pageSize": 4
+                "pageSize": 3
             },
-            timeout=20
+            timeout=10
         )
 
-        return r.text[:2000]
+        return r.text[:1500]
 
     except:
 
@@ -253,7 +233,7 @@ def wikipedia_search(query):
 
         r = requests.get(
             "https://en.wikipedia.org/api/rest_v1/page/summary/" + query,
-            timeout=20
+            timeout=10
         )
 
         return r.json().get("extract", "")
@@ -280,10 +260,10 @@ def exa_search(query):
                 "query": query,
                 "numResults": 3
             },
-            timeout=20
+            timeout=10
         )
 
-        return r.text[:2000]
+        return r.text[:1500]
 
     except:
 
@@ -301,13 +281,13 @@ def finance_search():
         r = requests.get(
             "https://finnhub.io/api/v1/news",
             params={
-                "category": "general",
-                "token": FINNHUB_API_KEY
+                "category":"general",
+                "token":FINNHUB_API_KEY
             },
-            timeout=20
+            timeout=10
         )
 
-        return r.text[:2000]
+        return r.text[:1200]
 
     except:
 
@@ -327,10 +307,10 @@ def wolfram_search(query):
         r = requests.get(
             "http://api.wolframalpha.com/v1/result",
             params={
-                "appid": key,
-                "i": query
+                "appid":key,
+                "i":query
             },
-            timeout=20
+            timeout=10
         )
 
         return r.text
@@ -343,6 +323,40 @@ def wolfram_search(query):
 # SPORTS
 # =========================================================
 
+def premier_league_table():
+
+    try:
+
+        r = requests.get(
+            "https://v3.football.api-sports.io/standings",
+            headers={
+                "x-apisports-key":
+                APISPORTS_API_KEY
+            },
+            params={
+                "league":39,
+                "season":2025
+            },
+            timeout=10
+        )
+
+        data = r.json()
+
+        table = data["response"][0]["league"]["standings"][0]
+
+        text = "Premier League Table\n\n"
+
+        for t in table[:20]:
+
+            text += f"{t['rank']}. {t['team']['name']} - {t['points']} pts\n"
+
+        return text
+
+    except:
+
+        return "Could not load Premier League table."
+
+
 def sports_context(query):
 
     context = []
@@ -354,12 +368,12 @@ def sports_context(query):
             r = requests.get(
                 f"https://www.thesportsdb.com/api/v1/json/{THESPORTSDB_API_KEY}/searchteams.php",
                 params={
-                    "t": query
+                    "t":query
                 },
-                timeout=20
+                timeout=10
             )
 
-            context.append(r.text[:1200])
+            context.append(r.text[:1000])
 
     except:
 
@@ -372,13 +386,13 @@ def sports_context(query):
             r = requests.get(
                 "https://apiv2.allsportsapi.com/football/",
                 params={
-                    "met": "Livescore",
-                    "APIkey": ALLSPORTS_API_KEY
+                    "met":"Livescore",
+                    "APIkey":ALLSPORTS_API_KEY
                 },
-                timeout=20
+                timeout=10
             )
 
-            context.append(r.text[:1200])
+            context.append(r.text[:1000])
 
     except:
 
@@ -391,12 +405,12 @@ def sports_context(query):
             r = requests.get(
                 "https://api.the-odds-api.com/v4/sports/",
                 params={
-                    "apiKey": ODDS_API_KEY
+                    "apiKey":ODDS_API_KEY
                 },
-                timeout=20
+                timeout=10
             )
 
-            context.append(r.text[:1200])
+            context.append(r.text[:1000])
 
     except:
 
@@ -413,46 +427,12 @@ def sports_context(query):
                     APISPORTS_API_KEY
                 },
                 params={
-                    "live": "all"
+                    "live":"all"
                 },
-                timeout=20
+                timeout=10
             )
 
-            context.append(r.text[:1200])
-
-    except:
-
-        pass
-
-    try:
-
-        if SPORTMONK_API_KEY:
-
-            r = requests.get(
-                "https://api.sportmonks.com/v3/football/livescores",
-                params={
-                    "api_token":
-                    SPORTMONK_API_KEY
-                },
-                timeout=20
-            )
-
-            context.append(r.text[:1200])
-
-    except:
-
-        pass
-
-    try:
-
-        if SPORTRADAR_API_KEY:
-
-            r = requests.get(
-                f"https://api.sportradar.com/soccer/trial/v4/en/schedules/live/schedule.json?api_key={SPORTRADAR_API_KEY}",
-                timeout=20
-            )
-
-            context.append(r.text[:1200])
+            context.append(r.text[:1000])
 
     except:
 
@@ -510,12 +490,12 @@ def groq_chat(model, messages):
             messages,
 
             "temperature":
-            0.7,
+            0.6,
 
             "max_tokens":
-            850
+            350
         },
-        timeout=60
+        timeout=40
     )
 
     data = r.json()
@@ -541,12 +521,12 @@ def openrouter_chat(model, messages):
             messages,
 
             "temperature":
-            0.7,
+            0.6,
 
             "max_tokens":
-            850
+            350
         },
-        timeout=60
+        timeout=40
     )
 
     data = r.json()
@@ -556,11 +536,7 @@ def openrouter_chat(model, messages):
 
 def ask_ai(messages):
 
-    shuffled = AI_MODELS.copy()
-
-    random.shuffle(shuffled)
-
-    for model in shuffled:
+    for model in AI_MODELS:
 
         try:
 
@@ -596,7 +572,7 @@ def signup(data: Signup):
     if data.email in users:
 
         return {
-            "ok": False
+            "ok":False
         }
 
     users[data.email] = {
@@ -615,7 +591,7 @@ def signup(data: Signup):
     save_json(USERS_FILE, users)
 
     return {
-        "ok": True
+        "ok":True
     }
 
 
@@ -627,50 +603,43 @@ def login(data: Login):
         if data.password != OWNER_PASSWORD:
 
             return {
-                "ok": False
+                "ok":False
             }
 
         return {
 
-            "ok":
-            True,
+            "ok":True,
 
-            "username":
-            OWNER_USERNAME,
+            "username":OWNER_USERNAME,
 
-            "verified":
-            True,
+            "verified":True,
 
-            "email":
-            OWNER_EMAIL
+            "email":OWNER_EMAIL
 
         }
 
     if data.email not in users:
 
         return {
-            "ok": False
+            "ok":False
         }
 
     if users[data.email]["password"] != data.password:
 
         return {
-            "ok": False
+            "ok":False
         }
 
     return {
 
-        "ok":
-        True,
+        "ok":True,
 
         "username":
         users[data.email]["username"],
 
-        "verified":
-        False,
+        "verified":False,
 
-        "email":
-        data.email
+        "email":data.email
 
     }
 
@@ -680,6 +649,15 @@ def login(data: Login):
 
 @app.post("/chat")
 def chat(data: ChatRequest):
+
+    lower = data.message.lower()
+
+    if "pl table" in lower or "premier league table" in lower:
+
+        return {
+            "reply":
+            premier_league_table()
+        }
 
     if data.email not in chat_memory:
 
@@ -697,15 +675,18 @@ def chat(data: ChatRequest):
 
 You are Bloxy-bot AI.
 
-Use:
-- live web info
-- live sports
-- live finance
-- live news
-- current events
-- current knowledge
-- reasoning
-- all APIs
+RULES:
+
+- NEVER define every word
+- Talk naturally
+- Give direct answers
+- Use live context aggressively
+- Sports answers must feel live
+- Be modern
+- Be fast
+- Do not act like a dictionary
+- Avoid robotic explanations
+- Only explain deeply if user asks
 
 Context:
 
@@ -716,21 +697,19 @@ Context:
     messages = [
 
         {
-            "role": "system",
-            "content": system_prompt
+            "role":"system",
+            "content":system_prompt
         }
 
     ]
 
-    messages += history[-8:]
+    messages += history[-6:]
 
     messages.append({
 
-        "role":
-        "user",
+        "role":"user",
 
-        "content":
-        data.message
+        "content":data.message
 
     })
 
@@ -738,21 +717,17 @@ Context:
 
     history.append({
 
-        "role":
-        "user",
+        "role":"user",
 
-        "content":
-        data.message
+        "content":data.message
 
     })
 
     history.append({
 
-        "role":
-        "assistant",
+        "role":"assistant",
 
-        "content":
-        reply
+        "content":reply
 
     })
 
@@ -760,8 +735,7 @@ Context:
 
     return {
 
-        "reply":
-        reply
+        "reply":reply
 
     }
 
@@ -801,7 +775,7 @@ height:100vh;
 }
 
 .sidebar{
-width:280px;
+width:290px;
 background:#111;
 border-right:1px solid #222;
 display:flex;
@@ -893,7 +867,7 @@ color:white;
 }
 
 .sendbtn{
-width:60px;
+width:65px;
 border:none;
 border-radius:18px;
 background:orange;
@@ -912,14 +886,13 @@ font-size:12px;
 
 .verified{
 display:inline-flex;
-margin-left:6px;
-vertical-align:middle;
+align-items:center;
 }
 
 .verified svg{
 width:18px;
 height:18px;
-filter:drop-shadow(0 0 6px orange);
+filter:drop-shadow(0 0 5px orange);
 }
 
 .auth{
@@ -962,6 +935,31 @@ background:#00ff88;
 font-weight:bold;
 cursor:pointer;
 margin-top:12px;
+}
+
+#accountBar{
+padding:16px;
+border-top:1px solid #222;
+display:flex;
+justify-content:space-between;
+align-items:center;
+background:#111;
+}
+
+#accountLeft{
+display:flex;
+align-items:center;
+gap:6px;
+font-weight:bold;
+}
+
+#accountBtns button{
+background:#1d1d1d;
+border:none;
+color:white;
+padding:10px;
+border-radius:12px;
+cursor:pointer;
 }
 
 </style>
@@ -1021,6 +1019,29 @@ onclick="newChat()">
 id="chatlist">
 </div>
 
+<div id="accountBar">
+
+<div id="accountLeft">
+
+<span id="accountName">
+Guest
+</span>
+
+<span id="accountBadge">
+</span>
+
+</div>
+
+<div id="accountBtns">
+
+<button onclick="logout()">
+Logout
+</button>
+
+</div>
+
+</div>
+
 </div>
 
 <div class="main">
@@ -1067,7 +1088,10 @@ verified:false
 let currentChat = "Main";
 
 let chats = {
-"Main":[]
+"Main":{
+messages:[],
+pinned:false
+}
 };
 
 function verifiedBadge(){
@@ -1080,25 +1104,25 @@ return `
 <svg viewBox="0 0 24 24">
 
 <path
-fill="#ff9900"
+fill="#ff8800"
 
 d="
-M12 2
-L15 5
-L19 4
-L20 8
+M12 1
+L15 4
+L20 4
+L20 9
 L23 12
-L20 16
-L19 20
-L15 19
-L12 22
-L9 19
-L5 20
-L4 16
+L20 15
+L20 20
+L15 20
+L12 23
+L9 20
+L4 20
+L4 15
 L1 12
-L4 8
-L5 4
-L9 5
+L4 9
+L4 4
+L9 4
 Z"/>
 
 <path
@@ -1124,13 +1148,30 @@ return "";
 
 }
 
+function updateAccountBar(){
+
+document.getElementById(
+"accountName"
+).innerText =
+currentUser.username;
+
+document.getElementById(
+"accountBadge"
+).innerHTML =
+verifiedBadge();
+
+}
+
 function newChat(){
 
 let n = prompt("Chat name");
 
 if(!n) return;
 
-chats[n] = [];
+chats[n] = {
+messages:[],
+pinned:false
+};
 
 currentChat = n;
 
@@ -1140,56 +1181,21 @@ render();
 
 }
 
-function renderChats(){
+function pinChat(c){
 
-let box =
-document.getElementById("chatlist");
+chats[c].pinned =
+!chats[c].pinned;
 
-box.innerHTML = "";
-
-for(let c in chats){
-
-let d =
-document.createElement("div");
-
-d.className = "chatitem";
-
-d.innerHTML = `
-<div>${c}</div>
-
-<div>
-
-<span onclick="
-event.stopPropagation();
-renameChat('${c}')
-">✏️</span>
-
-<span onclick="
-event.stopPropagation();
-deleteChat('${c}')
-">🗑️</span>
-
-</div>
-`;
-
-d.onclick = ()=>{
-
-currentChat = c;
-
-render();
-
-};
-
-box.appendChild(d);
-
-}
+renderChats();
 
 }
 
 function renameChat(c){
 
-let n =
-prompt("Rename", c);
+let n = prompt(
+"Rename",
+c
+);
 
 if(!n) return;
 
@@ -1209,7 +1215,10 @@ delete chats[c];
 
 if(Object.keys(chats).length===0){
 
-chats["Main"] = [];
+chats["Main"] = {
+messages:[],
+pinned:false
+};
 
 }
 
@@ -1222,14 +1231,95 @@ render();
 
 }
 
-function render(){
+function renderChats(){
 
 let box =
-document.getElementById("messages");
+document.getElementById(
+"chatlist"
+);
 
 box.innerHTML = "";
 
-for(let m of chats[currentChat]){
+let keys =
+Object.keys(chats);
+
+keys.sort((a,b)=>{
+
+return chats[b].pinned -
+chats[a].pinned;
+
+});
+
+for(let c of keys){
+
+let d =
+document.createElement("div");
+
+d.className = "chatitem";
+
+d.innerHTML = `
+
+<div>
+
+${chats[c].pinned ? "📌 " : ""}
+
+${c}
+
+</div>
+
+<div style="
+display:flex;
+gap:10px;
+">
+
+<span onclick="
+event.stopPropagation();
+pinChat('${c}')
+">
+📌
+</span>
+
+<span onclick="
+event.stopPropagation();
+renameChat('${c}')
+">
+✏️
+</span>
+
+<span onclick="
+event.stopPropagation();
+deleteChat('${c}')
+">
+🗑️
+</span>
+
+</div>
+`;
+
+d.onclick = ()=>{
+
+currentChat = c;
+
+render();
+
+};
+
+box.appendChild(d);
+
+}
+
+}
+
+function render(){
+
+let box =
+document.getElementById(
+"messages"
+);
+
+box.innerHTML = "";
+
+for(let m of chats[currentChat].messages){
 
 let d =
 document.createElement("div");
@@ -1251,11 +1341,24 @@ m.role==="user"
 : "";
 
 d.innerHTML = `
-<b>${name}${badge}</b>
+
+<div style="
+display:flex;
+align-items:center;
+gap:6px;
+font-weight:bold;
+">
+
+${name}
+
+${badge}
+
+</div>
 
 <div style="margin-top:10px;">
 ${m.content.replace(/\\n/g,"<br>")}
 </div>
+
 `;
 
 box.appendChild(d);
@@ -1328,11 +1431,28 @@ username:d.username,
 verified:d.verified
 };
 
+localStorage.setItem(
+"bloxyUser",
+JSON.stringify(currentUser)
+);
+
+updateAccountBar();
+
 document.getElementById(
 "auth"
 ).style.display = "none";
 
 });
+
+}
+
+function logout(){
+
+localStorage.removeItem(
+"bloxyUser"
+);
+
+location.reload();
 
 }
 
@@ -1350,7 +1470,7 @@ if(!msg) return;
 
 input.value = "";
 
-chats[currentChat].push({
+chats[currentChat].messages.push({
 role:"user",
 content:msg
 });
@@ -1372,7 +1492,7 @@ message:msg
 .then(r=>r.json())
 .then(d=>{
 
-chats[currentChat].push({
+chats[currentChat].messages.push({
 role:"assistant",
 content:d.reply
 });
@@ -1380,6 +1500,24 @@ content:d.reply
 render();
 
 });
+
+}
+
+let saved =
+localStorage.getItem(
+"bloxyUser"
+);
+
+if(saved){
+
+currentUser =
+JSON.parse(saved);
+
+document.getElementById(
+"auth"
+).style.display = "none";
+
+updateAccountBar();
 
 }
 
