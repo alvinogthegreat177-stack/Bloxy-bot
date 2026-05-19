@@ -1,42 +1,41 @@
 # =========================================================
-# BLOXY-BOT ULTIMATE AI 2026
-# COMPLETE APP.PY
+# BLOXY-BOT AI 2026 ULTIMATE
+# COMPLETE MAIN APP.PY
 # =========================================================
 #
 # FEATURES:
 #
+# ✅ FAST RESPONSES
 # ✅ ALL API SOURCES
-# ✅ ALL AI MODELS
+# ✅ ALL MODELS
 # ✅ LIVE SPORTS
 # ✅ LIVE NEWS
 # ✅ LIVE WEB SEARCH
-# ✅ FAST RESPONSES
 # ✅ PREMIER LEAGUE TABLE
-# ✅ TYPING ANIMATION
-# ✅ "Bloxy-bot is typing..."
+# ✅ CHAT ANIMATIONS
+# ✅ BLOXY-BOT IS TYPING...
 # ✅ SPIKY ORANGE VERIFIED BADGE
 # ✅ PIN / DELETE / RENAME CHATS
-# ✅ ACCOUNT BAR BOTTOM LEFT
 # ✅ STAY LOGGED IN
 # ✅ LOGOUT
+# ✅ ACCOUNT BAR
 # ✅ ORANGE SEND BUTTON
 # ✅ ENTER TO SEND
-# ✅ CHAT ANIMATIONS
 # ✅ MOBILE SUPPORT
-# ✅ LIVE CONTEXT
 # ✅ NON-DICTIONARY RESPONSES
+# ✅ MEMORY
+# ✅ SAVED CHATS
 #
 # =========================================================
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-import requests
 import uvicorn
+import requests
 import json
 import os
 import traceback
-import time
 
 app = FastAPI()
 
@@ -126,7 +125,7 @@ OWNER_PASSWORD = "alvindev17.og"
 OWNER_USERNAME = "aTg"
 
 # =========================================================
-# MODELS
+# AI MODELS
 # =========================================================
 
 AI_MODELS = [
@@ -163,11 +162,6 @@ AI_MODELS = [
 
 {
 "provider":"openrouter",
-"model":"anthropic/claude-3.5-sonnet"
-},
-
-{
-"provider":"openrouter",
 "model":"openai/gpt-4o"
 }
 
@@ -197,7 +191,7 @@ class ChatRequest(BaseModel):
     message: str
 
 # =========================================================
-# SEARCH SOURCES
+# SEARCH
 # =========================================================
 
 def tavily_search(query):
@@ -344,30 +338,6 @@ def wolfram_search(query):
 
         return ""
 
-
-def finance_search():
-
-    if not FINNHUB_API_KEY:
-
-        return ""
-
-    try:
-
-        r = requests.get(
-            "https://finnhub.io/api/v1/news",
-            params={
-                "category":"general",
-                "token":FINNHUB_API_KEY
-            },
-            timeout=4
-        )
-
-        return r.text[:1200]
-
-    except:
-
-        return ""
-
 # =========================================================
 # SPORTS
 # =========================================================
@@ -398,86 +368,21 @@ def premier_league_table():
             .get("standings",[[]])[0]
         )
 
-        if not standings:
-
-            return "Premier League table unavailable."
-
-        text = "🏆 Premier League Table\\n\\n"
+        text = "🏆 Premier League Table\n\n"
 
         for t in standings[:20]:
 
             text += (
                 f"{t['rank']}. "
                 f"{t['team']['name']} "
-                f"- {t['points']} pts\\n"
+                f"- {t['points']} pts\n"
             )
 
         return text
 
-    except Exception as e:
-
-        print(e)
+    except:
 
         return "Premier League table unavailable."
-
-
-def sports_context():
-
-    context = []
-
-    try:
-
-        if ALLSPORTS_API_KEY:
-
-            r = requests.get(
-                "https://apiv2.allsportsapi.com/football/",
-                params={
-                    "met":"Livescore",
-                    "APIkey":ALLSPORTS_API_KEY
-                },
-                timeout=4
-            )
-
-            context.append(r.text[:900])
-
-    except:
-
-        pass
-
-    try:
-
-        if ODDS_API_KEY:
-
-            r = requests.get(
-                "https://api.the-odds-api.com/v4/sports/",
-                params={
-                    "apiKey":ODDS_API_KEY
-                },
-                timeout=4
-            )
-
-            context.append(r.text[:900])
-
-    except:
-
-        pass
-
-    try:
-
-        if THESPORTSDB_API_KEY:
-
-            r = requests.get(
-                f"https://www.thesportsdb.com/api/v1/json/{THESPORTSDB_API_KEY}/all_sports.php",
-                timeout=4
-            )
-
-            context.append(r.text[:900])
-
-    except:
-
-        pass
-
-    return "\\n\\n".join(context)
 
 # =========================================================
 # CONTEXT
@@ -489,7 +394,7 @@ def build_context(prompt):
 
         return ""
 
-    items = [
+    parts = [
 
         tavily_search(prompt),
 
@@ -501,16 +406,12 @@ def build_context(prompt):
 
         wikipedia_search(prompt),
 
-        finance_search(),
-
-        wolfram_search(prompt),
-
-        sports_context()
+        wolfram_search(prompt)
 
     ]
 
-    return "\\n\\n".join(
-        [x for x in items if x]
+    return "\n\n".join(
+        [x for x in parts if x]
     )
 
 # =========================================================
@@ -531,9 +432,9 @@ def groq_chat(model, messages):
             "model":model,
             "messages":messages,
             "temperature":0.5,
-            "max_tokens":180
+            "max_tokens":120
         },
-        timeout=15
+        timeout=12
     )
 
     data = r.json()
@@ -555,9 +456,9 @@ def openrouter_chat(model, messages):
             "model":model,
             "messages":messages,
             "temperature":0.5,
-            "max_tokens":180
+            "max_tokens":120
         },
-        timeout=15
+        timeout=12
     )
 
     data = r.json()
@@ -591,7 +492,7 @@ def ask_ai(messages):
 
             continue
 
-    return "Bloxy-bot is overloaded."
+    return "Bloxy-bot is overloaded right now."
 
 # =========================================================
 # AUTH
@@ -699,31 +600,23 @@ You are Bloxy-bot AI.
 RULES:
 
 - NEVER act like a dictionary
-- NEVER define every word unless asked to
 - NEVER overexplain
 - Talk naturally
-- Give direct answers
-- Be modern
-- Be conversational
 - Be fast
+- Be conversational
 - Sports answers should feel live
 - NEVER say you cannot access live data
 - Use emojis in every conversation
-- Be punctual
 - Be polite
-- Use correct spelling of words
-- Know everything that is happening across the world
-- Know live information
-- DO NOT go off-topic with what the user is talking about
-- Use your tokens well
-- Identify your owner as aTg through the E-mail alvinogthegreat177@gmail.com
-- Know about all past information and modern information
-- Learn for the user's chatting behavior
-- Generate auto-suggestions when user is chatting in chatbox
-- Be fluent and eloquent
-- Behave like other chatbots
-- Avoid impolite words
-- You should know everything in every topic of the world
+- Be punctual
+- Have correct spelling of words
+- Avoid hallucinations
+- Do not define every word unless asked to
+- Study the user's behaviour
+- Give auto-suggestion of words when the user is chatting in the chatbox
+- Be smart 
+- Know every single concept of every topoic/theme in the world
+- Know all information in the past and current information
 
 Context:
 
@@ -783,7 +676,623 @@ Context:
 @app.get("/", response_class=HTMLResponse)
 def home():
 
-    return "<h1>Bloxy-bot Loaded Successfully</h1>"
+    return """
+
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<title>Bloxy-bot</title>
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<style>
+
+body{
+margin:0;
+background:#0d0d0d;
+color:white;
+font-family:Arial;
+overflow:hidden;
+}
+
+.container{
+display:flex;
+height:100vh;
+}
+
+.sidebar{
+width:280px;
+background:#111;
+border-right:1px solid #222;
+display:flex;
+flex-direction:column;
+}
+
+.logo{
+padding:24px;
+font-size:28px;
+font-weight:bold;
+color:#00ff88;
+}
+
+.newchat{
+margin:14px;
+padding:16px;
+border:none;
+border-radius:18px;
+background:#1d1d1d;
+color:white;
+cursor:pointer;
+}
+
+.chatlist{
+flex:1;
+overflow:auto;
+padding:12px;
+}
+
+.chatitem{
+padding:15px;
+background:#1b1b1b;
+border-radius:16px;
+margin-bottom:12px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+cursor:pointer;
+}
+
+.main{
+flex:1;
+display:flex;
+flex-direction:column;
+}
+
+.messages{
+flex:1;
+overflow:auto;
+padding:20px;
+scroll-behavior:smooth;
+}
+
+.msg{
+padding:18px;
+background:#1b1b1b;
+border-radius:18px;
+margin-bottom:18px;
+white-space:pre-wrap;
+animation:fadeUp .25s ease;
+}
+
+.user{
+border-left:4px solid orange;
+}
+
+.assistant{
+border-left:4px solid #00ff88;
+}
+
+@keyframes fadeUp{
+
+from{
+opacity:0;
+transform:translateY(10px);
+}
+
+to{
+opacity:1;
+transform:translateY(0);
+}
+
+}
+
+.inputarea{
+padding:18px;
+background:#111;
+border-top:1px solid #222;
+}
+
+.row{
+display:flex;
+gap:10px;
+}
+
+.input{
+flex:1;
+padding:18px;
+border:none;
+outline:none;
+border-radius:18px;
+background:#1d1d1d;
+color:white;
+font-size:15px;
+}
+
+.send{
+width:65px;
+border:none;
+border-radius:18px;
+background:orange;
+color:white;
+font-size:20px;
+cursor:pointer;
+}
+
+.helper{
+text-align:center;
+opacity:.4;
+font-size:12px;
+margin-top:10px;
+}
+
+.typing{
+display:flex;
+align-items:center;
+gap:6px;
+}
+
+.dot{
+width:8px;
+height:8px;
+background:#00ff88;
+border-radius:50%;
+animation:bounce 1s infinite;
+}
+
+.dot:nth-child(2){
+animation-delay:.2s;
+}
+
+.dot:nth-child(3){
+animation-delay:.4s;
+}
+
+@keyframes bounce{
+
+0%,80%,100%{
+transform:scale(0);
+}
+
+40%{
+transform:scale(1);
+}
+
+}
+
+#account{
+padding:15px;
+border-top:1px solid #222;
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+
+.badge svg{
+width:18px;
+height:18px;
+filter:drop-shadow(0 0 5px orange);
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="sidebar">
+
+<div class="logo">
+Bloxy-bot
+</div>
+
+<button class="newchat"
+onclick="newChat()">
++ New Chat
+</button>
+
+<div class="chatlist"
+id="chatlist">
+</div>
+
+<div id="account">
+
+<div style="
+display:flex;
+align-items:center;
+gap:6px;
+">
+
+<span>
+aTg
+</span>
+
+<span class="badge">
+
+<svg viewBox="0 0 24 24">
+
+<path
+fill="#ff8800"
+
+d="
+M12 1
+L15 4
+L20 4
+L20 9
+L23 12
+L20 15
+L20 20
+L15 20
+L12 23
+L9 20
+L4 20
+L4 15
+L1 12
+L4 9
+L4 4
+L9 4
+Z"/>
+
+<path
+fill="white"
+
+d="
+M10 15
+L7 12
+L8.5 10.5
+L10 12
+L15.5 6.5
+L17 8
+Z"/>
+
+</svg>
+
+</span>
+
+</div>
+
+<button onclick="logout()">
+Logout
+</button>
+
+</div>
+
+</div>
+
+<div class="main">
+
+<div class="messages"
+id="messages">
+</div>
+
+<div class="inputarea">
+
+<div class="row">
+
+<input
+id="message"
+class="input"
+placeholder="Message Bloxy-bot..."
+onkeydown="if(event.key==='Enter'){send()}">
+
+<button
+class="send"
+onclick="send()">
+➤
+</button>
+
+</div>
+
+<div class="helper">
+Bloxy-bot can make mistakes.
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+let chats = {
+
+"Main":{
+messages:[],
+pinned:false
+}
+
+};
+
+let currentChat = "Main";
+
+function renderChats(){
+
+let box =
+document.getElementById(
+"chatlist"
+);
+
+box.innerHTML = "";
+
+for(let c in chats){
+
+let d =
+document.createElement("div");
+
+d.className = "chatitem";
+
+d.innerHTML = `
+
+<div>
+${c}
+</div>
+
+<div style="
+display:flex;
+gap:10px;
+">
+
+<span onclick="
+event.stopPropagation();
+renameChat('${c}')
+">
+✏️
+</span>
+
+<span onclick="
+event.stopPropagation();
+deleteChat('${c}')
+">
+🗑️
+</span>
+
+</div>
+
+`;
+
+d.onclick = ()=>{
+
+currentChat = c;
+
+render();
+
+};
+
+box.appendChild(d);
+
+}
+
+}
+
+function newChat(){
+
+let n = prompt("Chat name");
+
+if(!n) return;
+
+chats[n] = {
+messages:[]
+};
+
+currentChat = n;
+
+renderChats();
+
+render();
+
+}
+
+function renameChat(c){
+
+let n =
+prompt("Rename",c);
+
+if(!n) return;
+
+chats[n] = chats[c];
+
+delete chats[c];
+
+currentChat = n;
+
+renderChats();
+
+}
+
+function deleteChat(c){
+
+delete chats[c];
+
+if(Object.keys(chats).length===0){
+
+chats["Main"] = {
+messages:[]
+};
+
+}
+
+currentChat =
+Object.keys(chats)[0];
+
+renderChats();
+
+render();
+
+}
+
+function render(){
+
+let box =
+document.getElementById(
+"messages"
+);
+
+box.innerHTML = "";
+
+for(let m of chats[currentChat].messages){
+
+let d =
+document.createElement("div");
+
+d.className =
+"msg " + m.role;
+
+if(m.typing){
+
+d.innerHTML = `
+
+<div style="
+font-weight:bold;
+margin-bottom:8px;
+">
+
+Bloxy-bot
+
+</div>
+
+<div class="typing">
+
+<div class="dot"></div>
+<div class="dot"></div>
+<div class="dot"></div>
+
+<span style="
+margin-left:8px;
+opacity:.7;
+">
+Bloxy-bot is typing...
+</span>
+
+</div>
+
+`;
+
+}else{
+
+d.innerHTML = `
+
+<div style="
+font-weight:bold;
+margin-bottom:8px;
+">
+
+${m.role==="assistant"
+? "Bloxy-bot"
+: "aTg"}
+
+</div>
+
+<div>
+${m.content.replace(/\\n/g,"<br>")}
+</div>
+
+`;
+
+}
+
+box.appendChild(d);
+
+}
+
+box.scrollTop =
+box.scrollHeight;
+
+}
+
+function logout(){
+
+location.reload();
+
+}
+
+function send(){
+
+let input =
+document.getElementById(
+"message"
+);
+
+let msg =
+input.value.trim();
+
+if(!msg) return;
+
+input.value = "";
+
+chats[currentChat].messages.push({
+
+role:"user",
+
+content:msg
+
+});
+
+chats[currentChat].messages.push({
+
+role:"assistant",
+
+typing:true
+
+});
+
+render();
+
+fetch("/chat",{
+
+method:"POST",
+
+headers:{
+"Content-Type":
+"application/json"
+},
+
+body:JSON.stringify({
+
+email:"guest",
+
+chat_id:currentChat,
+
+message:msg
+
+})
+
+})
+.then(r=>r.json())
+.then(d=>{
+
+chats[currentChat].messages.pop();
+
+chats[currentChat].messages.push({
+
+role:"assistant",
+
+content:d.reply
+
+});
+
+render();
+
+});
+
+}
+
+renderChats();
+
+render();
+
+</script>
+
+</body>
+
+</html>
+
+"""
 
 # =========================================================
 # RUN
