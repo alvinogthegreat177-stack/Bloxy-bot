@@ -1,41 +1,51 @@
 # =========================================================
-# BLOXY-BOT AI 2026 ULTIMATE
-# COMPLETE MAIN APP.PY
+# BLOXY-BOT AI ULTIMATE 2026
+# COMPLETE FULL APP.PY
+# WEBSITE READY
 # =========================================================
 #
-# FEATURES:
+# INCLUDED:
 #
 # ✅ FAST RESPONSES
-# ✅ ALL API SOURCES
-# ✅ ALL MODELS
+# ✅ MULTI MODEL SYSTEM
+# ✅ GROQ + OPENROUTER
 # ✅ LIVE SPORTS
 # ✅ LIVE NEWS
-# ✅ LIVE WEB SEARCH
+# ✅ LIVE SEARCH
+# ✅ LIVE FINANCE
 # ✅ PREMIER LEAGUE TABLE
-# ✅ CHAT ANIMATIONS
+# ✅ TYPING ANIMATION
 # ✅ BLOXY-BOT IS TYPING...
-# ✅ SPIKY ORANGE VERIFIED BADGE
-# ✅ PIN / DELETE / RENAME CHATS
-# ✅ STAY LOGGED IN
+# ✅ PIN CHATS
+# ✅ DELETE CHATS
+# ✅ RENAME CHATS
+# ✅ SAVE CHATS
+# ✅ SAVE LOGIN
 # ✅ LOGOUT
+# ✅ GUEST MODE
+# ✅ SPIKY ORANGE VERIFIED BADGE
+# ✅ VERIFIED BADGE TOOLTIP
 # ✅ ACCOUNT BAR
+# ✅ MOBILE UI
 # ✅ ORANGE SEND BUTTON
 # ✅ ENTER TO SEND
-# ✅ MOBILE SUPPORT
 # ✅ NON-DICTIONARY RESPONSES
+# ✅ 30 AI RULES
 # ✅ MEMORY
-# ✅ SAVED CHATS
+# ✅ CHAT ANIMATIONS
+# ✅ LIVE CONTEXT
+# ✅ CLEAN WEBSITE UI
 #
 # =========================================================
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-import uvicorn
 import requests
+import uvicorn
+import traceback
 import json
 import os
-import traceback
 
 app = FastAPI()
 
@@ -88,7 +98,7 @@ USERS_FILE = "users.json"
 CHATS_FILE = "chats.json"
 
 # =========================================================
-# LOAD / SAVE
+# LOAD JSON
 # =========================================================
 
 def load_json(path, default):
@@ -125,7 +135,7 @@ OWNER_PASSWORD = "alvindev17.og"
 OWNER_USERNAME = "aTg"
 
 # =========================================================
-# AI MODELS
+# MODELS
 # =========================================================
 
 AI_MODELS = [
@@ -432,7 +442,7 @@ def groq_chat(model, messages):
             "model":model,
             "messages":messages,
             "temperature":0.5,
-            "max_tokens":120
+            "max_tokens":140
         },
         timeout=12
     )
@@ -456,7 +466,7 @@ def openrouter_chat(model, messages):
             "model":model,
             "messages":messages,
             "temperature":0.5,
-            "max_tokens":120
+            "max_tokens":140
         },
         timeout=12
     )
@@ -597,26 +607,38 @@ def chat(data: ChatRequest):
 
 You are Bloxy-bot AI.
 
-RULES:
+STRICT RULES:
 
-- NEVER act like a dictionary
-- NEVER overexplain
-- Talk naturally
-- Be fast
-- Be conversational
-- Sports answers should feel live
-- NEVER say you cannot access live data
-- Use emojis in every conversation
-- Be polite
-- Be punctual
-- Have correct spelling of words
-- Avoid hallucinations
-- Do not define every word unless asked to
-- Study the user's behaviour
-- Give auto-suggestion of words when the user is chatting in the chatbox
-- Be smart 
-- Know every single concept of every topoic/theme in the world
-- Know all information in the past and current information
+1. NEVER act like a dictionary
+2. NEVER define every word
+3. NEVER repeat greetings
+4. NEVER always start with "Hey there"
+5. ALWAYS sound modern
+6. ALWAYS sound natural
+7. ALWAYS sound conversational
+8. ALWAYS answer directly
+9. KEEP responses fast
+10. NEVER overexplain
+11. NEVER sound robotic
+12. Sports answers should feel live
+13. NEVER say you cannot access live data
+14. NEVER give boring textbook responses
+15. ALWAYS prioritize usefulness
+16. NEVER spam emojis
+17. NEVER repeat prompts
+18. ALWAYS answer confidently
+19. NEVER sound overly formal
+20. ALWAYS keep responses smooth
+21. NEVER explain obvious things
+22. ALWAYS use context naturally
+23. NEVER sound like customer support
+24. NEVER hallucinate fake scores
+25. ALWAYS prioritize latest info
+26. ALWAYS keep sports updated
+27. ALWAYS feel premium
+28. NEVER break character
+29. ALWAYS feel intelligent
+30. ALWAYS keep answers concise
 
 Context:
 
@@ -644,6 +666,12 @@ Context:
     })
 
     reply = ask_ai(messages)
+
+    reply = reply.replace("Hey there!","")
+
+    reply = reply.replace("Hi there!","")
+
+    reply = reply.replace("Hello!","")
 
     history.append({
 
@@ -691,6 +719,11 @@ content="width=device-width, initial-scale=1.0">
 
 <style>
 
+*{
+box-sizing:border-box;
+-webkit-tap-highlight-color:transparent;
+}
+
 body{
 margin:0;
 background:#0d0d0d;
@@ -705,7 +738,7 @@ height:100vh;
 }
 
 .sidebar{
-width:280px;
+width:290px;
 background:#111;
 border-right:1px solid #222;
 display:flex;
@@ -744,6 +777,11 @@ display:flex;
 justify-content:space-between;
 align-items:center;
 cursor:pointer;
+transition:.2s;
+}
+
+.chatitem:hover{
+transform:scale(1.02);
 }
 
 .main{
@@ -766,6 +804,7 @@ border-radius:18px;
 margin-bottom:18px;
 white-space:pre-wrap;
 animation:fadeUp .25s ease;
+line-height:1.7;
 }
 
 .user{
@@ -820,13 +859,15 @@ background:orange;
 color:white;
 font-size:20px;
 cursor:pointer;
+font-weight:bold;
 }
 
 .helper{
 text-align:center;
-opacity:.4;
+opacity:.45;
 font-size:12px;
 margin-top:10px;
+line-height:1.6;
 }
 
 .typing{
@@ -871,10 +912,80 @@ justify-content:space-between;
 align-items:center;
 }
 
-.badge svg{
+.badgeWrap{
+position:relative;
+display:flex;
+align-items:center;
+}
+
+.badgeWrap svg{
 width:18px;
 height:18px;
-filter:drop-shadow(0 0 5px orange);
+filter:drop-shadow(0 0 6px orange);
+cursor:pointer;
+}
+
+.badgeTooltip{
+position:absolute;
+bottom:28px;
+left:-30px;
+width:240px;
+background:#1a1a1a;
+padding:10px;
+border-radius:12px;
+font-size:11px;
+opacity:0;
+pointer-events:none;
+transition:.2s;
+border:1px solid #333;
+line-height:1.5;
+z-index:999;
+}
+
+.badgeWrap:hover .badgeTooltip{
+opacity:1;
+}
+
+.auth{
+position:fixed;
+top:0;
+left:0;
+right:0;
+bottom:0;
+background:#000000dd;
+display:flex;
+justify-content:center;
+align-items:center;
+z-index:999;
+}
+
+.authbox{
+width:360px;
+background:#171717;
+padding:30px;
+border-radius:24px;
+}
+
+.authinput{
+width:100%;
+padding:16px;
+border:none;
+outline:none;
+border-radius:16px;
+background:#222;
+color:white;
+margin-top:12px;
+}
+
+.authbtn{
+width:100%;
+padding:16px;
+border:none;
+border-radius:16px;
+background:#00ff88;
+font-weight:bold;
+cursor:pointer;
+margin-top:12px;
 }
 
 </style>
@@ -882,6 +993,45 @@ filter:drop-shadow(0 0 5px orange);
 </head>
 
 <body>
+
+<div class="auth"
+id="auth">
+
+<div class="authbox">
+
+<h2>Bloxy-bot</h2>
+
+<input id="username"
+class="authinput"
+placeholder="Username">
+
+<input id="email"
+class="authinput"
+placeholder="Email">
+
+<input id="password"
+type="password"
+class="authinput"
+placeholder="Password">
+
+<button class="authbtn"
+onclick="signup()">
+Signup
+</button>
+
+<button class="authbtn"
+onclick="login()">
+Login
+</button>
+
+<button class="authbtn"
+onclick="guestMode()">
+Continue as Guest
+</button>
+
+</div>
+
+</div>
 
 <div class="container">
 
@@ -912,7 +1062,13 @@ gap:6px;
 aTg
 </span>
 
-<span class="badge">
+<div class="badgeWrap">
+
+<div class="badgeTooltip">
+
+This badge symbolizes the rightful owner of the platform or an admin contributor towards the platform.
+
+</div>
 
 <svg viewBox="0 0 24 24">
 
@@ -922,19 +1078,19 @@ fill="#ff8800"
 d="
 M12 1
 L15 4
-L20 4
-L20 9
+L19 3
+L20 7
 L23 12
-L20 15
-L20 20
+L20 17
+L19 21
 L15 20
 L12 23
 L9 20
-L4 20
-L4 15
+L5 21
+L4 17
 L1 12
-L4 9
-L4 4
+L4 7
+L5 3
 L9 4
 Z"/>
 
@@ -952,7 +1108,7 @@ Z"/>
 
 </svg>
 
-</span>
+</div>
 
 </div>
 
@@ -989,7 +1145,9 @@ onclick="send()">
 </div>
 
 <div class="helper">
-Bloxy-bot can make mistakes.
+
+Bloxy-bot can make mistakes. Responses may include live web, sports, finance, AI-generated or news information. Verify highly important information independently.
+
 </div>
 
 </div>
@@ -999,6 +1157,16 @@ Bloxy-bot can make mistakes.
 </div>
 
 <script>
+
+let currentUser = {
+
+email:"guest",
+
+username:"Guest",
+
+verified:false
+
+};
 
 let chats = {
 
@@ -1011,6 +1179,62 @@ pinned:false
 
 let currentChat = "Main";
 
+function verifiedBadge(){
+
+return `
+
+<div class="badgeWrap">
+
+<div class="badgeTooltip">
+
+This badge symbolizes the rightful owner of the platform or an admin contributor towards the platform.
+
+</div>
+
+<svg viewBox="0 0 24 24">
+
+<path
+fill="#ff8800"
+
+d="
+M12 1
+L15 4
+L19 3
+L20 7
+L23 12
+L20 17
+L19 21
+L15 20
+L12 23
+L9 20
+L5 21
+L4 17
+L1 12
+L4 7
+L5 3
+L9 4
+Z"/>
+
+<path
+fill="white"
+
+d="
+M10 15
+L7 12
+L8.5 10.5
+L10 12
+L15.5 6.5
+L17 8
+Z"/>
+
+</svg>
+
+</div>
+
+`;
+
+}
+
 function renderChats(){
 
 let box =
@@ -1020,7 +1244,17 @@ document.getElementById(
 
 box.innerHTML = "";
 
-for(let c in chats){
+let keys =
+Object.keys(chats);
+
+keys.sort((a,b)=>{
+
+return chats[b].pinned -
+chats[a].pinned;
+
+});
+
+for(let c of keys){
 
 let d =
 document.createElement("div");
@@ -1030,13 +1264,24 @@ d.className = "chatitem";
 d.innerHTML = `
 
 <div>
+
+${chats[c].pinned ? "📌 " : ""}
+
 ${c}
+
 </div>
 
 <div style="
 display:flex;
 gap:10px;
 ">
+
+<span onclick="
+event.stopPropagation();
+pinChat('${c}')
+">
+📌
+</span>
 
 <span onclick="
 event.stopPropagation();
@@ -1070,6 +1315,15 @@ box.appendChild(d);
 
 }
 
+function pinChat(c){
+
+chats[c].pinned =
+!chats[c].pinned;
+
+renderChats();
+
+}
+
 function newChat(){
 
 let n = prompt("Chat name");
@@ -1077,7 +1331,8 @@ let n = prompt("Chat name");
 if(!n) return;
 
 chats[n] = {
-messages:[]
+messages:[],
+pinned:false
 };
 
 currentChat = n;
@@ -1178,13 +1433,26 @@ Bloxy-bot is typing...
 d.innerHTML = `
 
 <div style="
+display:flex;
+align-items:center;
+gap:6px;
 font-weight:bold;
 margin-bottom:8px;
 ">
 
 ${m.role==="assistant"
+
 ? "Bloxy-bot"
-: "aTg"}
+
+: `
+
+aTg
+
+${verifiedBadge()}
+
+`
+
+}
 
 </div>
 
@@ -1205,9 +1473,128 @@ box.scrollHeight;
 
 }
 
+function signup(){
+
+fetch("/signup",{
+
+method:"POST",
+
+headers:{
+"Content-Type":
+"application/json"
+},
+
+body:JSON.stringify({
+
+username:username.value,
+
+email:email.value,
+
+password:password.value
+
+})
+
+})
+.then(r=>r.json())
+.then(d=>{
+
+if(!d.ok){
+
+alert("Signup failed");
+
+return;
+
+}
+
+alert("Signup successful");
+
+});
+
+}
+
+function login(){
+
+fetch("/login",{
+
+method:"POST",
+
+headers:{
+"Content-Type":
+"application/json"
+},
+
+body:JSON.stringify({
+
+email:email.value,
+
+password:password.value
+
+})
+
+})
+.then(r=>r.json())
+.then(d=>{
+
+if(!d.ok){
+
+alert("Login failed");
+
+return;
+
+}
+
+currentUser = {
+
+email:d.email,
+
+username:d.username,
+
+verified:d.verified
+
+};
+
+localStorage.setItem(
+"bloxyUser",
+JSON.stringify(currentUser)
+);
+
+document.getElementById(
+"auth"
+).style.display = "none";
+
+render();
+
+});
+
+}
+
+function guestMode(){
+
+currentUser = {
+
+email:"guest",
+
+username:"Guest",
+
+verified:false
+
+};
+
+document.getElementById(
+"auth"
+).style.display = "none";
+
+render();
+
+}
+
 function logout(){
 
-location.reload();
+localStorage.clear();
+
+sessionStorage.clear();
+
+location.href="/";
 
 }
 
@@ -1247,6 +1634,8 @@ fetch("/chat",{
 
 method:"POST",
 
+keepalive:true,
+
 headers:{
 "Content-Type":
 "application/json"
@@ -1254,7 +1643,7 @@ headers:{
 
 body:JSON.stringify({
 
-email:"guest",
+email:currentUser.email,
 
 chat_id:currentChat,
 
@@ -1279,6 +1668,22 @@ content:d.reply
 render();
 
 });
+
+}
+
+let saved =
+localStorage.getItem(
+"bloxyUser"
+);
+
+if(saved){
+
+currentUser =
+JSON.parse(saved);
+
+document.getElementById(
+"auth"
+).style.display = "none";
 
 }
 
