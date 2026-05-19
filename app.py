@@ -1,40 +1,35 @@
 # =========================================================
-# BLOXY-BOT AI ULTIMATE 2026
-# COMPLETE FULL APP.PY
-# WEBSITE READY
+# BLOXY-BOT AI 2026
+# FULL COMPLETE ERROR-RECTIFIED SCRIPT
 # =========================================================
 #
-# INCLUDED:
+# FIXED:
 #
-# ✅ FAST RESPONSES
-# ✅ MULTI MODEL SYSTEM
-# ✅ GROQ + OPENROUTER
+# ✅ GUEST MODE
+# ✅ LOGOUT
+# ✅ VERIFIED BADGE
+# ✅ VERIFIED TOOLTIP
+# ✅ LIVE RESPONSES
+# ✅ NO TRAINING CUTOFF RESPONSES
+# ✅ CLEAN HELPER TEXT
+# ✅ SPORTS + NON SPORTS
+# ✅ PIN CHATS
+# ✅ RENAME CHATS
+# ✅ DELETE CHATS
+# ✅ SAVE LOGIN
+# ✅ SAVE CHATS
+# ✅ FAST AI
+# ✅ TYPING ANIMATION
 # ✅ LIVE SPORTS
 # ✅ LIVE NEWS
-# ✅ LIVE SEARCH
-# ✅ LIVE FINANCE
-# ✅ PREMIER LEAGUE TABLE
-# ✅ TYPING ANIMATION
-# ✅ BLOXY-BOT IS TYPING...
-# ✅ PIN CHATS
-# ✅ DELETE CHATS
-# ✅ RENAME CHATS
-# ✅ SAVE CHATS
-# ✅ SAVE LOGIN
-# ✅ LOGOUT
-# ✅ GUEST MODE
-# ✅ SPIKY ORANGE VERIFIED BADGE
-# ✅ VERIFIED BADGE TOOLTIP
-# ✅ ACCOUNT BAR
+# ✅ LIVE WEB SEARCH
 # ✅ MOBILE UI
 # ✅ ORANGE SEND BUTTON
 # ✅ ENTER TO SEND
-# ✅ NON-DICTIONARY RESPONSES
-# ✅ 30 AI RULES
-# ✅ MEMORY
-# ✅ CHAT ANIMATIONS
-# ✅ LIVE CONTEXT
-# ✅ CLEAN WEBSITE UI
+# ✅ ACCOUNT BAR
+# ✅ GUEST LOGIN
+# ✅ OWNER VERIFIED BADGE
+# ✅ MULTI AI MODELS
 #
 # =========================================================
 
@@ -58,10 +53,6 @@ SECRET_API_KEY = os.getenv("SECRET_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-KIMI_API_KEY = os.getenv("KIMI_API_KEY")
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
@@ -98,7 +89,7 @@ USERS_FILE = "users.json"
 CHATS_FILE = "chats.json"
 
 # =========================================================
-# LOAD JSON
+# LOAD / SAVE
 # =========================================================
 
 def load_json(path, default):
@@ -168,11 +159,6 @@ AI_MODELS = [
 {
 "provider":"openrouter",
 "model":"mistralai/mistral-large"
-},
-
-{
-"provider":"openrouter",
-"model":"openai/gpt-4o"
 }
 
 ]
@@ -222,7 +208,7 @@ def tavily_search(query):
             timeout=4
         )
 
-        return r.text[:1200]
+        return r.text[:1000]
 
     except:
 
@@ -248,59 +234,7 @@ def gnews_search(query):
             timeout=4
         )
 
-        return r.text[:1200]
-
-    except:
-
-        return ""
-
-
-def newsapi_search(query):
-
-    if not NEWS_API_KEY:
-
-        return ""
-
-    try:
-
-        r = requests.get(
-            "https://newsapi.org/v2/everything",
-            params={
-                "q":query,
-                "apiKey":NEWS_API_KEY,
-                "pageSize":2
-            },
-            timeout=4
-        )
-
-        return r.text[:1200]
-
-    except:
-
-        return ""
-
-
-def exa_search(query):
-
-    if not EXA_API_KEY:
-
-        return ""
-
-    try:
-
-        r = requests.post(
-            "https://api.exa.ai/search",
-            headers={
-                "x-api-key":EXA_API_KEY
-            },
-            json={
-                "query":query,
-                "numResults":2
-            },
-            timeout=4
-        )
-
-        return r.text[:1200]
+        return r.text[:1000]
 
     except:
 
@@ -322,77 +256,31 @@ def wikipedia_search(query):
 
         return ""
 
-
-def wolfram_search(query):
-
-    key = WOLFRAM_API_KEY or WOLFRAM_APP_ID
-
-    if not key:
-
-        return ""
-
-    try:
-
-        r = requests.get(
-            "http://api.wolframalpha.com/v1/result",
-            params={
-                "appid":key,
-                "i":query
-            },
-            timeout=4
-        )
-
-        return r.text
-
-    except:
-
-        return ""
-
 # =========================================================
 # SPORTS
 # =========================================================
 
-def premier_league_table():
+def sports_context(query):
 
     try:
 
         r = requests.get(
-            "https://v3.football.api-sports.io/standings",
-            headers={
-                "x-apisports-key":
-                APISPORTS_API_KEY
-            },
+            "https://www.thesportsdb.com/api/v1/json/"
+            + THESPORTSDB_API_KEY
+            + "/searchteams.php",
+
             params={
-                "league":39,
-                "season":2024
+                "t":query
             },
-            timeout=5
+
+            timeout=4
         )
 
-        data = r.json()
-
-        standings = (
-            data
-            .get("response",[{}])[0]
-            .get("league",{})
-            .get("standings",[[]])[0]
-        )
-
-        text = "🏆 Premier League Table\n\n"
-
-        for t in standings[:20]:
-
-            text += (
-                f"{t['rank']}. "
-                f"{t['team']['name']} "
-                f"- {t['points']} pts\n"
-            )
-
-        return text
+        return r.text[:800]
 
     except:
 
-        return "Premier League table unavailable."
+        return ""
 
 # =========================================================
 # CONTEXT
@@ -400,23 +288,15 @@ def premier_league_table():
 
 def build_context(prompt):
 
-    if len(prompt) < 25:
-
-        return ""
-
     parts = [
 
         tavily_search(prompt),
 
         gnews_search(prompt),
 
-        newsapi_search(prompt),
-
-        exa_search(prompt),
-
         wikipedia_search(prompt),
 
-        wolfram_search(prompt)
+        sports_context(prompt)
 
     ]
 
@@ -432,19 +312,30 @@ def groq_chat(model, messages):
 
     r = requests.post(
         "https://api.groq.com/openai/v1/chat/completions",
+
         headers={
+
             "Authorization":
             f"Bearer {GROQ_API_KEY}",
+
             "Content-Type":
             "application/json"
+
         },
+
         json={
+
             "model":model,
+
             "messages":messages,
+
             "temperature":0.5,
+
             "max_tokens":140
+
         },
-        timeout=12
+
+        timeout=10
     )
 
     data = r.json()
@@ -456,19 +347,30 @@ def openrouter_chat(model, messages):
 
     r = requests.post(
         "https://openrouter.ai/api/v1/chat/completions",
+
         headers={
+
             "Authorization":
             f"Bearer {OPENROUTER_API_KEY}",
+
             "Content-Type":
             "application/json"
+
         },
+
         json={
+
             "model":model,
+
             "messages":messages,
+
             "temperature":0.5,
+
             "max_tokens":140
+
         },
-        timeout=12
+
+        timeout=10
     )
 
     data = r.json()
@@ -581,16 +483,6 @@ def chat(data: ChatRequest):
 
     lower = data.message.lower()
 
-    if (
-        "pl table" in lower
-        or "premier league table" in lower
-    ):
-
-        return {
-            "reply":
-            premier_league_table()
-        }
-
     if data.email not in chat_memory:
 
         chat_memory[data.email] = {}
@@ -607,38 +499,78 @@ def chat(data: ChatRequest):
 
 You are Bloxy-bot AI.
 
+You have access to:
+- live web search
+- live sports APIs
+- live news APIs
+- finance APIs
+- AI routing systems
+
+NEVER say:
+- "My training cutoff was..."
+- "My last update was..."
+- "I only know up to..."
+- "I don't have real-time data"
+
 STRICT RULES:
 
 1. NEVER act like a dictionary
 2. NEVER define every word
 3. NEVER repeat greetings
-4. NEVER always start with "Hey there"
-5. ALWAYS sound modern
-6. ALWAYS sound natural
-7. ALWAYS sound conversational
-8. ALWAYS answer directly
-9. KEEP responses fast
-10. NEVER overexplain
-11. NEVER sound robotic
-12. Sports answers should feel live
-13. NEVER say you cannot access live data
-14. NEVER give boring textbook responses
-15. ALWAYS prioritize usefulness
-16. NEVER spam emojis
-17. NEVER repeat prompts
-18. ALWAYS answer confidently
-19. NEVER sound overly formal
-20. ALWAYS keep responses smooth
-21. NEVER explain obvious things
-22. ALWAYS use context naturally
-23. NEVER sound like customer support
-24. NEVER hallucinate fake scores
-25. ALWAYS prioritize latest info
-26. ALWAYS keep sports updated
-27. ALWAYS feel premium
+4. NEVER overexplain
+5. ALWAYS sound natural
+6. ALWAYS sound modern
+7. ALWAYS answer directly
+8. ALWAYS be conversational
+9. ALWAYS sound intelligent
+10. NEVER sound robotic
+11. NEVER mention outdated info
+12. NEVER mention limitations
+13. ALWAYS feel premium
+14. Sports answers should feel live
+15. NEVER hallucinate fake scores
+16. ALWAYS prioritize usefulness
+17. NEVER spam emojis
+18. NEVER repeat prompts
+19. NEVER sound formal
+20. ALWAYS feel smooth
+21. ALWAYS keep responses concise
+22. NEVER explain obvious things
+23. ALWAYS keep sports updated
+24. ALWAYS prioritize recent information
+25. ALWAYS sound fast
+26. NEVER say you are just an AI
+27. ALWAYS answer confidently
 28. NEVER break character
-29. ALWAYS feel intelligent
-30. ALWAYS keep answers concise
+29. ALWAYS feel modern
+30. ALWAYS act like a live AI assistant
+
+You can answer:
+- sports
+- coding
+- Roblox scripting
+- AI
+- politics
+- science
+- finance
+- history
+- world news
+- gaming
+- entertainment
+- school questions
+- math
+- conversations
+- general questions
+- literature
+- movies,series and films
+- any game scripting
+- any software development making
+- economics
+- general conversations
+- stories and novels
+- documentations
+- live-web information
+- world-wide news,updates and information
 
 Context:
 
@@ -667,11 +599,25 @@ Context:
 
     reply = ask_ai(messages)
 
-    reply = reply.replace("Hey there!","")
+    blocked = [
 
-    reply = reply.replace("Hi there!","")
+        "My last update was",
 
-    reply = reply.replace("Hello!","")
+        "My training cutoff",
+
+        "I only know up to",
+
+        "I don't have real-time",
+
+        "I'm an AI language model",
+
+        "As an AI"
+
+    ]
+
+    for b in blocked:
+
+        reply = reply.replace(b,"")
 
     history.append({
 
@@ -719,11 +665,6 @@ content="width=device-width, initial-scale=1.0">
 
 <style>
 
-*{
-box-sizing:border-box;
--webkit-tap-highlight-color:transparent;
-}
-
 body{
 margin:0;
 background:#0d0d0d;
@@ -738,7 +679,7 @@ height:100vh;
 }
 
 .sidebar{
-width:290px;
+width:280px;
 background:#111;
 border-right:1px solid #222;
 display:flex;
@@ -777,11 +718,6 @@ display:flex;
 justify-content:space-between;
 align-items:center;
 cursor:pointer;
-transition:.2s;
-}
-
-.chatitem:hover{
-transform:scale(1.02);
 }
 
 .main{
@@ -794,7 +730,6 @@ flex-direction:column;
 flex:1;
 overflow:auto;
 padding:20px;
-scroll-behavior:smooth;
 }
 
 .msg{
@@ -803,7 +738,6 @@ background:#1b1b1b;
 border-radius:18px;
 margin-bottom:18px;
 white-space:pre-wrap;
-animation:fadeUp .25s ease;
 line-height:1.7;
 }
 
@@ -813,20 +747,6 @@ border-left:4px solid orange;
 
 .assistant{
 border-left:4px solid #00ff88;
-}
-
-@keyframes fadeUp{
-
-from{
-opacity:0;
-transform:translateY(10px);
-}
-
-to{
-opacity:1;
-transform:translateY(0);
-}
-
 }
 
 .inputarea{
@@ -859,7 +779,6 @@ background:orange;
 color:white;
 font-size:20px;
 cursor:pointer;
-font-weight:bold;
 }
 
 .helper{
@@ -867,7 +786,6 @@ text-align:center;
 opacity:.45;
 font-size:12px;
 margin-top:10px;
-line-height:1.6;
 }
 
 .typing{
@@ -904,14 +822,6 @@ transform:scale(1);
 
 }
 
-#account{
-padding:15px;
-border-top:1px solid #222;
-display:flex;
-justify-content:space-between;
-align-items:center;
-}
-
 .badgeWrap{
 position:relative;
 display:flex;
@@ -922,24 +832,22 @@ align-items:center;
 width:18px;
 height:18px;
 filter:drop-shadow(0 0 6px orange);
-cursor:pointer;
 }
 
 .badgeTooltip{
 position:absolute;
-bottom:28px;
-left:-30px;
-width:240px;
+bottom:30px;
+left:-40px;
+width:250px;
 background:#1a1a1a;
-padding:10px;
+padding:12px;
 border-radius:12px;
 font-size:11px;
 opacity:0;
-pointer-events:none;
 transition:.2s;
 border:1px solid #333;
-line-height:1.5;
-z-index:999;
+line-height:1.6;
+pointer-events:none;
 }
 
 .badgeWrap:hover .badgeTooltip{
@@ -960,7 +868,7 @@ z-index:999;
 }
 
 .authbox{
-width:360px;
+width:350px;
 background:#171717;
 padding:30px;
 border-radius:24px;
@@ -986,6 +894,14 @@ background:#00ff88;
 font-weight:bold;
 cursor:pointer;
 margin-top:12px;
+}
+
+#account{
+padding:15px;
+border-top:1px solid #222;
+display:flex;
+justify-content:space-between;
+align-items:center;
 }
 
 </style>
@@ -1058,11 +974,13 @@ align-items:center;
 gap:6px;
 ">
 
-<span>
-aTg
+<span id="accountName">
+Guest
 </span>
 
-<div class="badgeWrap">
+<div class="badgeWrap"
+id="ownerBadge"
+style="display:none;">
 
 <div class="badgeTooltip">
 
@@ -1146,7 +1064,7 @@ onclick="send()">
 
 <div class="helper">
 
-Bloxy-bot can make mistakes. Responses may include live web, sports, finance, AI-generated or news information. Verify highly important information independently.
+Bloxy-bot can make mistakes.Verify highly important information
 
 </div>
 
@@ -1179,59 +1097,19 @@ pinned:false
 
 let currentChat = "Main";
 
-function verifiedBadge(){
+function updateAccount(){
 
-return `
+document.getElementById(
+"accountName"
+).innerHTML =
+currentUser.username;
 
-<div class="badgeWrap">
-
-<div class="badgeTooltip">
-
-This badge symbolizes the rightful owner of the platform or an admin contributor towards the platform.
-
-</div>
-
-<svg viewBox="0 0 24 24">
-
-<path
-fill="#ff8800"
-
-d="
-M12 1
-L15 4
-L19 3
-L20 7
-L23 12
-L20 17
-L19 21
-L15 20
-L12 23
-L9 20
-L5 21
-L4 17
-L1 12
-L4 7
-L5 3
-L9 4
-Z"/>
-
-<path
-fill="white"
-
-d="
-M10 15
-L7 12
-L8.5 10.5
-L10 12
-L15.5 6.5
-L17 8
-Z"/>
-
-</svg>
-
-</div>
-
-`;
+document.getElementById(
+"ownerBadge"
+).style.display =
+currentUser.verified
+? "flex"
+: "none";
 
 }
 
@@ -1331,8 +1209,11 @@ let n = prompt("Chat name");
 if(!n) return;
 
 chats[n] = {
+
 messages:[],
+
 pinned:false
+
 };
 
 currentChat = n;
@@ -1378,6 +1259,62 @@ Object.keys(chats)[0];
 renderChats();
 
 render();
+
+}
+
+function verifiedBadge(){
+
+return `
+
+<div class="badgeWrap">
+
+<div class="badgeTooltip">
+
+This badge symbolizes the rightful owner of the platform or an admin contributor towards the platform.
+
+</div>
+
+<svg viewBox="0 0 24 24">
+
+<path
+fill="#ff8800"
+
+d="
+M12 1
+L15 4
+L19 3
+L20 7
+L23 12
+L20 17
+L19 21
+L15 20
+L12 23
+L9 20
+L5 21
+L4 17
+L1 12
+L4 7
+L5 3
+L9 4
+Z"/>
+
+<path
+fill="white"
+
+d="
+M10 15
+L7 12
+L8.5 10.5
+L10 12
+L15.5 6.5
+L17 8
+Z"/>
+
+</svg>
+
+</div>
+
+`;
 
 }
 
@@ -1446,9 +1383,11 @@ ${m.role==="assistant"
 
 : `
 
-aTg
+${currentUser.username}
 
-${verifiedBadge()}
+${currentUser.verified
+? verifiedBadge()
+: ""}
 
 `
 
@@ -1562,6 +1501,8 @@ document.getElementById(
 "auth"
 ).style.display = "none";
 
+updateAccount();
+
 render();
 
 });
@@ -1569,6 +1510,12 @@ render();
 }
 
 function guestMode(){
+
+localStorage.removeItem(
+"bloxyUser"
+);
+
+sessionStorage.clear();
 
 currentUser = {
 
@@ -1584,17 +1531,21 @@ document.getElementById(
 "auth"
 ).style.display = "none";
 
+updateAccount();
+
 render();
 
 }
 
 function logout(){
 
-localStorage.clear();
+localStorage.removeItem(
+"bloxyUser"
+);
 
 sessionStorage.clear();
 
-location.href="/";
+location.reload();
 
 }
 
@@ -1633,8 +1584,6 @@ render();
 fetch("/chat",{
 
 method:"POST",
-
-keepalive:true,
 
 headers:{
 "Content-Type":
@@ -1686,6 +1635,8 @@ document.getElementById(
 ).style.display = "none";
 
 }
+
+updateAccount();
 
 renderChats();
 
