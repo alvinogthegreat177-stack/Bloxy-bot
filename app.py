@@ -366,7 +366,7 @@ def openrouter_chat(model, messages):
 
             "temperature":0.5,
 
-            "max_tokens":140
+            "max_tokens":2500
 
         },
 
@@ -556,6 +556,9 @@ STRICT RULES:
 38. REMAIN on the topic or the concept that the user is talking about
 39. USE numbers or bullets when listing
 40. Avoid long and disorganised paragraphed unless it is requested by the user
+41. KNOW the latest 2026 informtion
+42. KNOW the history of everything and the latest information
+43. DO not give broken responses
 
 You can answer:
 - sports
