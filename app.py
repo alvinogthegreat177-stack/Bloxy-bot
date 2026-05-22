@@ -3,10 +3,10 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import uvicorn
 import requests
-import json
 import os
+import json
+import uuid
 import traceback
-import time
 
 app = FastAPI()
 
@@ -33,13 +33,36 @@ FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY", "")
 SECRET_API_KEY = os.getenv("SECRET_API_KEY", "")
 
 # =========================================================
-# STORAGE
+# DATABASE FILES
 # =========================================================
 
-CHATS = {}
+USERS_FILE = "users.json"
+MEMORY_FILE = "memory.json"
 
 # =========================================================
-# 5 AI MODELS
+# LOAD / SAVE
+# =========================================================
+
+def load_json(path, default):
+
+    try:
+
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    except:
+        return default
+
+def save_json(path, data):
+
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+USERS = load_json(USERS_FILE, {})
+MEMORY = load_json(MEMORY_FILE, {})
+
+# =========================================================
+# AI MODELS
 # =========================================================
 
 AI_MODELS = [
@@ -72,19 +95,28 @@ AI_MODELS = [
 ]
 
 # =========================================================
-# REQUEST MODEL
+# REQUESTS
 # =========================================================
 
 class ChatRequest(BaseModel):
     email: str
-    message: str
     chat_id: str
+    message: str
+
+class RegisterRequest(BaseModel):
+    email: str
+    username: str
+    password: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 # =========================================================
-# LIVE SPORTS CONTEXT
+# LIVE CONTEXT
 # =========================================================
 
-def get_sports_context(query):
+def sports_context(query):
 
     try:
 
@@ -96,46 +128,14 @@ def get_sports_context(query):
                 timeout=3
             )
 
-            return r.text[:1000]
+            return r.text[:900]
 
     except:
         pass
 
     return ""
 
-# =========================================================
-# NEWS CONTEXT
-# =========================================================
-
-def get_news_context(query):
-
-    try:
-
-        if GNEWS_API_KEY:
-
-            r = requests.get(
-                "https://gnews.io/api/v4/search",
-                params={
-                    "q": query,
-                    "token": GNEWS_API_KEY,
-                    "lang": "en",
-                    "max": 3
-                },
-                timeout=3
-            )
-
-            return r.text[:1200]
-
-    except:
-        pass
-
-    return ""
-
-# =========================================================
-# WIKIPEDIA CONTEXT
-# =========================================================
-
-def get_wiki_context(query):
+def wiki_context(query):
 
     try:
 
@@ -144,16 +144,10 @@ def get_wiki_context(query):
             timeout=3
         )
 
-        return r.text[:1000]
+        return r.text[:900]
 
     except:
-        pass
-
-    return ""
-
-# =========================================================
-# BUILD CONTEXT
-# =========================================================
+        return ""
 
 def build_context(prompt):
 
@@ -172,33 +166,20 @@ def build_context(prompt):
         "cricket",
         "f1",
         "formula 1",
-        "horse racing",
-        "nfl",
-        "rugby"
+        "horse racing"
     ]
 
-    news_words = [
-        "news",
-        "war",
-        "government",
-        "politics",
-        "breaking"
-    ]
-
-    context = []
+    parts = []
 
     if any(x in lower for x in sports_words):
-        context.append(get_sports_context(prompt))
+        parts.append(sports_context(prompt))
 
-    if any(x in lower for x in news_words):
-        context.append(get_news_context(prompt))
+    parts.append(wiki_context(prompt))
 
-    context.append(get_wiki_context(prompt))
-
-    return "\n\n".join(context)
+    return "\n\n".join(parts)
 
 # =========================================================
-# GROQ
+# AI
 # =========================================================
 
 def groq_chat(model, messages):
@@ -213,18 +194,14 @@ def groq_chat(model, messages):
             "model": model,
             "messages": messages,
             "temperature": 0.4,
-            "max_tokens": 250
+            "max_tokens": 260
         },
-        timeout=12
+        timeout=15
     )
 
     data = r.json()
 
     return data["choices"][0]["message"]["content"]
-
-# =========================================================
-# OPENROUTER
-# =========================================================
 
 def openrouter_chat(model, messages):
 
@@ -238,18 +215,14 @@ def openrouter_chat(model, messages):
             "model": model,
             "messages": messages,
             "temperature": 0.4,
-            "max_tokens": 250
+            "max_tokens": 260
         },
-        timeout=12
+        timeout=15
     )
 
     data = r.json()
 
     return data["choices"][0]["message"]["content"]
-
-# =========================================================
-# ASK AI
-# =========================================================
 
 def ask_ai(messages):
 
@@ -270,19 +243,91 @@ def ask_ai(messages):
     return "Bloxy-bot is overloaded right now."
 
 # =========================================================
-# CHAT ENDPOINT
+# REGISTER
+# =========================================================
+
+@app.post("/register")
+def register(data: RegisterRequest):
+
+    email = data.email.strip().lower()
+    username = data.username.strip()
+    password = data.password.strip()
+
+    if ".gmail.com" not in email and ".outlook.com" not in email:
+        return {"success": False, "message": "Use a valid email"}
+
+    if len(password) < 6:
+        return {"success": False, "message": "Password must be 6+ characters"}
+
+    if email in USERS:
+        return {"success": False, "message": "Account already exists"}
+
+    USERS[email] = {
+        "username": username,
+        "password": password,
+        "verified": username.lower() == "atg",
+        "memory": {},
+        "conversations": {}
+    }
+
+    save_json(USERS_FILE, USERS)
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# LOGIN
+# =========================================================
+
+@app.post("/login")
+def login(data: LoginRequest):
+
+    email = data.email.strip().lower()
+
+    if email not in USERS:
+        return {
+            "success": False,
+            "message": "Account not found"
+        }
+
+    if USERS[email]["password"] != data.password:
+        return {
+            "success": False,
+            "message": "Wrong password"
+        }
+
+    return {
+        "success": True,
+        "username": USERS[email]["username"],
+        "verified": USERS[email]["verified"]
+    }
+
+# =========================================================
+# CHAT
 # =========================================================
 
 @app.post("/chat")
 def chat(data: ChatRequest):
 
-    if data.email not in CHATS:
-        CHATS[data.email] = {}
+    email = data.email
 
-    if data.chat_id not in CHATS[data.email]:
-        CHATS[data.email][data.chat_id] = []
+    if email == "guest":
 
-    history = CHATS[data.email][data.chat_id]
+        if "guest" not in MEMORY:
+            MEMORY["guest"] = {}
+
+        if data.chat_id not in MEMORY["guest"]:
+            MEMORY["guest"][data.chat_id] = []
+
+        history = MEMORY["guest"][data.chat_id]
+
+    else:
+
+        if data.chat_id not in USERS[email]["conversations"]:
+            USERS[email]["conversations"][data.chat_id] = []
+
+        history = USERS[email]["conversations"][data.chat_id]
 
     context = build_context(data.message)
 
@@ -296,66 +341,60 @@ RULES:
 2. Never say outdated
 3. Never say As an AI
 4. Never sound robotic
-5. Never define words like a dictionary
+5. Never define like a dictionary
 6. Always sound modern
 7. Always sound premium
-8. Always sound natural
-9. Always answer directly
-10. Always answer beautifully
-11. Always answer cleanly
-12. Always support live information
-13. Always support sports
-14. Always support football
-15. Always support NBA
-16. Always support UFC
-17. Always support F1
-18. Always support cricket
-19. Always support rugby
-20. Always support NFL
-21. Always support horse racing
+8. Always sound intelligent
+9. Always answer naturally
+10. Always support sports
+11. Always support live events
+12. Always support recent events
+13. Always support football
+14. Always support NBA
+15. Always support UFC
+16. Always support F1
+17. Always support cricket
+18. Always support gaming
+19. Always support coding
+20. Always support education
+21. Always support science
 22. Always support world news
-23. Always support science
-24. Always support coding
-25. Always support gaming
-26. Always support Roblox scripting
-27. Always support current events
-28. Always support moments ago events
-29. Always avoid ugly formatting
-30. Always avoid robotic numbering
-31. Always avoid repeating yourself
-32. Always avoid fake scores
-33. Always avoid fake statistics
-34. Always avoid fake information
-35. Always prioritize live context
-36. Always stay conversational
-37. Always stay useful
-38. Always stay fast
-39. Always stay intelligent
-40. Always stay smooth
-41. Always avoid stale replies
-42. Always answer like ChatGPT premium
-43. Always avoid giant paragraphs
-44. Always answer in readable style
-45. Always support entertainment
-46. Always support education
-47. Always support finance
-48. Always support technology
-49. Always support tactical analysis
-50. Always support transfer news
-51. Always support standings
-52. Always support predictions carefully
-53. Always support recent updates
-54. Always support modern information
-55. Always support human-like replies
-56. Always remain Bloxy-bot
-57. Always feel production ready
-58. Always feel like a real modern AI
-59. Always use bullets or numbers when listing instead of paragraphing
-60. Always use emojis
-61. Be fluent
-62. Be punctual
-63. Be kind
-64. Have correct spelling of words
+23. Always avoid fake stats
+24. Always avoid fake scores
+25. Always avoid ugly formatting
+26. Always avoid repetitive greetings
+27. Always avoid giant paragraphs
+28. Always remain conversational
+29. Always stay readable
+30. Always stay smooth
+31. Always stay fast
+32. Always stay production ready
+33. Always feel human
+34. Always support moments ago events
+35. Always support current information
+36. Always support standings
+37. Always support transfer news
+38. Always support tactical analysis
+39. Always support finance
+40. Always support entertainment
+41. Always support Roblox scripting
+42. Always support any question
+43. Always answer beautifully
+44. Always prioritize usefulness
+45. Always prioritize clarity
+46. Always support horse racing
+47. Always support rugby
+48. Always support NFL
+49. Always support LaLiga
+50. Always support Premier League
+51. Always support Champions League
+52. Always support esports
+53. Always support history
+54. Always support modern technology
+55. Always stay accurate
+56. Always stay clean
+57. Always remain Bloxy-bot
+58. Always feel like a top AI
 
 LIVE CONTEXT:
 
@@ -372,7 +411,7 @@ LIVE CONTEXT:
 
     ]
 
-    messages += history[-4:]
+    messages += history[-6:]
 
     messages.append({
 
@@ -387,9 +426,8 @@ LIVE CONTEXT:
 
         "As an AI",
         "language model",
-        "training cutoff",
         "knowledge cutoff",
-        "My knowledge"
+        "training cutoff"
 
     ]
 
@@ -410,8 +448,10 @@ LIVE CONTEXT:
 
     })
 
-    if len(history) > 12:
-        history[:] = history[-12:]
+    if email != "guest":
+        save_json(USERS_FILE, USERS)
+
+    save_json(MEMORY_FILE, MEMORY)
 
     return {
         "reply": reply
@@ -450,6 +490,59 @@ color:white;
 overflow:hidden;
 }
 
+.authScreen{
+position:fixed;
+inset:0;
+background:#0d0d0d;
+display:flex;
+justify-content:center;
+align-items:center;
+z-index:9999;
+}
+
+.authBox{
+width:400px;
+background:#151515;
+padding:30px;
+border-radius:24px;
+border:1px solid #222;
+}
+
+.authTitle{
+font-size:34px;
+font-weight:bold;
+margin-bottom:25px;
+color:#00ff88;
+}
+
+.authInput{
+width:100%;
+padding:16px;
+margin-bottom:14px;
+background:#1c1c1c;
+border:none;
+border-radius:14px;
+color:white;
+font-size:15px;
+outline:none;
+}
+
+.authBtn{
+width:100%;
+padding:16px;
+border:none;
+border-radius:14px;
+background:orange;
+color:white;
+font-size:16px;
+cursor:pointer;
+margin-bottom:12px;
+}
+
+.guestBtn{
+background:#222;
+}
+
 .container{
 display:flex;
 height:100vh;
@@ -482,7 +575,6 @@ border-radius:14px;
 background:#1d1d1d;
 color:white;
 cursor:pointer;
-font-size:15px;
 }
 
 .chatlist{
@@ -518,31 +610,9 @@ cursor:pointer;
 .accountBar{
 padding:16px;
 border-top:1px solid #222;
-background:#151515;
 display:flex;
 justify-content:space-between;
 align-items:center;
-}
-
-.accountLeft{
-display:flex;
-align-items:center;
-gap:6px;
-font-weight:bold;
-}
-
-.accountBtns{
-display:flex;
-gap:8px;
-}
-
-.accountBtn{
-background:#222;
-border:none;
-color:white;
-padding:8px 12px;
-border-radius:10px;
-cursor:pointer;
 }
 
 .main{
@@ -570,19 +640,7 @@ border-radius:18px;
 margin-bottom:18px;
 background:#181818;
 line-height:1.7;
-animation:fade .2s;
 max-width:900px;
-}
-
-@keyframes fade{
-from{
-opacity:0;
-transform:translateY(10px);
-}
-to{
-opacity:1;
-transform:translateY(0px);
-}
 }
 
 .user{
@@ -594,18 +652,10 @@ border-left:4px solid orange;
 border-left:4px solid #00ff88;
 }
 
-.topName{
-display:flex;
-align-items:center;
-gap:6px;
-font-weight:bold;
-margin-bottom:8px;
-}
-
 .inputarea{
 padding:18px;
-border-top:1px solid #222;
 background:#111;
+border-top:1px solid #222;
 }
 
 .row{
@@ -616,29 +666,61 @@ gap:10px;
 .input{
 flex:1;
 padding:18px;
+background:#1c1c1c;
 border:none;
 outline:none;
-background:#1c1c1c;
 border-radius:18px;
 color:white;
-font-size:15px;
 }
 
 .send{
 width:70px;
 border:none;
+border-radius:18px;
 background:orange;
 color:white;
 font-size:22px;
-border-radius:18px;
 cursor:pointer;
 }
 
 .helper{
 text-align:center;
-opacity:.45;
 font-size:12px;
+opacity:.45;
 margin-top:10px;
+}
+
+.topName{
+display:flex;
+align-items:center;
+gap:6px;
+font-weight:bold;
+margin-bottom:8px;
+}
+
+.badgeWrap{
+display:flex;
+align-items:center;
+position:relative;
+}
+
+.badgeTooltip{
+position:absolute;
+bottom:35px;
+left:-50px;
+width:260px;
+background:#1b1b1b;
+padding:12px;
+border-radius:14px;
+font-size:11px;
+opacity:0;
+pointer-events:none;
+transition:.2s;
+border:1px solid #333;
+}
+
+.badgeWrap:hover .badgeTooltip{
+opacity:1;
 }
 
 .typing{
@@ -672,37 +754,67 @@ transform:scale(1);
 }
 }
 
-.badgeWrap{
-display:flex;
-align-items:center;
-position:relative;
-}
-
-.badgeTooltip{
-position:absolute;
-bottom:35px;
-left:-50px;
-width:260px;
-background:#1b1b1b;
-padding:12px;
-border-radius:14px;
-font-size:11px;
-opacity:0;
-pointer-events:none;
-transition:.2s;
-border:1px solid #333;
-z-index:999;
-}
-
-.badgeWrap:hover .badgeTooltip{
-opacity:1;
-}
-
 </style>
 
 </head>
 
 <body>
+
+<div class='authScreen' id='authScreen'>
+
+<div class='authBox'>
+
+<div class='authTitle'>
+Bloxy-bot
+</div>
+
+<input
+id='regEmail'
+class='authInput'
+placeholder='example@gmail.com'
+>
+
+<input
+id='regUser'
+class='authInput'
+placeholder='Username'
+>
+
+<input
+id='regPass'
+class='authInput'
+type='password'
+placeholder='Password (6+ chars)'
+>
+
+<button class='authBtn' onclick='register()'>
+Create Account
+</button>
+
+<input
+id='loginEmail'
+class='authInput'
+placeholder='example@gmail.com'
+>
+
+<input
+id='loginPass'
+class='authInput'
+type='password'
+placeholder='Password'
+>
+
+<button class='authBtn' onclick='login()'>
+Login
+</button>
+
+<button class='authBtn guestBtn' onclick='guestMode()'>
+Continue As Guest
+</button>
+
+</div>
+
+</div>
 
 <div class='container'>
 
@@ -724,9 +836,9 @@ Bloxy-bot
 
 <div class='accountBar'>
 
-<div class='accountLeft' id='account'></div>
+<div id='account'></div>
 
-<div class='accountBtns' id='accountButtons'></div>
+<div id='logoutArea'></div>
 
 </div>
 
@@ -815,29 +927,29 @@ d='M10 15 L7 12 L8.5 10.5 L10 12 L15.5 6.5 L17 8 Z'
 
 }
 
+function hideAuth(){
+
+document.getElementById('authScreen').style.display='none';
+
+}
+
 function updateAccount(){
 
 document.getElementById('account').innerHTML=
 
-currentUser.username +
+currentUser.username+
 
 (currentUser.verified ? badge() : '');
 
 if(currentUser.guest){
 
-document.getElementById('accountButtons').innerHTML=`
-
-<button class='accountBtn' onclick='login()'>
-Sign In
-</button>
-
-`;
+document.getElementById('logoutArea').innerHTML='';
 
 }else{
 
-document.getElementById('accountButtons').innerHTML=`
+document.getElementById('logoutArea').innerHTML=`
 
-<button class='accountBtn' onclick='logout()'>
+<button onclick='logout()'>
 Logout
 </button>
 
@@ -847,26 +959,90 @@ Logout
 
 }
 
-function login(){
+async function register(){
 
-let name=prompt("Enter username");
+let email=document.getElementById('regEmail').value;
+let username=document.getElementById('regUser').value;
+let password=document.getElementById('regPass').value;
 
-if(!name)return;
+let r=await fetch('/register',{
+
+method:'POST',
+
+headers:{
+'Content-Type':'application/json'
+},
+
+body:JSON.stringify({
+
+email,
+username,
+password
+
+})
+
+});
+
+let d=await r.json();
+
+if(!d.success){
+
+alert(d.message);
+return;
+
+}
+
+alert("Account created");
+
+}
+
+async function login(){
+
+let email=document.getElementById('loginEmail').value;
+let password=document.getElementById('loginPass').value;
+
+let r=await fetch('/login',{
+
+method:'POST',
+
+headers:{
+'Content-Type':'application/json'
+},
+
+body:JSON.stringify({
+
+email,
+password
+
+})
+
+});
+
+let d=await r.json();
+
+if(!d.success){
+
+alert(d.message);
+return;
+
+}
 
 currentUser={
 
-email:name+"@bloxy.ai",
-username:name,
-verified:name.toLowerCase()==='atg',
+email:email,
+username:d.username,
+verified:d.verified,
 guest:false
 
 };
+
+hideAuth();
 
 updateAccount();
 
 }
 
-function logout(){
+function guestMode(){
 
 currentUser={
 
@@ -877,7 +1053,15 @@ guest:true
 
 };
 
+hideAuth();
+
 updateAccount();
+
+}
+
+function logout(){
+
+location.reload();
 
 }
 
@@ -1085,8 +1269,8 @@ headers:{
 body:JSON.stringify({
 
 email:currentUser.email,
-message:msg,
-chat_id:currentChat
+chat_id:currentChat,
+message:msg
 
 })
 
