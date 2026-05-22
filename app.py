@@ -1,3 +1,8 @@
+# =========================================================
+# BLOXY-BOT ULTIMATE AI PLATFORM
+# FULL COMPLETE SCRIPT
+# =========================================================
+
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -5,8 +10,8 @@ import uvicorn
 import requests
 import os
 import json
-import traceback
 import uuid
+import traceback
 
 app = FastAPI()
 
@@ -48,15 +53,15 @@ def load_users():
     except:
         return {}
 
-def save_users(users):
+def save_users(data):
 
     with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(users, f, indent=2)
+        json.dump(data, f, indent=2)
 
 USERS = load_users()
 
 # =========================================================
-# AI MODELS
+# MODELS
 # =========================================================
 
 MODELS = [
@@ -89,7 +94,7 @@ MODELS = [
 ]
 
 # =========================================================
-# REQUEST MODELS
+# REQUESTS
 # =========================================================
 
 class RegisterRequest(BaseModel):
@@ -108,85 +113,82 @@ class ChatRequest(BaseModel):
 
 class ConversationRequest(BaseModel):
     email: str
-    chat_name: str
+    old_name: str = ""
+    new_name: str = ""
 
 # =========================================================
 # SPORTS TABLE
 # =========================================================
 
-def premier_league_table():
+def get_premier_league_table():
 
     try:
 
-        if APISPORTS_API_KEY:
+        r = requests.get(
+            "https://v3.football.api-sports.io/standings",
+            headers={
+                "x-apisports-key": APISPORTS_API_KEY
+            },
+            params={
+                "league": 39,
+                "season": 2025
+            },
+            timeout=5
+        )
 
-            r = requests.get(
-                "https://v3.football.api-sports.io/standings",
-                headers={
-                    "x-apisports-key": APISPORTS_API_KEY
-                },
-                params={
-                    "league": 39,
-                    "season": 2025
-                },
-                timeout=6
-            )
+        data = r.json()
 
-            data = r.json()
+        standings = data["response"][0]["league"]["standings"][0]
 
-            standings = data["response"][0]["league"]["standings"][0]
+        html = """
 
-            html = """
-
-<table style='width:100%;border-collapse:collapse;margin-top:10px;'>
+<table style='width:100%;border-collapse:collapse;background:#111;border-radius:14px;overflow:hidden;'>
 
 <tr style='background:#1f1f1f;'>
 
-<th style='padding:10px;'>#</th>
-<th style='padding:10px;'>Club</th>
-<th style='padding:10px;'>Pts</th>
+<th style='padding:12px;'>#</th>
+<th style='padding:12px;'>Club</th>
+<th style='padding:12px;'>Pts</th>
 
 </tr>
 
 """
 
-            for team in standings:
+        for t in standings:
 
-                html += f"""
+            html += f"""
 
 <tr style='border-top:1px solid #333;'>
 
-<td style='padding:10px;'>{team['rank']}</td>
-<td style='padding:10px;'>{team['team']['name']}</td>
-<td style='padding:10px;'>{team['points']}</td>
+<td style='padding:12px;'>{t['rank']}</td>
+<td style='padding:12px;'>{t['team']['name']}</td>
+<td style='padding:12px;'>{t['points']}</td>
 
 </tr>
 
 """
 
-            html += "</table>"
+        html += "</table>"
 
-            return html
+        return html
 
     except:
-        pass
-
-    return "<div>Could not load Premier League table.</div>"
+        return "Could not load Premier League table."
 
 # =========================================================
 # CONTEXT
 # =========================================================
 
-def get_context(prompt):
+def get_context(query):
 
     try:
 
         r = requests.get(
-            f"https://en.wikipedia.org/api/rest_v1/page/summary/{prompt}",
+            f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}",
             timeout=3
         )
 
-        return r.text[:1000]
+        return r.text[:1200]
 
     except:
         return ""
@@ -207,7 +209,7 @@ def groq_chat(model, messages):
             "model": model,
             "messages": messages,
             "temperature": 0.4,
-            "max_tokens": 260
+            "max_tokens": 350
         },
         timeout=15
     )
@@ -228,7 +230,7 @@ def openrouter_chat(model, messages):
             "model": model,
             "messages": messages,
             "temperature": 0.4,
-            "max_tokens": 260
+            "max_tokens": 350
         },
         timeout=15
     )
@@ -239,15 +241,15 @@ def openrouter_chat(model, messages):
 
 def ask_ai(messages):
 
-    for model in MODELS:
+    for m in MODELS:
 
         try:
 
-            if model["provider"] == "groq":
-                return groq_chat(model["model"], messages)
+            if m["provider"] == "groq":
+                return groq_chat(m["model"], messages)
 
-            if model["provider"] == "openrouter":
-                return openrouter_chat(model["model"], messages)
+            else:
+                return openrouter_chat(m["model"], messages)
 
         except:
             continue
@@ -265,13 +267,7 @@ def register(data: RegisterRequest):
     username = data.username.strip()
     password = data.password.strip()
 
-    if "@" not in email:
-        return {
-            "success": False,
-            "message": "Email must contain @"
-        }
-
-    if "." not in email:
+    if "@" not in email or "." not in email:
         return {
             "success": False,
             "message": "Invalid email"
@@ -294,7 +290,17 @@ def register(data: RegisterRequest):
         "username": username,
         "password": password,
         "verified": username.lower() == "atg",
-        "conversations": {}
+
+        "memory": [],
+
+        "conversations": {
+
+            "Main": {
+                "messages": [],
+                "pinned": False
+            }
+
+        }
 
     }
 
@@ -328,31 +334,93 @@ def login(data: LoginRequest):
     return {
 
         "success": True,
+
         "username": USERS[email]["username"],
+
         "verified": USERS[email]["verified"],
+
         "conversations": USERS[email]["conversations"]
 
     }
 
 # =========================================================
-# NEW CONVERSATION
+# NEW CHAT
 # =========================================================
 
 @app.post("/newchat")
 def newchat(data: ConversationRequest):
 
     if data.email not in USERS:
-        return {
-            "success": False
-        }
+        return {"success": False}
 
-    USERS[data.email]["conversations"][data.chat_name] = []
+    new_name = "Chat " + str(len(USERS[data.email]["conversations"]) + 1)
+
+    USERS[data.email]["conversations"][new_name] = {
+
+        "messages": [],
+        "pinned": False
+
+    }
 
     save_users(USERS)
 
     return {
-        "success": True
+
+        "success": True,
+        "chat_name": new_name
+
     }
+
+# =========================================================
+# RENAME CHAT
+# =========================================================
+
+@app.post("/renamechat")
+def renamechat(data: ConversationRequest):
+
+    if data.email not in USERS:
+        return {"success": False}
+
+    convos = USERS[data.email]["conversations"]
+
+    convos[data.new_name] = convos.pop(data.old_name)
+
+    save_users(USERS)
+
+    return {"success": True}
+
+# =========================================================
+# PIN CHAT
+# =========================================================
+
+@app.post("/pinchat")
+def pinchat(data: ConversationRequest):
+
+    convos = USERS[data.email]["conversations"]
+
+    convos[data.old_name]["pinned"] = not convos[data.old_name]["pinned"]
+
+    save_users(USERS)
+
+    return {"success": True}
+
+# =========================================================
+# DELETE CHAT
+# =========================================================
+
+@app.post("/deletechat")
+def deletechat(data: ConversationRequest):
+
+    convos = USERS[data.email]["conversations"]
+
+    if len(convos) == 1:
+        return {"success": False}
+
+    del convos[data.old_name]
+
+    save_users(USERS)
+
+    return {"success": True}
 
 # =========================================================
 # CHAT
@@ -368,58 +436,38 @@ def chat(data: ChatRequest):
     ]:
 
         return {
-            "reply": premier_league_table()
+            "reply": get_premier_league_table()
         }
 
-    if data.email == "guest":
+    history = []
 
-        history = []
+    memory = []
 
-    else:
+    if data.email != "guest":
 
-        if data.chat_id not in USERS[data.email]["conversations"]:
-            USERS[data.email]["conversations"][data.chat_id] = []
+        user = USERS[data.email]
 
-        history = USERS[data.email]["conversations"][data.chat_id]
+        history = user["conversations"][data.chat_id]["messages"]
+
+        memory = user["memory"][-25:]
 
     context = get_context(data.message)
+
+    rules = ""
+
+    for i in range(1, 151):
+
+        rules += f"{i}. Always remain accurate and useful\\n"
 
     system_prompt = f"""
 
 You are Bloxy-bot AI Ultimate.
 
-RULES:
+{rules}
 
-1. Never say knowledge cutoff
-2. Never say outdated
-3. Never say As an AI
-4. Never define like a dictionary
-5. Always sound modern
-6. Always sound premium
-7. Always sound conversational
-8. Always answer naturally
-9. Always support sports
-10. Always support football
-11. Always support NBA
-12. Always support UFC
-13. Always support F1
-14. Always support horse racing
-15. Always support live info
-16. Always support current events
-17. Always support coding
-18. Always support science
-19. Always support gaming
-20. Always support finance
-21. Always support transfer news
-22. Always support standings
-23. Always avoid fake stats
-24. Always avoid ugly formatting
-25. Always stay clean
-26. Always stay intelligent
-27. Always stay smooth
-28. Always stay useful
-29. Always remain Bloxy-bot
-30. Always feel like a premium AI
+LONG TERM MEMORY:
+
+{memory}
 
 LIVE CONTEXT:
 
@@ -436,7 +484,7 @@ LIVE CONTEXT:
 
     ]
 
-    messages += history[-6:]
+    messages += history[-10:]
 
     messages.append({
 
@@ -460,21 +508,26 @@ LIVE CONTEXT:
 
     if data.email != "guest":
 
-        history.append({
+        USERS[data.email]["memory"].append({
+
+            "user": data.message,
+            "assistant": reply
+
+        })
+
+        USERS[data.email]["conversations"][data.chat_id]["messages"].append({
 
             "role": "user",
             "content": data.message
 
         })
 
-        history.append({
+        USERS[data.email]["conversations"][data.chat_id]["messages"].append({
 
             "role": "assistant",
             "content": reply
 
         })
-
-        USERS[data.email]["conversations"][data.chat_id] = history
 
         save_users(USERS)
 
@@ -573,7 +626,7 @@ height:100vh;
 }
 
 .sidebar{
-width:280px;
+width:300px;
 background:#111;
 border-right:1px solid #222;
 display:flex;
@@ -581,7 +634,7 @@ flex-direction:column;
 }
 
 .logo{
-font-size:32px;
+font-size:34px;
 font-weight:bold;
 padding:20px;
 color:#00ff88;
@@ -611,6 +664,20 @@ margin-bottom:10px;
 display:flex;
 justify-content:space-between;
 align-items:center;
+}
+
+.chatbuttons{
+display:flex;
+gap:6px;
+}
+
+.chatbuttons button{
+background:#222;
+border:none;
+color:white;
+padding:6px 8px;
+border-radius:8px;
+cursor:pointer;
 }
 
 .accountBar{
@@ -760,12 +827,6 @@ border:1px solid #333;
 opacity:1;
 }
 
-table{
-background:#111;
-border-radius:14px;
-overflow:hidden;
-}
-
 </style>
 
 </head>
@@ -780,24 +841,9 @@ overflow:hidden;
 Bloxy-bot
 </div>
 
-<input
-id='registerEmail'
-class='authInput'
-placeholder='example@gmail.com'
->
-
-<input
-id='registerUser'
-class='authInput'
-placeholder='Username'
->
-
-<input
-id='registerPass'
-class='authInput'
-type='password'
-placeholder='Password (6+ chars)'
->
+<input id='registerEmail' class='authInput' placeholder='example@gmail.com'>
+<input id='registerUser' class='authInput' placeholder='Username'>
+<input id='registerPass' class='authInput' type='password' placeholder='Password'>
 
 <button class='authBtn' onclick='register()'>
 Create Account
@@ -805,18 +851,8 @@ Create Account
 
 <hr style='border:1px solid #222;margin:20px 0;'>
 
-<input
-id='loginEmail'
-class='authInput'
-placeholder='example@gmail.com'
->
-
-<input
-id='loginPass'
-class='authInput'
-type='password'
-placeholder='Password'
->
+<input id='loginEmail' class='authInput' placeholder='example@gmail.com'>
+<input id='loginPass' class='authInput' type='password' placeholder='Password'>
 
 <button class='authBtn' onclick='login()'>
 Login
@@ -899,10 +935,15 @@ guest:true
 };
 
 let chats={
-'Main':[]
+
+"Main":{
+messages:[],
+pinned:false
+}
+
 };
 
-let currentChat='Main';
+let currentChat="Main";
 
 function badge(){
 
@@ -935,9 +976,7 @@ d='M10 15 L7 12 L8.5 10.5 L10 12 L15.5 6.5 L17 8 Z'
 }
 
 function hideAuth(){
-
 document.getElementById('auth').style.display='none';
-
 }
 
 function updateAccount(){
@@ -1045,14 +1084,6 @@ guest:false
 
 chats=d.conversations;
 
-if(Object.keys(chats).length===0){
-
-chats={
-'Main':[]
-};
-
-}
-
 currentChat=Object.keys(chats)[0];
 
 hideAuth();
@@ -1087,22 +1118,31 @@ render();
 }
 
 function logout(){
-
 location.reload();
-
 }
 
 async function newChat(){
 
-let name='Chat '+(Object.keys(chats).length+1);
+if(currentUser.guest){
 
-chats[name]=[];
+let name="Guest Chat "+(Object.keys(chats).length+1);
+
+chats[name]={
+messages:[],
+pinned:false
+};
 
 currentChat=name;
 
-if(!currentUser.guest){
+renderChats();
 
-await fetch('/newchat',{
+render();
+
+return;
+
+}
+
+let r=await fetch('/newchat',{
 
 method:'POST',
 
@@ -1112,14 +1152,20 @@ headers:{
 
 body:JSON.stringify({
 
-email:currentUser.email,
-chat_name:name
+email:currentUser.email
 
 })
 
 });
 
-}
+let d=await r.json();
+
+chats[d.chat_name]={
+messages:[],
+pinned:false
+};
+
+currentChat=d.chat_name;
 
 renderChats();
 
@@ -1142,8 +1188,26 @@ d.className='chatitem';
 d.innerHTML=`
 
 <span onclick="switchChat('${name}')">
-${name}
+
+${chats[name].pinned ? '📌 ' : ''}${name}
+
 </span>
+
+<div class='chatbuttons'>
+
+<button onclick="renameChat('${name}')">
+✏️
+</button>
+
+<button onclick="pinChat('${name}')">
+📌
+</button>
+
+<button onclick="deleteChat('${name}')">
+🗑️
+</button>
+
+</div>
 
 `;
 
@@ -1161,13 +1225,121 @@ render();
 
 }
 
+async function renameChat(name){
+
+let newName=prompt("Rename chat",name);
+
+if(!newName)return;
+
+if(currentUser.guest){
+
+chats[newName]=chats[name];
+
+delete chats[name];
+
+currentChat=newName;
+
+renderChats();
+
+return;
+
+}
+
+await fetch('/renamechat',{
+
+method:'POST',
+
+headers:{
+'Content-Type':'application/json'
+},
+
+body:JSON.stringify({
+
+email:currentUser.email,
+old_name:name,
+new_name:newName
+
+})
+
+});
+
+chats[newName]=chats[name];
+
+delete chats[name];
+
+currentChat=newName;
+
+renderChats();
+
+}
+
+async function pinChat(name){
+
+chats[name].pinned=!chats[name].pinned;
+
+renderChats();
+
+if(currentUser.guest)return;
+
+await fetch('/pinchat',{
+
+method:'POST',
+
+headers:{
+'Content-Type':'application/json'
+},
+
+body:JSON.stringify({
+
+email:currentUser.email,
+old_name:name
+
+})
+
+});
+
+}
+
+async function deleteChat(name){
+
+if(Object.keys(chats).length===1)return;
+
+delete chats[name];
+
+currentChat=Object.keys(chats)[0];
+
+renderChats();
+
+render();
+
+if(currentUser.guest)return;
+
+await fetch('/deletechat',{
+
+method:'POST',
+
+headers:{
+'Content-Type':'application/json'
+},
+
+body:JSON.stringify({
+
+email:currentUser.email,
+old_name:name
+
+})
+
+});
+
+}
+
 function render(){
 
 let box=document.getElementById('messages');
 
 box.innerHTML='';
 
-for(let m of chats[currentChat]){
+for(let m of chats[currentChat].messages){
 
 let d=document.createElement('div');
 
@@ -1207,14 +1379,14 @@ if(!msg)return;
 
 input.value='';
 
-chats[currentChat].push({
+chats[currentChat].messages.push({
 
 role:'user',
 content:msg
 
 });
 
-chats[currentChat].push({
+chats[currentChat].messages.push({
 
 role:'assistant',
 content:`
@@ -1257,9 +1429,9 @@ message:msg
 
 let d=await r.json();
 
-chats[currentChat].pop();
+chats[currentChat].messages.pop();
 
-chats[currentChat].push({
+chats[currentChat].messages.push({
 
 role:'assistant',
 content:d.reply
