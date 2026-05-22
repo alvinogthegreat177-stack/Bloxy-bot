@@ -11,55 +11,32 @@ import time
 app = FastAPI()
 
 # =========================================================
-# 17+ API SOURCES
+# API KEYS
 # =========================================================
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-THESPORTSDB_API_KEY = os.getenv("THESPORTSDB_API_KEY")
-GNEWS_API_KEY = os.getenv("GNEWS_API_KEY")
-NEWS_API_KEY = os.getenv("NEWS_API_KEY")
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-APISPORTS_API_KEY = os.getenv("APISPORTS_API_KEY")
-SPORTMONK_API_KEY = os.getenv("SPORTMONK_API_KEY")
-SPORTRADAR_API_KEY = os.getenv("SPORTRADAR_API_KEY")
-ALLSPORTS_API_KEY = os.getenv("ALLSPORTS_API_KEY")
-ODDS_API_KEY = os.getenv("ODDS_API_KEY")
-EXA_API_KEY = os.getenv("EXA_API_KEY")
-FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
-WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY")
-WOLFRAM_APP_ID = os.getenv("WOLFRAM_APP_ID")
-FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
-SECRET_API_KEY = os.getenv("SECRET_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+THESPORTSDB_API_KEY = os.getenv("THESPORTSDB_API_KEY", "")
+GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "")
+NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
+APISPORTS_API_KEY = os.getenv("APISPORTS_API_KEY", "")
+SPORTMONK_API_KEY = os.getenv("SPORTMONK_API_KEY", "")
+SPORTRADAR_API_KEY = os.getenv("SPORTRADAR_API_KEY", "")
+ALLSPORTS_API_KEY = os.getenv("ALLSPORTS_API_KEY", "")
+ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
+EXA_API_KEY = os.getenv("EXA_API_KEY", "")
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
+WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY", "")
+WOLFRAM_APP_ID = os.getenv("WOLFRAM_APP_ID", "")
+FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY", "")
+SECRET_API_KEY = os.getenv("SECRET_API_KEY", "")
 
 # =========================================================
 # STORAGE
 # =========================================================
 
-USERS_FILE = "users.json"
-CHATS_FILE = "chats.json"
-
-def load_json(path, default):
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return default
-
-def save_json(path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-
-users = load_json(USERS_FILE, {})
-chats = load_json(CHATS_FILE, {})
-
-# =========================================================
-# OWNER
-# =========================================================
-
-OWNER_EMAIL = "admin@bloxy.ai"
-OWNER_PASSWORD = "bloxyadmin"
-OWNER_USERNAME = "aTg"
+CHATS = {}
 
 # =========================================================
 # 5 AI MODELS
@@ -104,10 +81,10 @@ class ChatRequest(BaseModel):
     chat_id: str
 
 # =========================================================
-# LIVE SOURCES
+# LIVE SPORTS CONTEXT
 # =========================================================
 
-def sports_context(query):
+def get_sports_context(query):
 
     try:
 
@@ -116,7 +93,7 @@ def sports_context(query):
             r = requests.get(
                 f"https://www.thesportsdb.com/api/v1/json/{THESPORTSDB_API_KEY}/searchteams.php",
                 params={"t": query},
-                timeout=2
+                timeout=3
             )
 
             return r.text[:1000]
@@ -126,8 +103,11 @@ def sports_context(query):
 
     return ""
 
+# =========================================================
+# NEWS CONTEXT
+# =========================================================
 
-def news_context(query):
+def get_news_context(query):
 
     try:
 
@@ -141,54 +121,39 @@ def news_context(query):
                     "lang": "en",
                     "max": 3
                 },
-                timeout=2
+                timeout=3
             )
 
-            return r.text[:1000]
+            return r.text[:1200]
 
     except:
         pass
 
     return ""
 
+# =========================================================
+# WIKIPEDIA CONTEXT
+# =========================================================
 
-def wiki_context(query):
+def get_wiki_context(query):
 
     try:
 
         r = requests.get(
             f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}",
-            timeout=2
+            timeout=3
         )
 
-        return r.text[:900]
-
-    except:
-        return ""
-
-
-def finance_context(query):
-
-    try:
-
-        if FINNHUB_API_KEY:
-
-            r = requests.get(
-                "https://finnhub.io/api/v1/quote",
-                params={
-                    "symbol": "AAPL",
-                    "token": FINNHUB_API_KEY
-                },
-                timeout=2
-            )
-
-            return r.text[:500]
+        return r.text[:1000]
 
     except:
         pass
 
     return ""
 
+# =========================================================
+# BUILD CONTEXT
+# =========================================================
 
 def build_context(prompt):
 
@@ -197,53 +162,43 @@ def build_context(prompt):
     sports_words = [
         "football",
         "soccer",
+        "arsenal",
+        "chelsea",
+        "man city",
         "premier league",
+        "laliga",
         "nba",
         "ufc",
-        "boxing",
+        "cricket",
         "f1",
         "formula 1",
-        "cricket",
-        "rugby",
         "horse racing",
         "nfl",
-        "mlb"
-    ]
-
-    finance_words = [
-        "stock",
-        "bitcoin",
-        "crypto",
-        "market",
-        "shares",
-        "finance"
+        "rugby"
     ]
 
     news_words = [
         "news",
         "war",
         "government",
-        "breaking",
-        "politics"
+        "politics",
+        "breaking"
     ]
 
-    parts = []
+    context = []
 
     if any(x in lower for x in sports_words):
-        parts.append(sports_context(prompt))
-
-    if any(x in lower for x in finance_words):
-        parts.append(finance_context(prompt))
+        context.append(get_sports_context(prompt))
 
     if any(x in lower for x in news_words):
-        parts.append(news_context(prompt))
+        context.append(get_news_context(prompt))
 
-    parts.append(wiki_context(prompt))
+    context.append(get_wiki_context(prompt))
 
-    return "\n\n".join([x for x in parts if x])
+    return "\n\n".join(context)
 
 # =========================================================
-# AI
+# GROQ
 # =========================================================
 
 def groq_chat(model, messages):
@@ -258,15 +213,18 @@ def groq_chat(model, messages):
             "model": model,
             "messages": messages,
             "temperature": 0.4,
-            "max_tokens": 220
+            "max_tokens": 250
         },
-        timeout=10
+        timeout=12
     )
 
     data = r.json()
 
     return data["choices"][0]["message"]["content"]
 
+# =========================================================
+# OPENROUTER
+# =========================================================
 
 def openrouter_chat(model, messages):
 
@@ -280,15 +238,18 @@ def openrouter_chat(model, messages):
             "model": model,
             "messages": messages,
             "temperature": 0.4,
-            "max_tokens": 220
+            "max_tokens": 250
         },
-        timeout=10
+        timeout=12
     )
 
     data = r.json()
 
     return data["choices"][0]["message"]["content"]
 
+# =========================================================
+# ASK AI
+# =========================================================
 
 def ask_ai(messages):
 
@@ -309,19 +270,19 @@ def ask_ai(messages):
     return "Bloxy-bot is overloaded right now."
 
 # =========================================================
-# CHAT
+# CHAT ENDPOINT
 # =========================================================
 
 @app.post("/chat")
 def chat(data: ChatRequest):
 
-    if data.email not in chats:
-        chats[data.email] = {}
+    if data.email not in CHATS:
+        CHATS[data.email] = {}
 
-    if data.chat_id not in chats[data.email]:
-        chats[data.email][data.chat_id] = []
+    if data.chat_id not in CHATS[data.email]:
+        CHATS[data.email][data.chat_id] = []
 
-    history = chats[data.email][data.chat_id]
+    history = CHATS[data.email][data.chat_id]
 
     context = build_context(data.message)
 
@@ -329,68 +290,68 @@ def chat(data: ChatRequest):
 
 You are Bloxy-bot AI Ultimate.
 
-CORE RULES:
+RULES:
 
 1. Never say knowledge cutoff
 2. Never say outdated
 3. Never say As an AI
 4. Never sound robotic
-5. Always sound modern
-6. Always sound premium
-7. Always prioritize live info
-8. Always answer naturally
+5. Never define words like a dictionary
+6. Always sound modern
+7. Always sound premium
+8. Always sound natural
 9. Always answer directly
-10. Always avoid dictionary definitions
-11. Always avoid repetitive greetings
-12. Always answer sports intelligently
-13. Always answer finance intelligently
-14. Always answer science intelligently
-15. Always answer coding intelligently
-16. Always answer gaming intelligently
-17. Always answer politics intelligently
-18. Always support live events
-19. Always support recent events
-20. Always support breaking news
+10. Always answer beautifully
+11. Always answer cleanly
+12. Always support live information
+13. Always support sports
+14. Always support football
+15. Always support NBA
+16. Always support UFC
+17. Always support F1
+18. Always support cricket
+19. Always support rugby
+20. Always support NFL
 21. Always support horse racing
-22. Always support football
-23. Always support NBA
-24. Always support UFC
-25. Always support Formula 1
-26. Always support cricket
-27. Always support rugby
-28. Always support NFL
-29. Always avoid fake scores
-30. Always avoid fake statistics
-31. Always avoid fake news
-32. Always avoid filler
-33. Always avoid stale replies
-34. Always stay conversational
-35. Always stay intelligent
-36. Always stay smooth
-37. Always adapt to user tone
-38. Always prioritize usefulness
-39. Always feel responsive
-40. Always feel alive
-41. Always support Roblox scripting
-42. Always support current technology
-43. Always support school questions
-44. Always support math
+22. Always support world news
+23. Always support science
+24. Always support coding
+25. Always support gaming
+26. Always support Roblox scripting
+27. Always support current events
+28. Always support moments ago events
+29. Always avoid ugly formatting
+30. Always avoid robotic numbering
+31. Always avoid repeating yourself
+32. Always avoid fake scores
+33. Always avoid fake statistics
+34. Always avoid fake information
+35. Always prioritize live context
+36. Always stay conversational
+37. Always stay useful
+38. Always stay fast
+39. Always stay intelligent
+40. Always stay smooth
+41. Always avoid stale replies
+42. Always answer like ChatGPT premium
+43. Always avoid giant paragraphs
+44. Always answer in readable style
 45. Always support entertainment
-46. Always support world affairs
-47. Always support recent sports standings
-48. Always support transfer news
-49. Always support match analysis
-50. Always support tactical analysis
-51. Always support betting discussions
-52. Always support odds analysis
-53. Always support historical topics
-54. Always support moments ago events
-55. Always support real-time style replies
-56. Always avoid repetitive formatting
-57. Always remain Bloxy-bot
-58. Always feel like a production AI
+46. Always support education
+47. Always support finance
+48. Always support technology
+49. Always support tactical analysis
+50. Always support transfer news
+51. Always support standings
+52. Always support predictions carefully
+53. Always support recent updates
+54. Always support modern information
+55. Always support human-like replies
+56. Always remain Bloxy-bot
+57. Always feel production ready
+58. Always feel like a real modern AI
 
-Live Context:
+LIVE CONTEXT:
 
 {context}
 
@@ -405,7 +366,7 @@ Live Context:
 
     ]
 
-    messages += history[-2:]
+    messages += history[-4:]
 
     messages.append({
 
@@ -443,10 +404,8 @@ Live Context:
 
     })
 
-    if len(history) > 8:
-        history[:] = history[-8:]
-
-    save_json(CHATS_FILE, chats)
+    if len(history) > 12:
+        history[:] = history[-12:]
 
     return {
         "reply": reply
@@ -473,6 +432,10 @@ def home():
 
 <style>
 
+*{
+box-sizing:border-box;
+}
+
 body{
 margin:0;
 background:#0d0d0d;
@@ -487,19 +450,22 @@ height:100vh;
 }
 
 .sidebar{
-width:260px;
+width:280px;
 background:#111;
 border-right:1px solid #222;
+display:flex;
+flex-direction:column;
+}
+
+.sidebarTop{
 padding:20px;
-box-sizing:border-box;
-overflow:auto;
 }
 
 .logo{
-font-size:30px;
+font-size:32px;
 font-weight:bold;
-margin-bottom:20px;
 color:#00ff88;
+margin-bottom:20px;
 }
 
 .newchat{
@@ -507,10 +473,16 @@ width:100%;
 padding:14px;
 border:none;
 border-radius:14px;
-background:#1c1c1c;
+background:#1d1d1d;
 color:white;
 cursor:pointer;
-margin-bottom:15px;
+font-size:15px;
+}
+
+.chatlist{
+flex:1;
+overflow:auto;
+padding:20px;
 }
 
 .chatitem{
@@ -523,6 +495,50 @@ justify-content:space-between;
 align-items:center;
 }
 
+.chatBtns{
+display:flex;
+gap:6px;
+}
+
+.chatBtns button{
+background:#222;
+border:none;
+color:white;
+padding:6px 8px;
+border-radius:8px;
+cursor:pointer;
+}
+
+.accountBar{
+padding:16px;
+border-top:1px solid #222;
+background:#151515;
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+
+.accountLeft{
+display:flex;
+align-items:center;
+gap:6px;
+font-weight:bold;
+}
+
+.accountBtns{
+display:flex;
+gap:8px;
+}
+
+.accountBtn{
+background:#222;
+border:none;
+color:white;
+padding:8px 12px;
+border-radius:10px;
+cursor:pointer;
+}
+
 .main{
 flex:1;
 display:flex;
@@ -531,11 +547,9 @@ flex-direction:column;
 
 .topbar{
 padding:18px;
-border-bottom:1px solid #222;
 background:#111;
-display:flex;
-justify-content:space-between;
-align-items:center;
+border-bottom:1px solid #222;
+font-weight:bold;
 }
 
 .messages{
@@ -548,9 +562,10 @@ padding:20px;
 padding:18px;
 border-radius:18px;
 margin-bottom:18px;
-line-height:1.7;
 background:#181818;
+line-height:1.7;
 animation:fade .2s;
+max-width:900px;
 }
 
 @keyframes fade{
@@ -565,11 +580,20 @@ transform:translateY(0px);
 }
 
 .user{
+margin-left:auto;
 border-left:4px solid orange;
 }
 
 .assistant{
 border-left:4px solid #00ff88;
+}
+
+.topName{
+display:flex;
+align-items:center;
+gap:6px;
+font-weight:bold;
+margin-bottom:8px;
 }
 
 .inputarea{
@@ -588,7 +612,7 @@ flex:1;
 padding:18px;
 border:none;
 outline:none;
-background:#1d1d1d;
+background:#1c1c1c;
 border-radius:18px;
 color:white;
 font-size:15px;
@@ -650,9 +674,9 @@ position:relative;
 
 .badgeTooltip{
 position:absolute;
-bottom:30px;
-left:-40px;
-width:250px;
+bottom:35px;
+left:-50px;
+width:260px;
 background:#1b1b1b;
 padding:12px;
 border-radius:14px;
@@ -661,6 +685,7 @@ opacity:0;
 pointer-events:none;
 transition:.2s;
 border:1px solid #333;
+z-index:999;
 }
 
 .badgeWrap:hover .badgeTooltip{
@@ -677,6 +702,8 @@ opacity:1;
 
 <div class='sidebar'>
 
+<div class='sidebarTop'>
+
 <div class='logo'>
 Bloxy-bot
 </div>
@@ -685,20 +712,24 @@ Bloxy-bot
 + New Chat
 </button>
 
-<div id='chatlist'></div>
+</div>
+
+<div class='chatlist' id='chatlist'></div>
+
+<div class='accountBar'>
+
+<div class='accountLeft' id='account'></div>
+
+<div class='accountBtns' id='accountButtons'></div>
+
+</div>
 
 </div>
 
 <div class='main'>
 
 <div class='topbar'>
-
-<div id='account'></div>
-
-<button onclick='guestMode()'>
-Continue As Guest
-</button>
-
+Bloxy-bot AI Ultimate
 </div>
 
 <div class='messages' id='messages'></div>
@@ -735,7 +766,8 @@ Bloxy-bot can make mistakes.Verify highly important information
 let currentUser={
 email:'guest',
 username:'Guest',
-verified:false
+verified:false,
+guest:true
 };
 
 let chats={
@@ -750,6 +782,7 @@ let currentChat='Main';
 function badge(){
 
 return `
+
 <div class='badgeWrap'>
 
 <div class='badgeTooltip'>
@@ -771,6 +804,7 @@ d='M10 15 L7 12 L8.5 10.5 L10 12 L15.5 6.5 L17 8 Z'
 </svg>
 
 </div>
+
 `;
 
 }
@@ -778,8 +812,66 @@ d='M10 15 L7 12 L8.5 10.5 L10 12 L15.5 6.5 L17 8 Z'
 function updateAccount(){
 
 document.getElementById('account').innerHTML=
-currentUser.username+
-(currentUser.verified?badge():"");
+
+currentUser.username +
+
+(currentUser.verified ? badge() : '');
+
+if(currentUser.guest){
+
+document.getElementById('accountButtons').innerHTML=`
+
+<button class='accountBtn' onclick='login()'>
+Sign In
+</button>
+
+`;
+
+}else{
+
+document.getElementById('accountButtons').innerHTML=`
+
+<button class='accountBtn' onclick='logout()'>
+Logout
+</button>
+
+`;
+
+}
+
+}
+
+function login(){
+
+let name=prompt("Enter username");
+
+if(!name)return;
+
+currentUser={
+
+email:name+"@bloxy.ai",
+username:name,
+verified:name.toLowerCase()==='atg',
+guest:false
+
+};
+
+updateAccount();
+
+}
+
+function logout(){
+
+currentUser={
+
+email:'guest',
+username:'Guest',
+verified:false,
+guest:true
+
+};
+
+updateAccount();
 
 }
 
@@ -798,10 +890,12 @@ d.className='chatitem';
 d.innerHTML=`
 
 <span onclick="switchChat('${name}')">
-${name}
+
+${chats[name].pinned ? '📌 ' : ''}${name}
+
 </span>
 
-<div>
+<div class='chatBtns'>
 
 <button onclick="renameChat('${name}')">
 ✏️
@@ -859,11 +953,13 @@ Bloxy-bot is typing...
 
 d.innerHTML=`
 
-<div style='display:flex;align-items:center;gap:6px;font-weight:bold;margin-bottom:8px;'>
+<div class='topName'>
 
 ${m.role==='assistant'
 ?'Bloxy-bot'
-:currentUser.username+(currentUser.verified?badge():'')}
+:currentUser.username}
+
+${m.role==='user' && currentUser.verified ? badge() : ''}
 
 </div>
 
@@ -926,7 +1022,7 @@ function pinChat(name){
 
 chats[name].pinned=!chats[name].pinned;
 
-alert(name+' pinned');
+renderChats();
 
 }
 
@@ -944,18 +1040,6 @@ render();
 
 }
 
-function guestMode(){
-
-currentUser={
-email:'guest',
-username:'Guest',
-verified:false
-};
-
-updateAccount();
-
-}
-
 async function send(){
 
 let input=document.getElementById('message');
@@ -967,13 +1051,17 @@ if(!msg)return;
 input.value='';
 
 chats[currentChat].messages.push({
+
 role:'user',
 content:msg
+
 });
 
 chats[currentChat].messages.push({
+
 role:'assistant',
 typing:true
+
 });
 
 render();
@@ -1018,7 +1106,7 @@ chats[currentChat].messages.pop();
 chats[currentChat].messages.push({
 
 role:'assistant',
-content:'Error loading response.'
+content:'Failed to load response.'
 
 });
 
