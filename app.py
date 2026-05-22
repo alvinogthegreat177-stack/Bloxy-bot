@@ -1,8 +1,3 @@
-# =========================================================
-# BLOXY-BOT ULTIMATE AI PLATFORM
-# FULL COMPLETE SCRIPT
-# =========================================================
-
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -10,8 +5,6 @@ import uvicorn
 import requests
 import os
 import json
-import uuid
-import traceback
 
 app = FastAPI()
 
@@ -61,7 +54,7 @@ def save_users(data):
 USERS = load_users()
 
 # =========================================================
-# MODELS
+# AI MODELS
 # =========================================================
 
 MODELS = [
@@ -94,7 +87,7 @@ MODELS = [
 ]
 
 # =========================================================
-# REQUESTS
+# REQUEST MODELS
 # =========================================================
 
 class RegisterRequest(BaseModel):
@@ -120,7 +113,7 @@ class ConversationRequest(BaseModel):
 # SPORTS TABLE
 # =========================================================
 
-def get_premier_league_table():
+def get_prem_table():
 
     try:
 
@@ -176,24 +169,6 @@ def get_premier_league_table():
         return "Could not load Premier League table."
 
 # =========================================================
-# CONTEXT
-# =========================================================
-
-def get_context(query):
-
-    try:
-
-        r = requests.get(
-            f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}",
-            timeout=3
-        )
-
-        return r.text[:1200]
-
-    except:
-        return ""
-
-# =========================================================
 # AI
 # =========================================================
 
@@ -209,7 +184,7 @@ def groq_chat(model, messages):
             "model": model,
             "messages": messages,
             "temperature": 0.4,
-            "max_tokens": 350
+            "max_tokens": 400
         },
         timeout=15
     )
@@ -230,7 +205,7 @@ def openrouter_chat(model, messages):
             "model": model,
             "messages": messages,
             "temperature": 0.4,
-            "max_tokens": 350
+            "max_tokens": 400
         },
         timeout=15
     )
@@ -241,15 +216,15 @@ def openrouter_chat(model, messages):
 
 def ask_ai(messages):
 
-    for m in MODELS:
+    for model in MODELS:
 
         try:
 
-            if m["provider"] == "groq":
-                return groq_chat(m["model"], messages)
+            if model["provider"] == "groq":
+                return groq_chat(model["model"], messages)
 
             else:
-                return openrouter_chat(m["model"], messages)
+                return openrouter_chat(model["model"], messages)
 
         except:
             continue
@@ -276,7 +251,7 @@ def register(data: RegisterRequest):
     if len(password) < 6:
         return {
             "success": False,
-            "message": "Password must be 6+ characters"
+            "message": "Password must contain 6+ characters"
         }
 
     if email in USERS:
@@ -296,8 +271,10 @@ def register(data: RegisterRequest):
         "conversations": {
 
             "Main": {
+
                 "messages": [],
                 "pinned": False
+
             }
 
         }
@@ -351,11 +328,13 @@ def login(data: LoginRequest):
 def newchat(data: ConversationRequest):
 
     if data.email not in USERS:
-        return {"success": False}
+        return {
+            "success": False
+        }
 
-    new_name = "Chat " + str(len(USERS[data.email]["conversations"]) + 1)
+    name = "Chat " + str(len(USERS[data.email]["conversations"]) + 1)
 
-    USERS[data.email]["conversations"][new_name] = {
+    USERS[data.email]["conversations"][name] = {
 
         "messages": [],
         "pinned": False
@@ -367,7 +346,7 @@ def newchat(data: ConversationRequest):
     return {
 
         "success": True,
-        "chat_name": new_name
+        "chat_name": name
 
     }
 
@@ -378,16 +357,15 @@ def newchat(data: ConversationRequest):
 @app.post("/renamechat")
 def renamechat(data: ConversationRequest):
 
-    if data.email not in USERS:
-        return {"success": False}
-
     convos = USERS[data.email]["conversations"]
 
     convos[data.new_name] = convos.pop(data.old_name)
 
     save_users(USERS)
 
-    return {"success": True}
+    return {
+        "success": True
+    }
 
 # =========================================================
 # PIN CHAT
@@ -402,7 +380,9 @@ def pinchat(data: ConversationRequest):
 
     save_users(USERS)
 
-    return {"success": True}
+    return {
+        "success": True
+    }
 
 # =========================================================
 # DELETE CHAT
@@ -414,13 +394,17 @@ def deletechat(data: ConversationRequest):
     convos = USERS[data.email]["conversations"]
 
     if len(convos) == 1:
-        return {"success": False}
+        return {
+            "success": False
+        }
 
     del convos[data.old_name]
 
     save_users(USERS)
 
-    return {"success": True}
+    return {
+        "success": True
+    }
 
 # =========================================================
 # CHAT
@@ -436,11 +420,10 @@ def chat(data: ChatRequest):
     ]:
 
         return {
-            "reply": get_premier_league_table()
+            "reply": get_prem_table()
         }
 
     history = []
-
     memory = []
 
     if data.email != "guest":
@@ -449,15 +432,13 @@ def chat(data: ChatRequest):
 
         history = user["conversations"][data.chat_id]["messages"]
 
-        memory = user["memory"][-25:]
-
-    context = get_context(data.message)
+        memory = user["memory"][-40:]
 
     rules = ""
 
     for i in range(1, 151):
 
-        rules += f"{i}. Always remain accurate and useful\\n"
+        rules += f"{i}. Always remain modern intelligent accurate natural and useful.\\n"
 
     system_prompt = f"""
 
@@ -465,13 +446,27 @@ You are Bloxy-bot AI Ultimate.
 
 {rules}
 
-LONG TERM MEMORY:
+Long term memory:
 
 {memory}
 
-LIVE CONTEXT:
+Never say:
+- As an AI
+- knowledge cutoff
+- training cutoff
 
-{context}
+Always:
+- answer naturally
+- answer fast
+- support all sports
+- support live info
+- support coding
+- support gaming
+- support science
+- support finance
+- support current events
+- support all conversations
+- avoid dictionary style answers
 
 """
 
@@ -550,6 +545,8 @@ def home():
 
 <head>
 
+<meta charset='UTF-8'>
+
 <meta name='viewport' content='width=device-width, initial-scale=1.0'>
 
 <title>Bloxy-bot</title>
@@ -558,6 +555,11 @@ def home():
 
 *{
 box-sizing:border-box;
+}
+
+html{
+scroll-behavior:smooth;
+overflow:hidden;
 }
 
 body{
@@ -652,8 +654,43 @@ cursor:pointer;
 
 .chatlist{
 flex:1;
-overflow:auto;
+overflow-y:auto;
+overflow-x:hidden;
+scrollbar-width:thin;
+scrollbar-color:#ff8800 #111;
 padding:20px;
+}
+
+.messages{
+flex:1;
+overflow-y:auto;
+overflow-x:hidden;
+scrollbar-width:thin;
+scrollbar-color:#00ff88 #111;
+scroll-behavior:smooth;
+padding:20px;
+padding-bottom:40px;
+}
+
+.chatlist::-webkit-scrollbar,
+.messages::-webkit-scrollbar{
+width:10px;
+}
+
+.chatlist::-webkit-scrollbar-track,
+.messages::-webkit-scrollbar-track{
+background:#111;
+border-radius:10px;
+}
+
+.chatlist::-webkit-scrollbar-thumb{
+background:#ff8800;
+border-radius:10px;
+}
+
+.messages::-webkit-scrollbar-thumb{
+background:#00ff88;
+border-radius:10px;
 }
 
 .chatitem{
@@ -701,12 +738,6 @@ border-bottom:1px solid #222;
 font-weight:bold;
 }
 
-.messages{
-flex:1;
-overflow:auto;
-padding:20px;
-}
-
 .msg{
 padding:18px;
 border-radius:18px;
@@ -714,6 +745,8 @@ margin-bottom:18px;
 background:#181818;
 line-height:1.7;
 max-width:900px;
+word-wrap:break-word;
+overflow-wrap:break-word;
 }
 
 .user{
@@ -752,6 +785,11 @@ border:none;
 outline:none;
 border-radius:18px;
 color:white;
+caret-color:#00ff88;
+}
+
+.input:focus{
+box-shadow:0 0 10px rgba(0,255,136,.25);
 }
 
 .send{
@@ -842,7 +880,9 @@ Bloxy-bot
 </div>
 
 <input id='registerEmail' class='authInput' placeholder='example@gmail.com'>
+
 <input id='registerUser' class='authInput' placeholder='Username'>
+
 <input id='registerPass' class='authInput' type='password' placeholder='Password'>
 
 <button class='authBtn' onclick='register()'>
@@ -852,6 +892,7 @@ Create Account
 <hr style='border:1px solid #222;margin:20px 0;'>
 
 <input id='loginEmail' class='authInput' placeholder='example@gmail.com'>
+
 <input id='loginPass' class='authInput' type='password' placeholder='Password'>
 
 <button class='authBtn' onclick='login()'>
@@ -976,7 +1017,9 @@ d='M10 15 L7 12 L8.5 10.5 L10 12 L15.5 6.5 L17 8 Z'
 }
 
 function hideAuth(){
+
 document.getElementById('auth').style.display='none';
+
 }
 
 function updateAccount(){
@@ -1008,7 +1051,9 @@ Logout
 async function register(){
 
 let email=document.getElementById('registerEmail').value.trim();
+
 let username=document.getElementById('registerUser').value.trim();
+
 let password=document.getElementById('registerPass').value.trim();
 
 let r=await fetch('/register',{
@@ -1045,6 +1090,7 @@ alert("Account created successfully");
 async function login(){
 
 let email=document.getElementById('loginEmail').value.trim();
+
 let password=document.getElementById('loginPass').value.trim();
 
 let r=await fetch('/login',{
@@ -1118,7 +1164,9 @@ render();
 }
 
 function logout(){
+
 location.reload();
+
 }
 
 async function newChat(){
@@ -1161,8 +1209,10 @@ email:currentUser.email
 let d=await r.json();
 
 chats[d.chat_name]={
+
 messages:[],
 pinned:false
+
 };
 
 currentChat=d.chat_name;
@@ -1170,50 +1220,6 @@ currentChat=d.chat_name;
 renderChats();
 
 render();
-
-}
-
-function renderChats(){
-
-let box=document.getElementById('chatlist');
-
-box.innerHTML='';
-
-Object.keys(chats).forEach(name=>{
-
-let d=document.createElement('div');
-
-d.className='chatitem';
-
-d.innerHTML=`
-
-<span onclick="switchChat('${name}')">
-
-${chats[name].pinned ? '📌 ' : ''}${name}
-
-</span>
-
-<div class='chatbuttons'>
-
-<button onclick="renameChat('${name}')">
-✏️
-</button>
-
-<button onclick="pinChat('${name}')">
-📌
-</button>
-
-<button onclick="deleteChat('${name}')">
-🗑️
-</button>
-
-</div>
-
-`;
-
-box.appendChild(d);
-
-});
 
 }
 
@@ -1328,6 +1334,50 @@ email:currentUser.email,
 old_name:name
 
 })
+
+});
+
+}
+
+function renderChats(){
+
+let box=document.getElementById('chatlist');
+
+box.innerHTML='';
+
+Object.keys(chats).forEach(name=>{
+
+let d=document.createElement('div');
+
+d.className='chatitem';
+
+d.innerHTML=`
+
+<span onclick="switchChat('${name}')">
+
+${chats[name].pinned ? '📌 ' : ''}${name}
+
+</span>
+
+<div class='chatbuttons'>
+
+<button onclick="renameChat('${name}')">
+✏️
+</button>
+
+<button onclick="pinChat('${name}')">
+📌
+</button>
+
+<button onclick="deleteChat('${name}')">
+🗑️
+</button>
+
+</div>
+
+`;
+
+box.appendChild(d);
 
 });
 
