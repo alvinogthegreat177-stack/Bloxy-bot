@@ -5,8 +5,8 @@ import uvicorn
 import requests
 import os
 import json
-import uuid
 import traceback
+import uuid
 
 app = FastAPI()
 
@@ -17,14 +17,14 @@ app = FastAPI()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 THESPORTSDB_API_KEY = os.getenv("THESPORTSDB_API_KEY", "")
-GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "")
-NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 APISPORTS_API_KEY = os.getenv("APISPORTS_API_KEY", "")
 SPORTMONK_API_KEY = os.getenv("SPORTMONK_API_KEY", "")
 SPORTRADAR_API_KEY = os.getenv("SPORTRADAR_API_KEY", "")
 ALLSPORTS_API_KEY = os.getenv("ALLSPORTS_API_KEY", "")
 ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
+NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
+GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 EXA_API_KEY = os.getenv("EXA_API_KEY", "")
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
 WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY", "")
@@ -33,39 +33,33 @@ FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY", "")
 SECRET_API_KEY = os.getenv("SECRET_API_KEY", "")
 
 # =========================================================
-# DATABASE FILES
+# DATABASE
 # =========================================================
 
 USERS_FILE = "users.json"
-MEMORY_FILE = "memory.json"
 
-# =========================================================
-# LOAD / SAVE
-# =========================================================
-
-def load_json(path, default):
+def load_users():
 
     try:
 
-        with open(path, "r", encoding="utf-8") as f:
+        with open(USERS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
 
     except:
-        return default
+        return {}
 
-def save_json(path, data):
+def save_users(users):
 
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(users, f, indent=2)
 
-USERS = load_json(USERS_FILE, {})
-MEMORY = load_json(MEMORY_FILE, {})
+USERS = load_users()
 
 # =========================================================
 # AI MODELS
 # =========================================================
 
-AI_MODELS = [
+MODELS = [
 
     {
         "provider": "groq",
@@ -95,13 +89,8 @@ AI_MODELS = [
 ]
 
 # =========================================================
-# REQUESTS
+# REQUEST MODELS
 # =========================================================
-
-class ChatRequest(BaseModel):
-    email: str
-    chat_id: str
-    message: str
 
 class RegisterRequest(BaseModel):
     email: str
@@ -112,71 +101,95 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class ChatRequest(BaseModel):
+    email: str
+    chat_id: str
+    message: str
+
+class ConversationRequest(BaseModel):
+    email: str
+    chat_name: str
+
 # =========================================================
-# LIVE CONTEXT
+# SPORTS TABLE
 # =========================================================
 
-def sports_context(query):
+def premier_league_table():
 
     try:
 
-        if THESPORTSDB_API_KEY:
+        if APISPORTS_API_KEY:
 
             r = requests.get(
-                f"https://www.thesportsdb.com/api/v1/json/{THESPORTSDB_API_KEY}/searchteams.php",
-                params={"t": query},
-                timeout=3
+                "https://v3.football.api-sports.io/standings",
+                headers={
+                    "x-apisports-key": APISPORTS_API_KEY
+                },
+                params={
+                    "league": 39,
+                    "season": 2025
+                },
+                timeout=6
             )
 
-            return r.text[:900]
+            data = r.json()
+
+            standings = data["response"][0]["league"]["standings"][0]
+
+            html = """
+
+<table style='width:100%;border-collapse:collapse;margin-top:10px;'>
+
+<tr style='background:#1f1f1f;'>
+
+<th style='padding:10px;'>#</th>
+<th style='padding:10px;'>Club</th>
+<th style='padding:10px;'>Pts</th>
+
+</tr>
+
+"""
+
+            for team in standings:
+
+                html += f"""
+
+<tr style='border-top:1px solid #333;'>
+
+<td style='padding:10px;'>{team['rank']}</td>
+<td style='padding:10px;'>{team['team']['name']}</td>
+<td style='padding:10px;'>{team['points']}</td>
+
+</tr>
+
+"""
+
+            html += "</table>"
+
+            return html
 
     except:
         pass
 
-    return ""
+    return "<div>Could not load Premier League table.</div>"
 
-def wiki_context(query):
+# =========================================================
+# CONTEXT
+# =========================================================
+
+def get_context(prompt):
 
     try:
 
         r = requests.get(
-            f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}",
+            f"https://en.wikipedia.org/api/rest_v1/page/summary/{prompt}",
             timeout=3
         )
 
-        return r.text[:900]
+        return r.text[:1000]
 
     except:
         return ""
-
-def build_context(prompt):
-
-    lower = prompt.lower()
-
-    sports_words = [
-        "football",
-        "soccer",
-        "arsenal",
-        "chelsea",
-        "man city",
-        "premier league",
-        "laliga",
-        "nba",
-        "ufc",
-        "cricket",
-        "f1",
-        "formula 1",
-        "horse racing"
-    ]
-
-    parts = []
-
-    if any(x in lower for x in sports_words):
-        parts.append(sports_context(prompt))
-
-    parts.append(wiki_context(prompt))
-
-    return "\n\n".join(parts)
 
 # =========================================================
 # AI
@@ -226,7 +239,7 @@ def openrouter_chat(model, messages):
 
 def ask_ai(messages):
 
-    for model in AI_MODELS:
+    for model in MODELS:
 
         try:
 
@@ -236,8 +249,7 @@ def ask_ai(messages):
             if model["provider"] == "openrouter":
                 return openrouter_chat(model["model"], messages)
 
-        except Exception:
-            print(traceback.format_exc())
+        except:
             continue
 
     return "Bloxy-bot is overloaded right now."
@@ -253,24 +265,40 @@ def register(data: RegisterRequest):
     username = data.username.strip()
     password = data.password.strip()
 
-    if ".gmail.com" not in email and ".outlook.com" not in email:
-        return {"success": False, "message": "Use a valid email"}
+    if "@" not in email:
+        return {
+            "success": False,
+            "message": "Email must contain @"
+        }
+
+    if "." not in email:
+        return {
+            "success": False,
+            "message": "Invalid email"
+        }
 
     if len(password) < 6:
-        return {"success": False, "message": "Password must be 6+ characters"}
+        return {
+            "success": False,
+            "message": "Password must be 6+ characters"
+        }
 
     if email in USERS:
-        return {"success": False, "message": "Account already exists"}
+        return {
+            "success": False,
+            "message": "Account already exists"
+        }
 
     USERS[email] = {
+
         "username": username,
         "password": password,
         "verified": username.lower() == "atg",
-        "memory": {},
         "conversations": {}
+
     }
 
-    save_json(USERS_FILE, USERS)
+    save_users(USERS)
 
     return {
         "success": True
@@ -298,9 +326,32 @@ def login(data: LoginRequest):
         }
 
     return {
+
         "success": True,
         "username": USERS[email]["username"],
-        "verified": USERS[email]["verified"]
+        "verified": USERS[email]["verified"],
+        "conversations": USERS[email]["conversations"]
+
+    }
+
+# =========================================================
+# NEW CONVERSATION
+# =========================================================
+
+@app.post("/newchat")
+def newchat(data: ConversationRequest):
+
+    if data.email not in USERS:
+        return {
+            "success": False
+        }
+
+    USERS[data.email]["conversations"][data.chat_name] = []
+
+    save_users(USERS)
+
+    return {
+        "success": True
     }
 
 # =========================================================
@@ -310,26 +361,28 @@ def login(data: LoginRequest):
 @app.post("/chat")
 def chat(data: ChatRequest):
 
-    email = data.email
+    if data.message.lower() in [
+        "pl table",
+        "premier league table",
+        "epl table"
+    ]:
 
-    if email == "guest":
+        return {
+            "reply": premier_league_table()
+        }
 
-        if "guest" not in MEMORY:
-            MEMORY["guest"] = {}
+    if data.email == "guest":
 
-        if data.chat_id not in MEMORY["guest"]:
-            MEMORY["guest"][data.chat_id] = []
-
-        history = MEMORY["guest"][data.chat_id]
+        history = []
 
     else:
 
-        if data.chat_id not in USERS[email]["conversations"]:
-            USERS[email]["conversations"][data.chat_id] = []
+        if data.chat_id not in USERS[data.email]["conversations"]:
+            USERS[data.email]["conversations"][data.chat_id] = []
 
-        history = USERS[email]["conversations"][data.chat_id]
+        history = USERS[data.email]["conversations"][data.chat_id]
 
-    context = build_context(data.message)
+    context = get_context(data.message)
 
     system_prompt = f"""
 
@@ -340,61 +393,33 @@ RULES:
 1. Never say knowledge cutoff
 2. Never say outdated
 3. Never say As an AI
-4. Never sound robotic
-5. Never define like a dictionary
-6. Always sound modern
-7. Always sound premium
-8. Always sound intelligent
-9. Always answer naturally
-10. Always support sports
-11. Always support live events
-12. Always support recent events
-13. Always support football
-14. Always support NBA
-15. Always support UFC
-16. Always support F1
-17. Always support cricket
-18. Always support gaming
-19. Always support coding
-20. Always support education
-21. Always support science
-22. Always support world news
+4. Never define like a dictionary
+5. Always sound modern
+6. Always sound premium
+7. Always sound conversational
+8. Always answer naturally
+9. Always support sports
+10. Always support football
+11. Always support NBA
+12. Always support UFC
+13. Always support F1
+14. Always support horse racing
+15. Always support live info
+16. Always support current events
+17. Always support coding
+18. Always support science
+19. Always support gaming
+20. Always support finance
+21. Always support transfer news
+22. Always support standings
 23. Always avoid fake stats
-24. Always avoid fake scores
-25. Always avoid ugly formatting
-26. Always avoid repetitive greetings
-27. Always avoid giant paragraphs
-28. Always remain conversational
-29. Always stay readable
-30. Always stay smooth
-31. Always stay fast
-32. Always stay production ready
-33. Always feel human
-34. Always support moments ago events
-35. Always support current information
-36. Always support standings
-37. Always support transfer news
-38. Always support tactical analysis
-39. Always support finance
-40. Always support entertainment
-41. Always support Roblox scripting
-42. Always support any question
-43. Always answer beautifully
-44. Always prioritize usefulness
-45. Always prioritize clarity
-46. Always support horse racing
-47. Always support rugby
-48. Always support NFL
-49. Always support LaLiga
-50. Always support Premier League
-51. Always support Champions League
-52. Always support esports
-53. Always support history
-54. Always support modern technology
-55. Always stay accurate
-56. Always stay clean
-57. Always remain Bloxy-bot
-58. Always feel like a top AI
+24. Always avoid ugly formatting
+25. Always stay clean
+26. Always stay intelligent
+27. Always stay smooth
+28. Always stay useful
+29. Always remain Bloxy-bot
+30. Always feel like a premium AI
 
 LIVE CONTEXT:
 
@@ -425,7 +450,6 @@ LIVE CONTEXT:
     blocked = [
 
         "As an AI",
-        "language model",
         "knowledge cutoff",
         "training cutoff"
 
@@ -434,24 +458,25 @@ LIVE CONTEXT:
     for b in blocked:
         reply = reply.replace(b, "")
 
-    history.append({
+    if data.email != "guest":
 
-        "role": "user",
-        "content": data.message
+        history.append({
 
-    })
+            "role": "user",
+            "content": data.message
 
-    history.append({
+        })
 
-        "role": "assistant",
-        "content": reply
+        history.append({
 
-    })
+            "role": "assistant",
+            "content": reply
 
-    if email != "guest":
-        save_json(USERS_FILE, USERS)
+        })
 
-    save_json(MEMORY_FILE, MEMORY)
+        USERS[data.email]["conversations"][data.chat_id] = history
+
+        save_users(USERS)
 
     return {
         "reply": reply
@@ -490,18 +515,18 @@ color:white;
 overflow:hidden;
 }
 
-.authScreen{
+.auth{
 position:fixed;
 inset:0;
 background:#0d0d0d;
 display:flex;
 justify-content:center;
 align-items:center;
-z-index:9999;
+z-index:999;
 }
 
 .authBox{
-width:400px;
+width:420px;
 background:#151515;
 padding:30px;
 border-radius:24px;
@@ -519,11 +544,10 @@ color:#00ff88;
 width:100%;
 padding:16px;
 margin-bottom:14px;
-background:#1c1c1c;
+background:#1d1d1d;
 border:none;
 border-radius:14px;
 color:white;
-font-size:15px;
 outline:none;
 }
 
@@ -534,9 +558,9 @@ border:none;
 border-radius:14px;
 background:orange;
 color:white;
-font-size:16px;
+font-size:15px;
 cursor:pointer;
-margin-bottom:12px;
+margin-bottom:10px;
 }
 
 .guestBtn{
@@ -556,19 +580,15 @@ display:flex;
 flex-direction:column;
 }
 
-.sidebarTop{
-padding:20px;
-}
-
 .logo{
 font-size:32px;
 font-weight:bold;
+padding:20px;
 color:#00ff88;
-margin-bottom:20px;
 }
 
 .newchat{
-width:100%;
+margin:0 20px 20px 20px;
 padding:14px;
 border:none;
 border-radius:14px;
@@ -591,20 +611,6 @@ margin-bottom:10px;
 display:flex;
 justify-content:space-between;
 align-items:center;
-}
-
-.chatBtns{
-display:flex;
-gap:6px;
-}
-
-.chatBtns button{
-background:#222;
-border:none;
-color:white;
-padding:6px 8px;
-border-radius:8px;
-cursor:pointer;
 }
 
 .accountBar{
@@ -652,6 +658,14 @@ border-left:4px solid orange;
 border-left:4px solid #00ff88;
 }
 
+.topName{
+display:flex;
+align-items:center;
+gap:6px;
+font-weight:bold;
+margin-bottom:8px;
+}
+
 .inputarea{
 padding:18px;
 background:#111;
@@ -666,7 +680,7 @@ gap:10px;
 .input{
 flex:1;
 padding:18px;
-background:#1c1c1c;
+background:#1d1d1d;
 border:none;
 outline:none;
 border-radius:18px;
@@ -676,51 +690,18 @@ color:white;
 .send{
 width:70px;
 border:none;
-border-radius:18px;
 background:orange;
 color:white;
 font-size:22px;
+border-radius:18px;
 cursor:pointer;
 }
 
 .helper{
 text-align:center;
-font-size:12px;
 opacity:.45;
+font-size:12px;
 margin-top:10px;
-}
-
-.topName{
-display:flex;
-align-items:center;
-gap:6px;
-font-weight:bold;
-margin-bottom:8px;
-}
-
-.badgeWrap{
-display:flex;
-align-items:center;
-position:relative;
-}
-
-.badgeTooltip{
-position:absolute;
-bottom:35px;
-left:-50px;
-width:260px;
-background:#1b1b1b;
-padding:12px;
-border-radius:14px;
-font-size:11px;
-opacity:0;
-pointer-events:none;
-transition:.2s;
-border:1px solid #333;
-}
-
-.badgeWrap:hover .badgeTooltip{
-opacity:1;
 }
 
 .typing{
@@ -754,13 +735,44 @@ transform:scale(1);
 }
 }
 
+.badgeWrap{
+display:flex;
+align-items:center;
+position:relative;
+}
+
+.badgeTooltip{
+position:absolute;
+bottom:35px;
+left:-50px;
+width:260px;
+background:#1b1b1b;
+padding:12px;
+border-radius:14px;
+font-size:11px;
+opacity:0;
+pointer-events:none;
+transition:.2s;
+border:1px solid #333;
+}
+
+.badgeWrap:hover .badgeTooltip{
+opacity:1;
+}
+
+table{
+background:#111;
+border-radius:14px;
+overflow:hidden;
+}
+
 </style>
 
 </head>
 
 <body>
 
-<div class='authScreen' id='authScreen'>
+<div class='auth' id='auth'>
 
 <div class='authBox'>
 
@@ -769,19 +781,19 @@ Bloxy-bot
 </div>
 
 <input
-id='regEmail'
+id='registerEmail'
 class='authInput'
 placeholder='example@gmail.com'
 >
 
 <input
-id='regUser'
+id='registerUser'
 class='authInput'
 placeholder='Username'
 >
 
 <input
-id='regPass'
+id='registerPass'
 class='authInput'
 type='password'
 placeholder='Password (6+ chars)'
@@ -790,6 +802,8 @@ placeholder='Password (6+ chars)'
 <button class='authBtn' onclick='register()'>
 Create Account
 </button>
+
+<hr style='border:1px solid #222;margin:20px 0;'>
 
 <input
 id='loginEmail'
@@ -820,8 +834,6 @@ Continue As Guest
 
 <div class='sidebar'>
 
-<div class='sidebarTop'>
-
 <div class='logo'>
 Bloxy-bot
 </div>
@@ -829,8 +841,6 @@ Bloxy-bot
 <button class='newchat' onclick='newChat()'>
 + New Chat
 </button>
-
-</div>
 
 <div class='chatlist' id='chatlist'></div>
 
@@ -889,10 +899,7 @@ guest:true
 };
 
 let chats={
-'Main':{
-messages:[],
-pinned:false
-}
+'Main':[]
 };
 
 let currentChat='Main';
@@ -929,7 +936,7 @@ d='M10 15 L7 12 L8.5 10.5 L10 12 L15.5 6.5 L17 8 Z'
 
 function hideAuth(){
 
-document.getElementById('authScreen').style.display='none';
+document.getElementById('auth').style.display='none';
 
 }
 
@@ -937,7 +944,7 @@ function updateAccount(){
 
 document.getElementById('account').innerHTML=
 
-currentUser.username+
+currentUser.username +
 
 (currentUser.verified ? badge() : '');
 
@@ -961,9 +968,9 @@ Logout
 
 async function register(){
 
-let email=document.getElementById('regEmail').value;
-let username=document.getElementById('regUser').value;
-let password=document.getElementById('regPass').value;
+let email=document.getElementById('registerEmail').value.trim();
+let username=document.getElementById('registerUser').value.trim();
+let password=document.getElementById('registerPass').value.trim();
 
 let r=await fetch('/register',{
 
@@ -992,14 +999,14 @@ return;
 
 }
 
-alert("Account created");
+alert("Account created successfully");
 
 }
 
 async function login(){
 
-let email=document.getElementById('loginEmail').value;
-let password=document.getElementById('loginPass').value;
+let email=document.getElementById('loginEmail').value.trim();
+let password=document.getElementById('loginPass').value.trim();
 
 let r=await fetch('/login',{
 
@@ -1036,9 +1043,25 @@ guest:false
 
 };
 
+chats=d.conversations;
+
+if(Object.keys(chats).length===0){
+
+chats={
+'Main':[]
+};
+
+}
+
+currentChat=Object.keys(chats)[0];
+
 hideAuth();
 
 updateAccount();
+
+renderChats();
+
+render();
 
 }
 
@@ -1057,11 +1080,50 @@ hideAuth();
 
 updateAccount();
 
+renderChats();
+
+render();
+
 }
 
 function logout(){
 
 location.reload();
+
+}
+
+async function newChat(){
+
+let name='Chat '+(Object.keys(chats).length+1);
+
+chats[name]=[];
+
+currentChat=name;
+
+if(!currentUser.guest){
+
+await fetch('/newchat',{
+
+method:'POST',
+
+headers:{
+'Content-Type':'application/json'
+},
+
+body:JSON.stringify({
+
+email:currentUser.email,
+chat_name:name
+
+})
+
+});
+
+}
+
+renderChats();
+
+render();
 
 }
 
@@ -1080,26 +1142,8 @@ d.className='chatitem';
 d.innerHTML=`
 
 <span onclick="switchChat('${name}')">
-
-${chats[name].pinned ? '📌 ' : ''}${name}
-
+${name}
 </span>
-
-<div class='chatBtns'>
-
-<button onclick="renameChat('${name}')">
-✏️
-</button>
-
-<button onclick="pinChat('${name}')">
-📌
-</button>
-
-<button onclick="deleteChat('${name}')">
-🗑️
-</button>
-
-</div>
 
 `;
 
@@ -1109,37 +1153,25 @@ box.appendChild(d);
 
 }
 
+function switchChat(name){
+
+currentChat=name;
+
+render();
+
+}
+
 function render(){
 
 let box=document.getElementById('messages');
 
-box.replaceChildren();
+box.innerHTML='';
 
-for(let m of chats[currentChat].messages){
+for(let m of chats[currentChat]){
 
 let d=document.createElement('div');
 
 d.className='msg '+m.role;
-
-if(m.typing){
-
-d.innerHTML=`
-
-<div class='typing'>
-
-<div class='dot'></div>
-<div class='dot'></div>
-<div class='dot'></div>
-
-<span>
-Bloxy-bot is typing...
-</span>
-
-</div>
-
-`;
-
-}else{
 
 d.innerHTML=`
 
@@ -1157,76 +1189,11 @@ ${m.role==='user' && currentUser.verified ? badge() : ''}
 
 `;
 
-}
-
 box.appendChild(d);
 
 }
 
 box.scrollTop=box.scrollHeight;
-
-}
-
-function newChat(){
-
-let name='Chat '+(Object.keys(chats).length+1);
-
-chats[name]={
-messages:[],
-pinned:false
-};
-
-currentChat=name;
-
-renderChats();
-
-render();
-
-}
-
-function switchChat(name){
-
-currentChat=name;
-
-render();
-
-}
-
-function renameChat(name){
-
-let n=prompt('Rename conversation',name);
-
-if(!n)return;
-
-chats[n]=chats[name];
-
-delete chats[name];
-
-currentChat=n;
-
-renderChats();
-
-}
-
-function pinChat(name){
-
-chats[name].pinned=!chats[name].pinned;
-
-renderChats();
-
-}
-
-function deleteChat(name){
-
-if(Object.keys(chats).length===1)return;
-
-delete chats[name];
-
-currentChat=Object.keys(chats)[0];
-
-renderChats();
-
-render();
 
 }
 
@@ -1240,23 +1207,35 @@ if(!msg)return;
 
 input.value='';
 
-chats[currentChat].messages.push({
+chats[currentChat].push({
 
 role:'user',
 content:msg
 
 });
 
-chats[currentChat].messages.push({
+chats[currentChat].push({
 
 role:'assistant',
-typing:true
+content:`
+
+<div class='typing'>
+
+<div class='dot'></div>
+<div class='dot'></div>
+<div class='dot'></div>
+
+<span>
+Bloxy-bot is typing...
+</span>
+
+</div>
+
+`
 
 });
 
 render();
-
-try{
 
 let r=await fetch('/chat',{
 
@@ -1278,9 +1257,9 @@ message:msg
 
 let d=await r.json();
 
-chats[currentChat].messages.pop();
+chats[currentChat].pop();
 
-chats[currentChat].messages.push({
+chats[currentChat].push({
 
 role:'assistant',
 content:d.reply
@@ -1288,21 +1267,6 @@ content:d.reply
 });
 
 render();
-
-}catch(e){
-
-chats[currentChat].messages.pop();
-
-chats[currentChat].messages.push({
-
-role:'assistant',
-content:'Failed to load response.'
-
-});
-
-render();
-
-}
 
 }
 
