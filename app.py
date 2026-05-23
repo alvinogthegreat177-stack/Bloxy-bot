@@ -1,116 +1,179 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-import uvicorn
+import sqlite3
 import requests
-import os
+import uvicorn
 import json
+import os
+import time
 
 app = FastAPI()
 
 # =========================================================
-# API KEYS
+# ENV VARIABLES
 # =========================================================
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-THESPORTSDB_API_KEY = os.getenv("THESPORTSDB_API_KEY", "")
 APISPORTS_API_KEY = os.getenv("APISPORTS_API_KEY", "")
+THESPORTSDB_API_KEY = os.getenv("THESPORTSDB_API_KEY", "")
 SPORTMONK_API_KEY = os.getenv("SPORTMONK_API_KEY", "")
 SPORTRADAR_API_KEY = os.getenv("SPORTRADAR_API_KEY", "")
 ALLSPORTS_API_KEY = os.getenv("ALLSPORTS_API_KEY", "")
 ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
 GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "")
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 EXA_API_KEY = os.getenv("EXA_API_KEY", "")
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
-WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY", "")
-WOLFRAM_APP_ID = os.getenv("WOLFRAM_APP_ID", "")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY", "")
+WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY", "")
 SECRET_API_KEY = os.getenv("SECRET_API_KEY", "")
 
 # =========================================================
 # DATABASE
 # =========================================================
 
-USERS_FILE = "users.json"
+conn = sqlite3.connect("bloxy.db", check_same_thread=False)
+cursor = conn.cursor()
 
-def load_users():
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS users(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+email TEXT UNIQUE,
+username TEXT,
+password TEXT,
+verified INTEGER DEFAULT 0
+)
+""")
 
-    try:
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS conversations(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+email TEXT,
+title TEXT,
+messages TEXT,
+pinned INTEGER DEFAULT 0
+)
+""")
 
-        with open(USERS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS drafts(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+email TEXT,
+content TEXT
+)
+""")
 
-    except:
-        return {}
-
-def save_users(data):
-
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-
-USERS = load_users()
+conn.commit()
 
 # =========================================================
-# AI MODELS
+# MODELS
 # =========================================================
 
 MODELS = [
-
-    {
-        "provider": "groq",
-        "model": "llama-3.1-8b-instant"
-    },
-
-    {
-        "provider": "groq",
-        "model": "llama-3.3-70b-versatile"
-    },
-
-    {
-        "provider": "openrouter",
-        "model": "deepseek/deepseek-chat-v3-0324:free"
-    },
-
-    {
-        "provider": "openrouter",
-        "model": "qwen/qwen3-32b"
-    },
-
-    {
-        "provider": "openrouter",
-        "model": "mistralai/mistral-small-3.2-24b-instruct:free"
-    }
-
+    "meta-llama/llama-3.1-8b-instruct",
+    "meta-llama/llama-3.3-70b-instruct",
+    "deepseek/deepseek-chat-v3-0324:free",
+    "qwen/qwen3-32b:free",
+    "mistralai/mistral-small-3.2-24b-instruct:free"
 ]
 
 # =========================================================
-# REQUEST MODELS
+# RULES
 # =========================================================
 
-class RegisterRequest(BaseModel):
+RULES = []
+
+for i in range(1, 301):
+    RULES.append(
+        f"{i}. Always remain modern intelligent organized fast emoji-friendly and visually structured."
+    )
+
+SYSTEM_PROMPT = "\n".join(RULES)
+
+# =========================================================
+# PYDANTIC
+# =========================================================
+
+class Register(BaseModel):
     email: str
     username: str
     password: str
 
-class LoginRequest(BaseModel):
+class Login(BaseModel):
     email: str
     password: str
 
-class ChatRequest(BaseModel):
+class Chat(BaseModel):
     email: str
-    chat_id: str
+    title: str
     message: str
 
-class ConversationRequest(BaseModel):
+class RenameChat(BaseModel):
     email: str
-    old_name: str = ""
-    new_name: str = ""
+    old: str
+    new: str
+
+class DeleteChat(BaseModel):
+    email: str
+    title: str
+
+class PinChat(BaseModel):
+    email: str
+    title: str
 
 # =========================================================
-# SPORTS TABLE
+# AI
+# =========================================================
+
+def ask_ai(message, history=[]):
+
+    messages = [
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT
+        }
+    ]
+
+    for item in history:
+        messages.append(item)
+
+    messages.append({
+        "role": "user",
+        "content": message
+    })
+
+    for model in MODELS:
+
+        try:
+
+            r = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "temperature": 0.5,
+                    "max_tokens": 800
+                },
+                timeout=40
+            )
+
+            data = r.json()
+
+            return data["choices"][0]["message"]["content"]
+
+        except:
+            continue
+
+    return "⚠️ Bloxy-bot is overloaded right now."
+
+# =========================================================
+# SPORTS
 # =========================================================
 
 def get_prem_table():
@@ -125,8 +188,7 @@ def get_prem_table():
             params={
                 "league": 39,
                 "season": 2025
-            },
-            timeout=5
+            }
         )
 
         data = r.json()
@@ -134,440 +196,363 @@ def get_prem_table():
         standings = data["response"][0]["league"]["standings"][0]
 
         html = """
-
-<table style='width:100%;border-collapse:collapse;background:#111;border-radius:14px;overflow:hidden;'>
-
-<tr style='background:#1f1f1f;'>
-
-<th style='padding:12px;'>#</th>
-<th style='padding:12px;'>Club</th>
-<th style='padding:12px;'>Pts</th>
-
-</tr>
-
-"""
+        <table style='width:100%;border-collapse:collapse'>
+        <tr>
+        <th>#</th>
+        <th>Club</th>
+        <th>Pts</th>
+        </tr>
+        """
 
         for t in standings:
 
             html += f"""
-
-<tr style='border-top:1px solid #333;'>
-
-<td style='padding:12px;'>{t['rank']}</td>
-<td style='padding:12px;'>{t['team']['name']}</td>
-<td style='padding:12px;'>{t['points']}</td>
-
-</tr>
-
-"""
+            <tr>
+            <td>{t['rank']}</td>
+            <td>{t['team']['name']}</td>
+            <td>{t['points']}</td>
+            </tr>
+            """
 
         html += "</table>"
 
         return html
 
     except:
-        return "Could not load Premier League table."
-
-# =========================================================
-# AI
-# =========================================================
-
-def groq_chat(model, messages):
-
-    r = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": model,
-            "messages": messages,
-            "temperature": 0.4,
-            "max_tokens": 400
-        },
-        timeout=15
-    )
-
-    data = r.json()
-
-    return data["choices"][0]["message"]["content"]
-
-def openrouter_chat(model, messages):
-
-    r = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": model,
-            "messages": messages,
-            "temperature": 0.4,
-            "max_tokens": 400
-        },
-        timeout=15
-    )
-
-    data = r.json()
-
-    return data["choices"][0]["message"]["content"]
-
-def ask_ai(messages):
-
-    for model in MODELS:
-
-        try:
-
-            if model["provider"] == "groq":
-                return groq_chat(model["model"], messages)
-
-            else:
-                return openrouter_chat(model["model"], messages)
-
-        except:
-            continue
-
-    return "Bloxy-bot is overloaded right now."
+        return "⚠️ Could not load PL table"
 
 # =========================================================
 # REGISTER
 # =========================================================
 
 @app.post("/register")
-def register(data: RegisterRequest):
+def register(data: Register):
 
-    email = data.email.strip().lower()
-    username = data.username.strip()
-    password = data.password.strip()
+    if "@" not in data.email:
+        return {"success": False}
 
-    if "@" not in email or "." not in email:
+    if len(data.password) < 6:
+        return {"success": False}
+
+    verified = 1 if data.username.lower() in [
+        "atg",
+        "alvin",
+        "consolemicgg"
+    ] else 0
+
+    try:
+
+        cursor.execute(
+            "INSERT INTO users(email,username,password,verified) VALUES(?,?,?,?)",
+            (data.email, data.username, data.password, verified)
+        )
+
+        cursor.execute(
+            "INSERT INTO conversations(email,title,messages) VALUES(?,?,?)",
+            (data.email, "Main", "[]")
+        )
+
+        conn.commit()
+
         return {
-            "success": False,
-            "message": "Invalid email"
+            "success": True,
+            "username": data.username,
+            "verified": bool(verified)
         }
 
-    if len(password) < 6:
-        return {
-            "success": False,
-            "message": "Password must contain 6+ characters"
-        }
-
-    if email in USERS:
-        return {
-            "success": False,
-            "message": "Account already exists"
-        }
-
-    USERS[email] = {
-
-        "username": username,
-        "password": password,
-        "verified": username.lower() == "atg",
-
-        "memory": [],
-
-        "conversations": {
-
-            "Main": {
-
-                "messages": [],
-                "pinned": False
-
-            }
-
-        }
-
-    }
-
-    save_users(USERS)
-
-    return {
-        "success": True
-    }
+    except:
+        return {"success": False}
 
 # =========================================================
 # LOGIN
 # =========================================================
 
 @app.post("/login")
-def login(data: LoginRequest):
+def login(data: Login):
 
-    email = data.email.strip().lower()
+    cursor.execute(
+        "SELECT * FROM users WHERE email=? AND password=?",
+        (data.email, data.password)
+    )
 
-    if email not in USERS:
-        return {
-            "success": False,
-            "message": "Account not found"
-        }
+    user = cursor.fetchone()
 
-    if USERS[email]["password"] != data.password:
-        return {
-            "success": False,
-            "message": "Wrong password"
-        }
+    if not user:
+        return {"success": False}
 
     return {
-
         "success": True,
-
-        "username": USERS[email]["username"],
-
-        "verified": USERS[email]["verified"],
-
-        "conversations": USERS[email]["conversations"]
-
+        "username": user[2],
+        "verified": bool(user[4])
     }
 
 # =========================================================
 # NEW CHAT
 # =========================================================
 
-@app.post("/newchat")
-def newchat(data: ConversationRequest):
+@app.post("/new-chat")
+def new_chat(data: Chat):
 
-    if data.email not in USERS:
-        return {
-            "success": False
-        }
+    cursor.execute(
+        "INSERT INTO conversations(email,title,messages) VALUES(?,?,?)",
+        (data.email, data.title, "[]")
+    )
 
-    name = "Chat " + str(len(USERS[data.email]["conversations"]) + 1)
+    conn.commit()
 
-    USERS[data.email]["conversations"][name] = {
-
-        "messages": [],
-        "pinned": False
-
-    }
-
-    save_users(USERS)
-
-    return {
-
-        "success": True,
-        "chat_name": name
-
-    }
+    return {"success": True}
 
 # =========================================================
-# RENAME CHAT
+# RENAME
 # =========================================================
 
-@app.post("/renamechat")
-def renamechat(data: ConversationRequest):
+@app.post("/rename-chat")
+def rename_chat(data: RenameChat):
 
-    convos = USERS[data.email]["conversations"]
+    cursor.execute(
+        "UPDATE conversations SET title=? WHERE email=? AND title=?",
+        (data.new, data.email, data.old)
+    )
 
-    convos[data.new_name] = convos.pop(data.old_name)
+    conn.commit()
 
-    save_users(USERS)
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# PIN CHAT
-# =========================================================
-
-@app.post("/pinchat")
-def pinchat(data: ConversationRequest):
-
-    convos = USERS[data.email]["conversations"]
-
-    convos[data.old_name]["pinned"] = not convos[data.old_name]["pinned"]
-
-    save_users(USERS)
-
-    return {
-        "success": True
-    }
+    return {"success": True}
 
 # =========================================================
-# DELETE CHAT
+# PIN
 # =========================================================
 
-@app.post("/deletechat")
-def deletechat(data: ConversationRequest):
+@app.post("/pin-chat")
+def pin_chat(data: PinChat):
 
-    convos = USERS[data.email]["conversations"]
+    cursor.execute(
+        "UPDATE conversations SET pinned=1 WHERE email=? AND title=?",
+        (data.email, data.title)
+    )
 
-    if len(convos) == 1:
-        return {
-            "success": False
-        }
+    conn.commit()
 
-    del convos[data.old_name]
+    return {"success": True}
 
-    save_users(USERS)
+# =========================================================
+# DELETE
+# =========================================================
 
-    return {
-        "success": True
-    }
+@app.post("/delete-chat")
+def delete_chat(data: DeleteChat):
+
+    cursor.execute(
+        "DELETE FROM conversations WHERE email=? AND title=?",
+        (data.email, data.title)
+    )
+
+    conn.commit()
+
+    return {"success": True}
 
 # =========================================================
 # CHAT
 # =========================================================
 
 @app.post("/chat")
-def chat(data: ChatRequest):
+def chat(data: Chat):
 
-    if data.message.lower() in [
+    low = data.message.lower().strip()
+
+    if low in [
         "pl table",
         "premier league table",
         "epl table"
     ]:
-
         return {
             "reply": get_prem_table()
         }
 
     history = []
-    memory = []
 
     if data.email != "guest":
 
-        user = USERS[data.email]
+        cursor.execute(
+            "SELECT messages FROM conversations WHERE email=? AND title=?",
+            (data.email, data.title)
+        )
 
-        history = user["conversations"][data.chat_id]["messages"]
+        row = cursor.fetchone()
 
-        memory = user["memory"][-40:]
+        if row:
 
-    rules = ""
+            try:
+                history = json.loads(row[0])[-12:]
+            except:
+                history = []
 
-    for i in range(1, 151):
-
-        rules += f"{i}. Always remain modern intelligent accurate natural and useful.\\n"
-
-    system_prompt = f"""
-
-You are Bloxy-bot AI Ultimate.
-
-{rules}
-
-Long term memory:
-
-{memory}
-
-Never say:
-- As an AI
-- knowledge cutoff
-- training cutoff
-
-Always:
-- answer naturally
-- answer fast
-- support all sports
-- support live info
-- support coding
-- support gaming
-- support science
-- support finance
-- support current events
-- support all conversations
-- avoid dictionary style answers
-
-"""
-
-    messages = [
-
-        {
-            "role": "system",
-            "content": system_prompt
-        }
-
-    ]
-
-    messages += history[-10:]
-
-    messages.append({
-
-        "role": "user",
-        "content": data.message
-
-    })
-
-    reply = ask_ai(messages)
-
-    blocked = [
-
-        "As an AI",
-        "knowledge cutoff",
-        "training cutoff"
-
-    ]
-
-    for b in blocked:
-        reply = reply.replace(b, "")
+    reply = ask_ai(data.message, history)
 
     if data.email != "guest":
 
-        USERS[data.email]["memory"].append({
-
-            "user": data.message,
-            "assistant": reply
-
-        })
-
-        USERS[data.email]["conversations"][data.chat_id]["messages"].append({
-
+        history.append({
             "role": "user",
             "content": data.message
-
         })
 
-        USERS[data.email]["conversations"][data.chat_id]["messages"].append({
-
+        history.append({
             "role": "assistant",
             "content": reply
-
         })
 
-        save_users(USERS)
+        cursor.execute(
+            "UPDATE conversations SET messages=? WHERE email=? AND title=?",
+            (
+                json.dumps(history),
+                data.email,
+                data.title
+            )
+        )
+
+        conn.commit()
 
     return {
         "reply": reply
     }
 
 # =========================================================
-# FRONTEND
+# UI
 # =========================================================
 
 @app.get("/", response_class=HTMLResponse)
 def home():
 
     return """
-
-<!DOCTYPE html>
-
 <html>
-
 <head>
-
-<meta charset='UTF-8'>
-
-<meta name='viewport' content='width=device-width, initial-scale=1.0'>
-
 <title>Bloxy-bot</title>
 
 <style>
-
-*{
-box-sizing:border-box;
-}
-
-html{
-scroll-behavior:smooth;
-overflow:hidden;
-}
 
 body{
 margin:0;
 background:#0d0d0d;
 font-family:Arial;
-color:white;
 overflow:hidden;
+color:white;
+}
+
+.sidebar{
+position:fixed;
+left:0;
+top:0;
+bottom:0;
+width:300px;
+background:#111;
+display:flex;
+flex-direction:column;
+border-right:1px solid #222;
+overflow-y:auto;
+}
+
+.logo{
+padding:20px;
+font-size:32px;
+font-weight:bold;
+color:#00ff88;
+}
+
+.newchat{
+margin:10px;
+padding:15px;
+background:#1d1d1d;
+border-radius:14px;
+cursor:pointer;
+}
+
+.conversations{
+flex:1;
+padding:10px;
+overflow-y:auto;
+}
+
+.conv{
+padding:15px;
+margin-bottom:10px;
+background:#181818;
+border-radius:12px;
+cursor:pointer;
+}
+
+.account{
+padding:20px;
+border-top:1px solid #222;
+}
+
+.main{
+margin-left:300px;
+height:100vh;
+display:flex;
+flex-direction:column;
+}
+
+.messages{
+flex:1;
+overflow-y:auto;
+padding:20px;
+}
+
+.msg{
+padding:18px;
+border-radius:18px;
+margin-bottom:18px;
+white-space:pre-wrap;
+word-break:break-word;
+line-height:1.5;
+}
+
+.user{
+background:#1f1f1f;
+}
+
+.bot{
+background:#181818;
+border-left:4px solid #00ff88;
+}
+
+.inputbar{
+display:flex;
+gap:10px;
+padding:20px;
+background:#111;
+}
+
+textarea{
+flex:1;
+height:70px;
+background:#1b1b1b;
+border:none;
+border-radius:16px;
+padding:16px;
+color:white;
+resize:none;
+font-size:16px;
+}
+
+button{
+width:80px;
+background:orange;
+border:none;
+border-radius:16px;
+color:white;
+font-size:20px;
+cursor:pointer;
+}
+
+.verify{
+color:#00ff88;
+font-size:14px;
+margin-left:5px;
+cursor:pointer;
+}
+
+.typing{
+opacity:0.7;
 }
 
 .auth{
@@ -577,292 +562,30 @@ background:#0d0d0d;
 display:flex;
 justify-content:center;
 align-items:center;
-z-index:999;
+z-index:1000;
 }
 
-.authBox{
-width:420px;
-background:#151515;
+.authbox{
+width:400px;
+background:#111;
 padding:30px;
-border-radius:24px;
-border:1px solid #222;
-}
-
-.authTitle{
-font-size:34px;
-font-weight:bold;
-margin-bottom:25px;
-color:#00ff88;
-}
-
-.authInput{
-width:100%;
-padding:16px;
-margin-bottom:14px;
-background:#1d1d1d;
-border:none;
-border-radius:14px;
-color:white;
-outline:none;
-}
-
-.authBtn{
-width:100%;
-padding:16px;
-border:none;
-border-radius:14px;
-background:orange;
-color:white;
-font-size:15px;
-cursor:pointer;
-margin-bottom:10px;
-}
-
-.guestBtn{
-background:#222;
-}
-
-.container{
-display:flex;
-height:100vh;
-}
-
-.sidebar{
-width:300px;
-background:#111;
-border-right:1px solid #222;
+border-radius:20px;
 display:flex;
 flex-direction:column;
+gap:15px;
 }
 
-.logo{
-font-size:34px;
-font-weight:bold;
-padding:20px;
-color:#00ff88;
-}
-
-.newchat{
-margin:0 20px 20px 20px;
-padding:14px;
-border:none;
-border-radius:14px;
-background:#1d1d1d;
-color:white;
-cursor:pointer;
-}
-
-.chatlist{
-flex:1;
-overflow-y:auto;
-overflow-x:hidden;
-scrollbar-width:thin;
-scrollbar-color:#ff8800 #111;
-padding:20px;
-}
-
-.messages{
-flex:1;
-overflow-y:auto;
-overflow-x:hidden;
-scrollbar-width:thin;
-scrollbar-color:#00ff88 #111;
-scroll-behavior:smooth;
-padding:20px;
-padding-bottom:40px;
-}
-
-.chatlist::-webkit-scrollbar,
-.messages::-webkit-scrollbar{
-width:10px;
-}
-
-.chatlist::-webkit-scrollbar-track,
-.messages::-webkit-scrollbar-track{
-background:#111;
-border-radius:10px;
-}
-
-.chatlist::-webkit-scrollbar-thumb{
-background:#ff8800;
-border-radius:10px;
-}
-
-.messages::-webkit-scrollbar-thumb{
-background:#00ff88;
-border-radius:10px;
-}
-
-.chatitem{
-padding:14px;
-background:#181818;
-border-radius:14px;
-margin-bottom:10px;
-display:flex;
-justify-content:space-between;
-align-items:center;
-}
-
-.chatbuttons{
-display:flex;
-gap:6px;
-}
-
-.chatbuttons button{
-background:#222;
-border:none;
-color:white;
-padding:6px 8px;
-border-radius:8px;
-cursor:pointer;
-}
-
-.accountBar{
+input{
 padding:16px;
-border-top:1px solid #222;
-display:flex;
-justify-content:space-between;
-align-items:center;
-}
-
-.main{
-flex:1;
-display:flex;
-flex-direction:column;
-}
-
-.topbar{
-padding:18px;
-background:#111;
-border-bottom:1px solid #222;
-font-weight:bold;
-}
-
-.msg{
-padding:18px;
-border-radius:18px;
-margin-bottom:18px;
-background:#181818;
-line-height:1.7;
-max-width:900px;
-word-wrap:break-word;
-overflow-wrap:break-word;
-}
-
-.user{
-margin-left:auto;
-border-left:4px solid orange;
-}
-
-.assistant{
-border-left:4px solid #00ff88;
-}
-
-.topName{
-display:flex;
-align-items:center;
-gap:6px;
-font-weight:bold;
-margin-bottom:8px;
-}
-
-.inputarea{
-padding:18px;
-background:#111;
-border-top:1px solid #222;
-}
-
-.row{
-display:flex;
-gap:10px;
-}
-
-.input{
-flex:1;
-padding:18px;
-background:#1d1d1d;
+background:#1c1c1c;
 border:none;
-outline:none;
-border-radius:18px;
-color:white;
-caret-color:#00ff88;
-}
-
-.input:focus{
-box-shadow:0 0 10px rgba(0,255,136,.25);
-}
-
-.send{
-width:70px;
-border:none;
-background:orange;
-color:white;
-font-size:22px;
-border-radius:18px;
-cursor:pointer;
-}
-
-.helper{
-text-align:center;
-opacity:.45;
-font-size:12px;
-margin-top:10px;
-}
-
-.typing{
-display:flex;
-align-items:center;
-gap:5px;
-}
-
-.dot{
-width:8px;
-height:8px;
-background:#00ff88;
-border-radius:50%;
-animation:bounce 1s infinite;
-}
-
-.dot:nth-child(2){
-animation-delay:.2s;
-}
-
-.dot:nth-child(3){
-animation-delay:.4s;
-}
-
-@keyframes bounce{
-0%,80%,100%{
-transform:scale(0);
-}
-40%{
-transform:scale(1);
-}
-}
-
-.badgeWrap{
-display:flex;
-align-items:center;
-position:relative;
-}
-
-.badgeTooltip{
-position:absolute;
-bottom:35px;
-left:-50px;
-width:260px;
-background:#1b1b1b;
-padding:12px;
 border-radius:14px;
-font-size:11px;
-opacity:0;
-pointer-events:none;
-transition:.2s;
-border:1px solid #333;
+color:white;
 }
 
-.badgeWrap:hover .badgeTooltip{
-opacity:1;
+.small{
+font-size:13px;
+opacity:0.7;
 }
 
 </style>
@@ -873,90 +596,19 @@ opacity:1;
 
 <div class='auth' id='auth'>
 
-<div class='authBox'>
+<div class='authbox'>
 
-<div class='authTitle'>
-Bloxy-bot
-</div>
+<h1>🤖 Bloxy-bot</h1>
 
-<input id='registerEmail' class='authInput' placeholder='example@gmail.com'>
+<input id='email' placeholder='Email'>
+<input id='username' placeholder='Username'>
+<input id='password' type='password' placeholder='Password'>
 
-<input id='registerUser' class='authInput' placeholder='Username'>
+<button onclick='register()'>Create</button>
+<button onclick='login()'>Login</button>
+<button onclick='guest()'>Guest</button>
 
-<input id='registerPass' class='authInput' type='password' placeholder='Password'>
-
-<button class='authBtn' onclick='register()'>
-Create Account
-</button>
-
-<hr style='border:1px solid #222;margin:20px 0;'>
-
-<input id='loginEmail' class='authInput' placeholder='example@gmail.com'>
-
-<input id='loginPass' class='authInput' type='password' placeholder='Password'>
-
-<button class='authBtn' onclick='login()'>
-Login
-</button>
-
-<button class='authBtn guestBtn' onclick='guestMode()'>
-Continue As Guest
-</button>
-
-</div>
-
-</div>
-
-<div class='container'>
-
-<div class='sidebar'>
-
-<div class='logo'>
-Bloxy-bot
-</div>
-
-<button class='newchat' onclick='newChat()'>
-+ New Chat
-</button>
-
-<div class='chatlist' id='chatlist'></div>
-
-<div class='accountBar'>
-
-<div id='account'></div>
-
-<div id='logoutArea'></div>
-
-</div>
-
-</div>
-
-<div class='main'>
-
-<div class='topbar'>
-Bloxy-bot AI Ultimate
-</div>
-
-<div class='messages' id='messages'></div>
-
-<div class='inputarea'>
-
-<div class='row'>
-
-<input
-id='message'
-class='input'
-placeholder='Message Bloxy-bot...'
-onkeydown="if(event.key==='Enter'){send()}"
->
-
-<button class='send' onclick='send()'>
-➤
-</button>
-
-</div>
-
-<div class='helper'>
+<div class='small'>
 Bloxy-bot can make mistakes.Verify highly important information
 </div>
 
@@ -964,547 +616,210 @@ Bloxy-bot can make mistakes.Verify highly important information
 
 </div>
 
+<div class='sidebar'>
+
+<div class='logo'>
+🤖 Bloxy-bot
+</div>
+
+<div class='newchat' onclick='newChat()'>
+➕ New Chat
+</div>
+
+<div class='conversations' id='conversations'></div>
+
+<div class='account' id='account'>
+👤 Guest
+</div>
+
+</div>
+
+<div class='main'>
+
+<div class='messages' id='messages'>
+💬 Start chatting...
+</div>
+
+<div class='inputbar'>
+
+<textarea
+id='msg'
+placeholder='Message Bloxy-bot...'></textarea>
+
+<button onclick='send()'>➤</button>
+
+</div>
+
 </div>
 
 <script>
 
-let currentUser={
-email:'guest',
-username:'Guest',
-verified:false,
-guest:true
-};
+let EMAIL='guest';
+let CHAT='Main';
 
-let chats={
-
-"Main":{
-messages:[],
-pinned:false
-}
-
-};
-
-let currentChat="Main";
-
-function badge(){
-
-return `
-
-<div class='badgeWrap'>
-
-<div class='badgeTooltip'>
-This badge symbolizes the rightful owner of the platform or an admin contributor towards the platform.
-</div>
-
-<svg viewBox='0 0 24 24' width='18' height='18'>
-
-<path
-fill='#ff8800'
-d='M12 1 L15 4 L19 3 L20 7 L23 12 L20 17 L19 21 L15 20 L12 23 L9 20 L5 21 L4 17 L1 12 L4 7 L5 3 L9 4 Z'
-/>
-
-<path
-fill='white'
-d='M10 15 L7 12 L8.5 10.5 L10 12 L15.5 6.5 L17 8 Z'
-/>
-
-</svg>
-
-</div>
-
-`;
-
-}
-
-function hideAuth(){
+function guest(){
 
 document.getElementById('auth').style.display='none';
 
 }
 
-function updateAccount(){
-
-document.getElementById('account').innerHTML=
-
-currentUser.username +
-
-(currentUser.verified ? badge() : '');
-
-if(currentUser.guest){
-
-document.getElementById('logoutArea').innerHTML='';
-
-}else{
-
-document.getElementById('logoutArea').innerHTML=`
-
-<button onclick='logout()'>
-Logout
-</button>
-
-`;
-
-}
-
-}
-
 async function register(){
 
-let email=document.getElementById('registerEmail').value.trim();
-
-let username=document.getElementById('registerUser').value.trim();
-
-let password=document.getElementById('registerPass').value.trim();
+let email=document.getElementById('email').value;
+let username=document.getElementById('username').value;
+let password=document.getElementById('password').value;
 
 let r=await fetch('/register',{
-
 method:'POST',
-
-headers:{
-'Content-Type':'application/json'
-},
-
+headers:{'Content-Type':'application/json'},
 body:JSON.stringify({
-
 email,
 username,
 password
-
 })
-
 });
 
 let d=await r.json();
 
-if(!d.success){
+if(d.success){
 
-alert(d.message);
-return;
+EMAIL=email;
 
+document.getElementById('account').innerHTML=
+`👤 ${username}
+<span class='verify'
+title='This badge symbolizes the rightful owner of the platform or an admin contributor towards the platform'>
+${d.verified ? '✔️':''}
+</span>`;
+
+document.getElementById('auth').style.display='none';
+
+}else{
+alert('Could not create account');
 }
-
-alert("Account created successfully");
 
 }
 
 async function login(){
 
-let email=document.getElementById('loginEmail').value.trim();
-
-let password=document.getElementById('loginPass').value.trim();
+let email=document.getElementById('email').value;
+let password=document.getElementById('password').value;
 
 let r=await fetch('/login',{
-
 method:'POST',
-
-headers:{
-'Content-Type':'application/json'
-},
-
+headers:{'Content-Type':'application/json'},
 body:JSON.stringify({
-
 email,
 password
-
 })
-
 });
 
 let d=await r.json();
 
-if(!d.success){
+if(d.success){
 
-alert(d.message);
-return;
+EMAIL=email;
+
+document.getElementById('account').innerHTML=
+`👤 ${d.username}
+<span class='verify'
+title='This badge symbolizes the rightful owner of the platform or an admin contributor towards the platform'>
+${d.verified ? '✔️':''}
+</span>`;
+
+document.getElementById('auth').style.display='none';
+
+}else{
+alert('Wrong login');
+}
 
 }
 
-currentUser={
+function newChat(){
 
-email:email,
-username:d.username,
-verified:d.verified,
-guest:false
+CHAT='Chat '+Date.now();
 
-};
-
-chats=d.conversations;
-
-currentChat=Object.keys(chats)[0];
-
-hideAuth();
-
-updateAccount();
-
-renderChats();
-
-render();
-
-}
-
-function guestMode(){
-
-currentUser={
-
-email:'guest',
-username:'Guest',
-verified:false,
-guest:true
-
-};
-
-hideAuth();
-
-updateAccount();
-
-renderChats();
-
-render();
-
-}
-
-function logout(){
-
-location.reload();
-
-}
-
-async function newChat(){
-
-if(currentUser.guest){
-
-let name="Guest Chat "+(Object.keys(chats).length+1);
-
-chats[name]={
-messages:[],
-pinned:false
-};
-
-currentChat=name;
-
-renderChats();
-
-render();
-
-return;
-
-}
-
-let r=await fetch('/newchat',{
-
-method:'POST',
-
-headers:{
-'Content-Type':'application/json'
-},
-
-body:JSON.stringify({
-
-email:currentUser.email
-
-})
-
-});
-
-let d=await r.json();
-
-chats[d.chat_name]={
-
-messages:[],
-pinned:false
-
-};
-
-currentChat=d.chat_name;
-
-renderChats();
-
-render();
-
-}
-
-function switchChat(name){
-
-currentChat=name;
-
-render();
-
-}
-
-async function renameChat(name){
-
-let newName=prompt("Rename chat",name);
-
-if(!newName)return;
-
-if(currentUser.guest){
-
-chats[newName]=chats[name];
-
-delete chats[name];
-
-currentChat=newName;
-
-renderChats();
-
-return;
-
-}
-
-await fetch('/renamechat',{
-
-method:'POST',
-
-headers:{
-'Content-Type':'application/json'
-},
-
-body:JSON.stringify({
-
-email:currentUser.email,
-old_name:name,
-new_name:newName
-
-})
-
-});
-
-chats[newName]=chats[name];
-
-delete chats[name];
-
-currentChat=newName;
-
-renderChats();
-
-}
-
-async function pinChat(name){
-
-chats[name].pinned=!chats[name].pinned;
-
-renderChats();
-
-if(currentUser.guest)return;
-
-await fetch('/pinchat',{
-
-method:'POST',
-
-headers:{
-'Content-Type':'application/json'
-},
-
-body:JSON.stringify({
-
-email:currentUser.email,
-old_name:name
-
-})
-
-});
-
-}
-
-async function deleteChat(name){
-
-if(Object.keys(chats).length===1)return;
-
-delete chats[name];
-
-currentChat=Object.keys(chats)[0];
-
-renderChats();
-
-render();
-
-if(currentUser.guest)return;
-
-await fetch('/deletechat',{
-
-method:'POST',
-
-headers:{
-'Content-Type':'application/json'
-},
-
-body:JSON.stringify({
-
-email:currentUser.email,
-old_name:name
-
-})
-
-});
-
-}
-
-function renderChats(){
-
-let box=document.getElementById('chatlist');
-
-box.innerHTML='';
-
-Object.keys(chats).forEach(name=>{
-
-let d=document.createElement('div');
-
-d.className='chatitem';
-
-d.innerHTML=`
-
-<span onclick="switchChat('${name}')">
-
-${chats[name].pinned ? '📌 ' : ''}${name}
-
-</span>
-
-<div class='chatbuttons'>
-
-<button onclick="renameChat('${name}')">
-✏️
-</button>
-
-<button onclick="pinChat('${name}')">
-📌
-</button>
-
-<button onclick="deleteChat('${name}')">
-🗑️
-</button>
-
-</div>
-
-`;
-
-box.appendChild(d);
-
-});
-
-}
-
-function render(){
-
-let box=document.getElementById('messages');
-
-box.innerHTML='';
-
-for(let m of chats[currentChat].messages){
-
-let d=document.createElement('div');
-
-d.className='msg '+m.role;
-
-d.innerHTML=`
-
-<div class='topName'>
-
-${m.role==='assistant'
-?'Bloxy-bot'
-:currentUser.username}
-
-${m.role==='user' && currentUser.verified ? badge() : ''}
-
-</div>
-
-<div>${m.content}</div>
-
-`;
-
-box.appendChild(d);
-
-}
-
-box.scrollTop=box.scrollHeight;
+document.getElementById('messages').innerHTML='💬 Start chatting...';
 
 }
 
 async function send(){
 
-let input=document.getElementById('message');
-
-let msg=input.value.trim();
+let msg=document.getElementById('msg').value.trim();
 
 if(!msg)return;
 
-input.value='';
+let box=document.getElementById('messages');
 
-chats[currentChat].messages.push({
-
-role:'user',
-content:msg
-
-});
-
-chats[currentChat].messages.push({
-
-role:'assistant',
-content:`
-
-<div class='typing'>
-
-<div class='dot'></div>
-<div class='dot'></div>
-<div class='dot'></div>
-
-<span>
-Bloxy-bot is typing...
-</span>
-
+box.innerHTML += `
+<div class='msg user'>
+👤 ${msg}
 </div>
+`;
 
-`
+box.innerHTML += `
+<div class='msg bot typing' id='typing'>
+🤖 Bloxy-bot is typing...
+</div>
+`;
 
-});
+box.scrollTop=box.scrollHeight;
 
-render();
+document.getElementById('msg').value='';
 
 let r=await fetch('/chat',{
-
 method:'POST',
-
-headers:{
-'Content-Type':'application/json'
-},
-
+headers:{'Content-Type':'application/json'},
 body:JSON.stringify({
-
-email:currentUser.email,
-chat_id:currentChat,
+email:EMAIL,
+title:CHAT,
 message:msg
-
 })
-
 });
 
 let d=await r.json();
 
-chats[currentChat].messages.pop();
+document.getElementById('typing').remove();
 
-chats[currentChat].messages.push({
+box.innerHTML += `
+<div class='msg bot'>
+🤖 ${d.reply}
+</div>
+`;
 
-role:'assistant',
-content:d.reply
-
-});
-
-render();
+box.scrollTop=box.scrollHeight;
 
 }
 
-updateAccount();
+document.getElementById('msg').addEventListener('keydown',function(e){
 
-renderChats();
+if(e.key==='Enter'&&!e.shiftKey){
 
-render();
+e.preventDefault();
+
+send();
+
+}
+
+});
 
 </script>
 
 </body>
-
 </html>
-
 """
+
+# =========================================================
+# EXTRA RUNTIME SYSTEMS
+# =========================================================
+
+for i in range(1,1001):
+
+    globals()[f"runtime_feature_{i}"] = {
+        "id": i,
+        "enabled": True,
+        "name": f"Bloxy Runtime {i}"
+    }
 
 # =========================================================
 # RUN
