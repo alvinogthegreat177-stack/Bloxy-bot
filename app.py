@@ -1,3 +1,7 @@
+# app.py
+# BLOXY-BOT ULTIMATE FULL SYSTEM
+# SINGLE FILE MASSIVE BUILD
+
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -6,12 +10,14 @@ import requests
 import uvicorn
 import json
 import os
+import hashlib
 import time
+import random
 
 app = FastAPI()
 
 # =========================================================
-# ENV VARIABLES
+# API KEYS
 # =========================================================
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
@@ -43,7 +49,8 @@ id INTEGER PRIMARY KEY AUTOINCREMENT,
 email TEXT UNIQUE,
 username TEXT,
 password TEXT,
-verified INTEGER DEFAULT 0
+verified INTEGER DEFAULT 0,
+created_at TEXT
 )
 """)
 
@@ -53,7 +60,8 @@ id INTEGER PRIMARY KEY AUTOINCREMENT,
 email TEXT,
 title TEXT,
 messages TEXT,
-pinned INTEGER DEFAULT 0
+pinned INTEGER DEFAULT 0,
+updated_at TEXT
 )
 """)
 
@@ -61,87 +69,90 @@ cursor.execute("""
 CREATE TABLE IF NOT EXISTS drafts(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
 email TEXT,
-content TEXT
+draft TEXT
 )
 """)
 
 conn.commit()
 
 # =========================================================
-# MODELS
+# AI MODELS
 # =========================================================
 
 MODELS = [
-    "meta-llama/llama-3.1-8b-instruct",
-    "meta-llama/llama-3.3-70b-instruct",
-    "deepseek/deepseek-chat-v3-0324:free",
-    "qwen/qwen3-32b:free",
-    "mistralai/mistral-small-3.2-24b-instruct:free"
+"meta-llama/llama-3.1-8b-instruct",
+"meta-llama/llama-3.3-70b-instruct",
+"deepseek/deepseek-chat-v3-0324:free",
+"qwen/qwen3-32b:free",
+"mistralai/mistral-small-3.2-24b-instruct:free"
 ]
 
 # =========================================================
-# RULES
+# 300 RULES
 # =========================================================
 
 RULES = []
 
-for i in range(1, 301):
+for i in range(1,301):
     RULES.append(
-        f"{i}. Always remain modern intelligent organized fast emoji-friendly and visually structured."
+        f"{i}. Always remain intelligent modern organized emoji-friendly visually clean fast responsive and helpful."
     )
 
 SYSTEM_PROMPT = "\n".join(RULES)
 
 # =========================================================
-# PYDANTIC
+# MODELS
 # =========================================================
 
 class Register(BaseModel):
-    email: str
-    username: str
-    password: str
+    email:str
+    username:str
+    password:str
 
 class Login(BaseModel):
-    email: str
-    password: str
+    email:str
+    password:str
 
 class Chat(BaseModel):
-    email: str
-    title: str
-    message: str
+    email:str
+    title:str
+    message:str
 
 class RenameChat(BaseModel):
-    email: str
-    old: str
-    new: str
+    email:str
+    old:str
+    new:str
 
 class DeleteChat(BaseModel):
-    email: str
-    title: str
+    email:str
+    title:str
 
 class PinChat(BaseModel):
-    email: str
-    title: str
+    email:str
+    title:str
 
 # =========================================================
-# AI
+# HELPERS
 # =========================================================
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
 def ask_ai(message, history=[]):
 
     messages = [
         {
-            "role": "system",
-            "content": SYSTEM_PROMPT
+            "role":"system",
+            "content":SYSTEM_PROMPT
         }
     ]
 
-    for item in history:
-        messages.append(item)
+    for h in history:
+        messages.append(h)
 
     messages.append({
-        "role": "user",
-        "content": message
+        "role":"user",
+        "content":message
     })
 
     for model in MODELS:
@@ -151,14 +162,14 @@ def ask_ai(message, history=[]):
             r = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json"
+                    "Authorization":f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type":"application/json"
                 },
                 json={
-                    "model": model,
-                    "messages": messages,
-                    "temperature": 0.5,
-                    "max_tokens": 800
+                    "model":model,
+                    "messages":messages,
+                    "temperature":0.6,
+                    "max_tokens":800
                 },
                 timeout=40
             )
@@ -170,7 +181,7 @@ def ask_ai(message, history=[]):
         except:
             continue
 
-    return "⚠️ Bloxy-bot is overloaded right now."
+    return "⚠️ Bloxy-bot is overloaded."
 
 # =========================================================
 # SPORTS
@@ -183,11 +194,11 @@ def get_prem_table():
         r = requests.get(
             "https://v3.football.api-sports.io/standings",
             headers={
-                "x-apisports-key": APISPORTS_API_KEY
+                "x-apisports-key":APISPORTS_API_KEY
             },
             params={
-                "league": 39,
-                "season": 2025
+                "league":39,
+                "season":2025
             }
         )
 
@@ -195,14 +206,8 @@ def get_prem_table():
 
         standings = data["response"][0]["league"]["standings"][0]
 
-        html = """
-        <table style='width:100%;border-collapse:collapse'>
-        <tr>
-        <th>#</th>
-        <th>Club</th>
-        <th>Pts</th>
-        </tr>
-        """
+        html = "<table class='sport-table'>"
+        html += "<tr><th>#</th><th>Club</th><th>Pts</th></tr>"
 
         for t in standings:
 
@@ -226,64 +231,78 @@ def get_prem_table():
 # =========================================================
 
 @app.post("/register")
-def register(data: Register):
+def register(data:Register):
 
     if "@" not in data.email:
-        return {"success": False}
+        return {"success":False}
 
     if len(data.password) < 6:
-        return {"success": False}
+        return {"success":False}
 
     verified = 1 if data.username.lower() in [
-        "atg",
         "alvin",
+        "atg",
         "consolemicgg"
     ] else 0
 
     try:
 
         cursor.execute(
-            "INSERT INTO users(email,username,password,verified) VALUES(?,?,?,?)",
-            (data.email, data.username, data.password, verified)
+            "INSERT INTO users(email,username,password,verified,created_at) VALUES(?,?,?,?,?)",
+            (
+                data.email,
+                data.username,
+                hash_password(data.password),
+                verified,
+                str(time.time())
+            )
         )
 
         cursor.execute(
-            "INSERT INTO conversations(email,title,messages) VALUES(?,?,?)",
-            (data.email, "Main", "[]")
+            "INSERT INTO conversations(email,title,messages,updated_at) VALUES(?,?,?,?)",
+            (
+                data.email,
+                "Main",
+                "[]",
+                str(time.time())
+            )
         )
 
         conn.commit()
 
         return {
-            "success": True,
-            "username": data.username,
-            "verified": bool(verified)
+            "success":True,
+            "username":data.username,
+            "verified":bool(verified)
         }
 
     except:
-        return {"success": False}
+        return {"success":False}
 
 # =========================================================
 # LOGIN
 # =========================================================
 
 @app.post("/login")
-def login(data: Login):
+def login(data:Login):
 
     cursor.execute(
         "SELECT * FROM users WHERE email=? AND password=?",
-        (data.email, data.password)
+        (
+            data.email,
+            hash_password(data.password)
+        )
     )
 
     user = cursor.fetchone()
 
     if not user:
-        return {"success": False}
+        return {"success":False}
 
     return {
-        "success": True,
-        "username": user[2],
-        "verified": bool(user[4])
+        "success":True,
+        "username":user[2],
+        "verified":bool(user[4])
     }
 
 # =========================================================
@@ -291,71 +310,86 @@ def login(data: Login):
 # =========================================================
 
 @app.post("/new-chat")
-def new_chat(data: Chat):
+def new_chat(data:Chat):
 
     cursor.execute(
-        "INSERT INTO conversations(email,title,messages) VALUES(?,?,?)",
-        (data.email, data.title, "[]")
+        "INSERT INTO conversations(email,title,messages,updated_at) VALUES(?,?,?,?)",
+        (
+            data.email,
+            data.title,
+            "[]",
+            str(time.time())
+        )
     )
 
     conn.commit()
 
-    return {"success": True}
+    return {"success":True}
 
 # =========================================================
 # RENAME
 # =========================================================
 
 @app.post("/rename-chat")
-def rename_chat(data: RenameChat):
+def rename_chat(data:RenameChat):
 
     cursor.execute(
         "UPDATE conversations SET title=? WHERE email=? AND title=?",
-        (data.new, data.email, data.old)
+        (
+            data.new,
+            data.email,
+            data.old
+        )
     )
 
     conn.commit()
 
-    return {"success": True}
+    return {"success":True}
 
 # =========================================================
 # PIN
 # =========================================================
 
 @app.post("/pin-chat")
-def pin_chat(data: PinChat):
+def pin_chat(data:PinChat):
 
     cursor.execute(
         "UPDATE conversations SET pinned=1 WHERE email=? AND title=?",
-        (data.email, data.title)
+        (
+            data.email,
+            data.title
+        )
     )
 
     conn.commit()
 
-    return {"success": True}
+    return {"success":True}
 
 # =========================================================
 # DELETE
 # =========================================================
 
 @app.post("/delete-chat")
-def delete_chat(data: DeleteChat):
+def delete_chat(data:DeleteChat):
 
     cursor.execute(
         "DELETE FROM conversations WHERE email=? AND title=?",
-        (data.email, data.title)
+        (
+            data.email,
+            data.title
+        )
     )
 
     conn.commit()
 
-    return {"success": True}
+    return {"success":True}
 
 # =========================================================
 # CHAT
 # =========================================================
 
 @app.post("/chat")
-def chat(data: Chat):
+def chat(data:Chat):
 
     low = data.message.lower().strip()
 
@@ -365,7 +399,7 @@ def chat(data: Chat):
         "epl table"
     ]:
         return {
-            "reply": get_prem_table()
+            "reply":get_prem_table()
         }
 
     history = []
@@ -374,7 +408,10 @@ def chat(data: Chat):
 
         cursor.execute(
             "SELECT messages FROM conversations WHERE email=? AND title=?",
-            (data.email, data.title)
+            (
+                data.email,
+                data.title
+            )
         )
 
         row = cursor.fetchone()
@@ -391,19 +428,20 @@ def chat(data: Chat):
     if data.email != "guest":
 
         history.append({
-            "role": "user",
-            "content": data.message
+            "role":"user",
+            "content":data.message
         })
 
         history.append({
-            "role": "assistant",
-            "content": reply
+            "role":"assistant",
+            "content":reply
         })
 
         cursor.execute(
-            "UPDATE conversations SET messages=? WHERE email=? AND title=?",
+            "UPDATE conversations SET messages=?, updated_at=? WHERE email=? AND title=?",
             (
                 json.dumps(history),
+                str(time.time()),
                 data.email,
                 data.title
             )
@@ -412,7 +450,7 @@ def chat(data: Chat):
         conn.commit()
 
     return {
-        "reply": reply
+        "reply":reply
     }
 
 # =========================================================
@@ -423,15 +461,20 @@ def chat(data: Chat):
 def home():
 
     return """
+<!DOCTYPE html>
 <html>
+
 <head>
+
 <title>Bloxy-bot</title>
+
+<meta name='viewport' content='width=device-width, initial-scale=1'>
 
 <style>
 
 body{
 margin:0;
-background:#0d0d0d;
+background:#0b0b0b;
 font-family:Arial;
 overflow:hidden;
 color:white;
@@ -442,50 +485,74 @@ position:fixed;
 left:0;
 top:0;
 bottom:0;
-width:300px;
-background:#111;
+width:320px;
+background:#111111;
+border-right:1px solid #222;
 display:flex;
 flex-direction:column;
-border-right:1px solid #222;
-overflow-y:auto;
 }
 
 .logo{
-padding:20px;
-font-size:32px;
+padding:25px;
+font-size:35px;
 font-weight:bold;
-color:#00ff88;
+background:linear-gradient(90deg,#ff8800,#ffaa00);
+-webkit-background-clip:text;
+-webkit-text-fill-color:transparent;
 }
 
 .newchat{
-margin:10px;
-padding:15px;
-background:#1d1d1d;
-border-radius:14px;
+margin:12px;
+padding:16px;
+background:#1b1b1b;
+border-radius:18px;
 cursor:pointer;
+font-weight:bold;
+transition:0.2s;
+}
+
+.newchat:hover{
+background:#252525;
 }
 
 .conversations{
 flex:1;
-padding:10px;
 overflow-y:auto;
+padding:12px;
 }
 
-.conv{
-padding:15px;
-margin-bottom:10px;
+.conversation{
+padding:16px;
 background:#181818;
-border-radius:12px;
+border-radius:18px;
+margin-bottom:12px;
 cursor:pointer;
+transition:0.2s;
+}
+
+.conversation:hover{
+background:#242424;
 }
 
 .account{
 padding:20px;
 border-top:1px solid #222;
+display:flex;
+align-items:center;
+gap:10px;
+font-weight:bold;
+}
+
+.verify{
+width:18px;
+height:18px;
+background:orange;
+clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+display:inline-block;
 }
 
 .main{
-margin-left:300px;
+margin-left:320px;
 height:100vh;
 display:flex;
 flex-direction:column;
@@ -494,16 +561,16 @@ flex-direction:column;
 .messages{
 flex:1;
 overflow-y:auto;
-padding:20px;
+padding:24px;
 }
 
-.msg{
+.message{
 padding:18px;
-border-radius:18px;
 margin-bottom:18px;
+border-radius:18px;
 white-space:pre-wrap;
 word-break:break-word;
-line-height:1.5;
+line-height:1.6;
 }
 
 .user{
@@ -512,80 +579,106 @@ background:#1f1f1f;
 
 .bot{
 background:#181818;
-border-left:4px solid #00ff88;
+border-left:4px solid orange;
 }
 
 .inputbar{
 display:flex;
-gap:10px;
+gap:12px;
 padding:20px;
 background:#111;
 }
 
 textarea{
 flex:1;
-height:70px;
-background:#1b1b1b;
+height:72px;
+background:#1c1c1c;
 border:none;
-border-radius:16px;
-padding:16px;
+border-radius:18px;
+padding:18px;
 color:white;
 resize:none;
 font-size:16px;
 }
 
-button{
+.send{
 width:80px;
 background:orange;
 border:none;
-border-radius:16px;
+border-radius:18px;
 color:white;
-font-size:20px;
+font-size:22px;
+font-weight:bold;
 cursor:pointer;
-}
-
-.verify{
-color:#00ff88;
-font-size:14px;
-margin-left:5px;
-cursor:pointer;
-}
-
-.typing{
-opacity:0.7;
 }
 
 .auth{
 position:fixed;
 inset:0;
-background:#0d0d0d;
+background:#0a0a0a;
 display:flex;
 justify-content:center;
 align-items:center;
-z-index:1000;
+z-index:9999;
 }
 
 .authbox{
-width:400px;
+width:430px;
 background:#111;
-padding:30px;
-border-radius:20px;
-display:flex;
-flex-direction:column;
-gap:15px;
+padding:36px;
+border-radius:28px;
+box-shadow:0 0 40px rgba(255,136,0,0.2);
 }
 
-input{
+.title{
+font-size:42px;
+font-weight:bold;
+margin-bottom:20px;
+background:linear-gradient(90deg,#ff8800,#ffcc00);
+-webkit-background-clip:text;
+-webkit-text-fill-color:transparent;
+}
+
+.input{
+width:100%;
 padding:16px;
-background:#1c1c1c;
+margin-bottom:14px;
+background:#1b1b1b;
 border:none;
-border-radius:14px;
+border-radius:16px;
 color:white;
+font-size:16px;
+box-sizing:border-box;
+}
+
+.authbtn{
+width:100%;
+padding:16px;
+margin-bottom:12px;
+background:orange;
+border:none;
+border-radius:16px;
+font-size:16px;
+font-weight:bold;
+color:white;
+cursor:pointer;
 }
 
 .small{
 font-size:13px;
 opacity:0.7;
+margin-top:10px;
+text-align:center;
+}
+
+.sport-table{
+width:100%;
+border-collapse:collapse;
+}
+
+.sport-table td,.sport-table th{
+padding:10px;
+border-bottom:1px solid #333;
 }
 
 </style>
@@ -598,15 +691,43 @@ opacity:0.7;
 
 <div class='authbox'>
 
-<h1>🤖 Bloxy-bot</h1>
+<div class='title'>
+🤖 Bloxy-bot
+</div>
 
-<input id='email' placeholder='Email'>
-<input id='username' placeholder='Username'>
-<input id='password' type='password' placeholder='Password'>
+<input
+class='input'
+id='email'
+placeholder='Email'>
 
-<button onclick='register()'>Create</button>
-<button onclick='login()'>Login</button>
-<button onclick='guest()'>Guest</button>
+<input
+class='input'
+id='username'
+placeholder='Username'>
+
+<input
+class='input'
+id='password'
+type='password'
+placeholder='Password'>
+
+<button
+class='authbtn'
+onclick='register()'>
+Create Account
+</button>
+
+<button
+class='authbtn'
+onclick='login()'>
+Login
+</button>
+
+<button
+class='authbtn'
+onclick='guest()'>
+Continue as Guest
+</button>
 
 <div class='small'>
 Bloxy-bot can make mistakes.Verify highly important information
@@ -619,16 +740,23 @@ Bloxy-bot can make mistakes.Verify highly important information
 <div class='sidebar'>
 
 <div class='logo'>
-🤖 Bloxy-bot
+Bloxy-bot
 </div>
 
-<div class='newchat' onclick='newChat()'>
+<div
+class='newchat'
+onclick='newChat()'>
 ➕ New Chat
 </div>
 
-<div class='conversations' id='conversations'></div>
+<div
+class='conversations'
+id='conversations'>
+</div>
 
-<div class='account' id='account'>
+<div
+class='account'
+id='account'>
 👤 Guest
 </div>
 
@@ -636,7 +764,9 @@ Bloxy-bot can make mistakes.Verify highly important information
 
 <div class='main'>
 
-<div class='messages' id='messages'>
+<div
+class='messages'
+id='messages'>
 💬 Start chatting...
 </div>
 
@@ -646,7 +776,11 @@ Bloxy-bot can make mistakes.Verify highly important information
 id='msg'
 placeholder='Message Bloxy-bot...'></textarea>
 
-<button onclick='send()'>➤</button>
+<button
+class='send'
+onclick='send()'>
+➤
+</button>
 
 </div>
 
@@ -655,6 +789,7 @@ placeholder='Message Bloxy-bot...'></textarea>
 <script>
 
 let EMAIL='guest';
+let USERNAME='Guest';
 let CHAT='Main';
 
 function guest(){
@@ -684,18 +819,16 @@ let d=await r.json();
 if(d.success){
 
 EMAIL=email;
+USERNAME=username;
 
-document.getElementById('account').innerHTML=
-`👤 ${username}
-<span class='verify'
-title='This badge symbolizes the rightful owner of the platform or an admin contributor towards the platform'>
-${d.verified ? '✔️':''}
-</span>`;
+updateAccount(d.verified);
 
 document.getElementById('auth').style.display='none';
 
 }else{
+
 alert('Could not create account');
+
 }
 
 }
@@ -719,19 +852,30 @@ let d=await r.json();
 if(d.success){
 
 EMAIL=email;
+USERNAME=d.username;
 
-document.getElementById('account').innerHTML=
-`👤 ${d.username}
-<span class='verify'
-title='This badge symbolizes the rightful owner of the platform or an admin contributor towards the platform'>
-${d.verified ? '✔️':''}
-</span>`;
+updateAccount(d.verified);
 
 document.getElementById('auth').style.display='none';
 
 }else{
+
 alert('Wrong login');
+
 }
+
+}
+
+function updateAccount(verified){
+
+document.getElementById('account').innerHTML=
+`👤 ${USERNAME}
+${verified ? `
+<span
+class='verify'
+title='This badge symbolizes the rightful owner of the platform or an admin contributor towards the platform'>
+</span>`:''}
+`;
 
 }
 
@@ -740,6 +884,20 @@ function newChat(){
 CHAT='Chat '+Date.now();
 
 document.getElementById('messages').innerHTML='💬 Start chatting...';
+
+let div=document.createElement('div');
+
+div.className='conversation';
+
+div.innerHTML=CHAT;
+
+div.onclick=()=>{
+
+CHAT=div.innerHTML;
+
+};
+
+document.getElementById('conversations').prepend(div);
 
 }
 
@@ -752,13 +910,13 @@ if(!msg)return;
 let box=document.getElementById('messages');
 
 box.innerHTML += `
-<div class='msg user'>
+<div class='message user'>
 👤 ${msg}
 </div>
 `;
 
 box.innerHTML += `
-<div class='msg bot typing' id='typing'>
+<div class='message bot' id='typing'>
 🤖 Bloxy-bot is typing...
 </div>
 `;
@@ -782,7 +940,7 @@ let d=await r.json();
 document.getElementById('typing').remove();
 
 box.innerHTML += `
-<div class='msg bot'>
+<div class='message bot'>
 🤖 ${d.reply}
 </div>
 `;
@@ -806,19 +964,22 @@ send();
 </script>
 
 </body>
+
 </html>
 """
 
 # =========================================================
-# EXTRA RUNTIME SYSTEMS
+# MASSIVE RUNTIME SYSTEM
 # =========================================================
 
-for i in range(1,1001):
+for i in range(1,1301):
 
     globals()[f"runtime_feature_{i}"] = {
-        "id": i,
-        "enabled": True,
-        "name": f"Bloxy Runtime {i}"
+        "id":i,
+        "enabled":True,
+        "name":f"Runtime Feature {i}",
+        "engine":"Bloxy-bot",
+        "version":"2.0"
     }
 
 # =========================================================
@@ -826,4 +987,9 @@ for i in range(1,1001):
 # =========================================================
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000
+    )
