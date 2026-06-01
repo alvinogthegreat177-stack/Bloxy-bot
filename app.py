@@ -1,11 +1,12 @@
 # =========================================================
 # BLOXY-BOT X (PART 1)
-# Imports + Config + Database + Models
+# Imports + App + Environment + Database + Models
 # =========================================================
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
+
 import sqlite3
 import hashlib
 import requests
@@ -13,28 +14,38 @@ import json
 import os
 import time
 import uuid
-import uvicorn
 
-app = FastAPI(title="Bloxy-Bot X")
+# =========================================================
+# APP
+# =========================================================
+
+app = FastAPI(
+    title="Bloxy-Bot X",
+    version="1.0"
+)
 
 # =========================================================
 # ENVIRONMENT VARIABLES
 # =========================================================
 
+# AI
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 KIMI_API_KEY = os.getenv("KIMI_API_KEY", "")
 
+# Search / Research
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 EXA_API_KEY = os.getenv("EXA_API_KEY", "")
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY", "")
 
+# News
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
 GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "")
 GUARDIAN_API_KEY = os.getenv("GUARDIAN_API_KEY", "")
 MEDIASTACK_API_KEY = os.getenv("MEDIASTACK_API_KEY", "")
 
+# Sports
 APISPORTS_API_KEY = os.getenv("APISPORTS_API_KEY", "")
 ALLSPORTS_API_KEY = os.getenv("ALLSPORTS_API_KEY", "")
 SPORTMONKS_API_KEY = os.getenv("SPORTMONKS_API_KEY", "")
@@ -42,16 +53,22 @@ SPORTRADAR_API_KEY = os.getenv("SPORTRADAR_API_KEY", "")
 THESPORTSDB_API_KEY = os.getenv("THESPORTSDB_API_KEY", "")
 ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
 
+# Finance
 ALPHAVANTAGE_API_KEY = os.getenv("ALPHAVANTAGE_API_KEY", "")
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
 EXCHANGERATE_API_KEY = os.getenv("EXCHANGERATE_API_KEY", "")
 
+# Weather
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
+
+# Movies
 TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")
 
+# Knowledge
 WOLFRAM_APP_ID = os.getenv("WOLFRAM_APP_ID", "")
 WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY", "")
 
+# Security
 SECRET_KEY = os.getenv("SECRET_KEY", "")
 
 # =========================================================
@@ -65,26 +82,40 @@ conn = sqlite3.connect(
 
 cur = conn.cursor()
 
+# Users
+
 cur.execute("""
 CREATE TABLE IF NOT EXISTS users(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-email TEXT UNIQUE,
-username TEXT,
-password TEXT,
-verified INTEGER DEFAULT 0,
-created_at TEXT
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE,
+    username TEXT,
+    password TEXT,
+    verified INTEGER DEFAULT 0,
+    created_at TEXT
 )
 """)
 
+# Conversations
+
 cur.execute("""
 CREATE TABLE IF NOT EXISTS conversations(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-conversation_id TEXT,
-email TEXT,
-title TEXT,
-pinned INTEGER DEFAULT 0,
-messages TEXT,
-updated_at TEXT
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id TEXT,
+    email TEXT,
+    title TEXT,
+    pinned INTEGER DEFAULT 0,
+    messages TEXT,
+    updated_at TEXT
+)
+""")
+
+# Drafts
+
+cur.execute("""
+CREATE TABLE IF NOT EXISTS drafts(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT,
+    draft TEXT
 )
 """)
 
@@ -108,22 +139,6 @@ class Chat(BaseModel):
     conversation_id: str
     message: str
 
-# =========================================================
-# HELPERS
-# =========================================================
-
-def hash_password(password: str):
-    return hashlib.sha256(
-        password.encode()
-    ).hexdigest()
-
-# ===== END PART 1 =====
-
-# =========================================================
-# BLOXY-BOT X (PART 2)
-# Authentication + Conversations
-# =========================================================
-
 class ConversationAction(BaseModel):
     email: str
     conversation_id: str
@@ -134,42 +149,70 @@ class RenameConversation(BaseModel):
     new_title: str
 
 # =========================================================
-# AUTH
+# HELPERS
+# =========================================================
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(
+        password.encode()
+    ).hexdigest()
+
+def now():
+    return str(time.time())
+
+def generate_id():
+    return str(uuid.uuid4())
+
+# =========================================================
+# END PART 1
+# =========================================================
+
+# =========================================================
+# BLOXY-BOT X (PART 2)
+# Authentication + Conversation Management
 # =========================================================
 
 @app.post("/register")
 def register(data: Register):
 
+    if "@" not in data.email:
+        return {"success": False, "message": "Invalid email"}
+
+    if len(data.password) < 6:
+        return {"success": False, "message": "Password too short"}
+
     try:
+
+        conversation_id = generate_id()
 
         cur.execute(
             """
             INSERT INTO users(
-            email,
-            username,
-            password,
-            created_at
+                email,
+                username,
+                password,
+                verified,
+                created_at
             )
-            VALUES(?,?,?,?)
+            VALUES(?,?,?,?,?)
             """,
             (
                 data.email,
                 data.username,
                 hash_password(data.password),
-                str(time.time())
+                0,
+                now()
             )
         )
-
-        conversation_id = str(uuid.uuid4())
 
         cur.execute(
             """
             INSERT INTO conversations(
-            conversation_id,
-            email,
-            title,
-            messages,
-            updated_at
+                conversation_id,
+                email,
+                title,
+                messages,
+                updated_at
             )
             VALUES(?,?,?,?,?)
             """,
@@ -178,7 +221,7 @@ def register(data: Register):
                 data.email,
                 "New Chat",
                 "[]",
-                str(time.time())
+                now()
             )
         )
 
@@ -193,7 +236,7 @@ def register(data: Register):
 
         return {
             "success": False,
-            "error": str(e)
+            "message": str(e)
         }
 
 
@@ -202,7 +245,7 @@ def login(data: Login):
 
     cur.execute(
         """
-        SELECT username
+        SELECT username, verified
         FROM users
         WHERE email=? AND password=?
         """,
@@ -215,29 +258,21 @@ def login(data: Login):
     user = cur.fetchone()
 
     if not user:
-
-        return {
-            "success": False
-        }
+        return {"success": False}
 
     return {
         "success": True,
-        "username": user[0]
+        "username": user[0],
+        "verified": bool(user[1])
     }
 
-# =========================================================
-# CONVERSATIONS
-# =========================================================
 
 @app.get("/conversations/{email}")
-def conversations(email: str):
+def get_conversations(email: str):
 
     cur.execute(
         """
-        SELECT
-        conversation_id,
-        title,
-        pinned
+        SELECT conversation_id,title,pinned
         FROM conversations
         WHERE email=?
         ORDER BY pinned DESC,
@@ -263,16 +298,16 @@ def conversations(email: str):
 @app.post("/new-chat")
 def new_chat(data: ConversationAction):
 
-    conversation_id = str(uuid.uuid4())
+    conversation_id = generate_id()
 
     cur.execute(
         """
         INSERT INTO conversations(
-        conversation_id,
-        email,
-        title,
-        messages,
-        updated_at
+            conversation_id,
+            email,
+            title,
+            messages,
+            updated_at
         )
         VALUES(?,?,?,?,?)
         """,
@@ -281,7 +316,7 @@ def new_chat(data: ConversationAction):
             data.email,
             "New Chat",
             "[]",
-            str(time.time())
+            now()
         )
     )
 
@@ -345,18 +380,20 @@ def delete_chat(data: ConversationAction):
 
     return {"success": True}
 
-# ===== END PART 2 =====
+# =========================================================
+# END PART 2
+# =========================================================
 
 # =========================================================
 # BLOXY-BOT X (PART 3)
-# AI + Search + Chat Engine
+# AI Engine + Search + Chat Logic
 # =========================================================
 
 MODELS = [
-    "openai",
-    "openrouter",
-    "groq",
-    "kimi"
+    "meta-llama/llama-3.3-70b-instruct",
+    "qwen/qwen-2.5-72b-instruct",
+    "deepseek/deepseek-chat",
+    "mistralai/mistral-small-3.2-24b-instruct"
 ]
 
 def tavily_search(query):
@@ -378,30 +415,93 @@ def tavily_search(query):
 
         data = r.json()
 
-        return "\n".join([
-            x.get("content", "")
-            for x in data.get("results", [])
-        ])
+        results = []
 
-    except:
+        for item in data.get("results", []):
+            results.append(
+                item.get("content", "")
+            )
+
+        return "\n".join(results)
+
+    except Exception:
         return ""
+
+
+def news_context(query):
+
+    if not NEWS_API_KEY:
+        return ""
+
+    try:
+
+        r = requests.get(
+            "https://newsapi.org/v2/everything",
+            params={
+                "q": query,
+                "pageSize": 5,
+                "language": "en",
+                "apiKey": NEWS_API_KEY
+            },
+            timeout=20
+        )
+
+        data = r.json()
+
+        articles = []
+
+        for a in data.get("articles", []):
+
+            title = a.get("title", "")
+
+            if title:
+                articles.append(title)
+
+        return "\n".join(articles)
+
+    except Exception:
+        return ""
+
+
+def format_response(text):
+
+    if not text:
+        return "⚠️ Empty response."
+
+    lines = text.split("\n")
+
+    output = []
+
+    for line in lines:
+
+        line = line.strip()
+
+        if line:
+            output.append(line)
+
+    return "\n".join(output)
 
 
 def ai_reply(message, history):
 
-    live_data = tavily_search(message)
+    live_search = tavily_search(message)
+
+    live_news = news_context(message)
 
     system_prompt = f"""
 You are Bloxy-Bot X.
 
-Use:
-- Clean formatting
-- Bullet points
-- Concise answers
-- Real-time information when available
+Rules:
+- Be helpful.
+- Use clean formatting.
+- Use bullet points when useful.
+- Keep answers concise.
 
-Live Data:
-{live_data}
+SEARCH DATA:
+{live_search}
+
+NEWS DATA:
+{live_news}
 """
 
     messages = [
@@ -413,20 +513,14 @@ Live Data:
 
     messages.extend(history)
 
-    messages.append({
-        "role": "user",
-        "content": message
-    })
+    messages.append(
+        {
+            "role": "user",
+            "content": message
+        }
+    )
 
-    # OpenRouter fallback chain
-
-    models = [
-        "meta-llama/llama-3.3-70b-instruct",
-        "qwen/qwen-2.5-72b-instruct",
-        "deepseek/deepseek-chat"
-    ]
-
-    for model in models:
+    for model in MODELS:
 
         try:
 
@@ -442,22 +536,24 @@ Live Data:
                     "model": model,
                     "messages": messages,
                     "temperature": 0.7,
-                    "max_tokens": 1000
+                    "max_tokens": 1200
                 },
-                timeout=45
+                timeout=60
             )
 
             data = r.json()
 
-            return (
+            reply = (
                 data["choices"][0]
                 ["message"]["content"]
             )
 
-        except:
+            return format_response(reply)
+
+        except Exception:
             continue
 
-    return "⚠️ No AI provider responded."
+    return "⚠️ All AI providers failed."
 
 
 @app.post("/chat")
@@ -482,7 +578,7 @@ def chat(data: Chat):
 
             try:
                 history = json.loads(row[0])
-            except:
+            except Exception:
                 history = []
 
     reply = ai_reply(
@@ -506,12 +602,12 @@ def chat(data: Chat):
             """
             UPDATE conversations
             SET messages=?,
-            updated_at=?
+                updated_at=?
             WHERE conversation_id=?
             """,
             (
                 json.dumps(history),
-                str(time.time()),
+                now(),
                 data.conversation_id
             )
         )
@@ -526,7 +622,7 @@ def chat(data: Chat):
 
 # =========================================================
 # BLOXY-BOT X (PART 4)
-# News + Sports + Weather + Finance APIs
+# News + Sports + Weather + Finance + Movies + Wolfram
 # =========================================================
 
 @app.get("/news")
@@ -541,8 +637,8 @@ def get_news(query: str):
             "https://newsapi.org/v2/everything",
             params={
                 "q": query,
-                "pageSize": 10,
                 "language": "en",
+                "pageSize": 10,
                 "apiKey": NEWS_API_KEY
             },
             timeout=20
@@ -550,8 +646,12 @@ def get_news(query: str):
 
         return r.json()
 
-    except:
-        return {"articles": []}
+    except Exception as e:
+
+        return {
+            "error": str(e),
+            "articles": []
+        }
 
 
 @app.get("/weather")
@@ -571,8 +671,11 @@ def weather(city: str):
 
         return r.json()
 
-    except:
-        return {"error": "Weather unavailable"}
+    except Exception as e:
+
+        return {
+            "error": str(e)
+        }
 
 
 @app.get("/finance")
@@ -592,188 +695,53 @@ def finance(symbol: str):
 
         return r.json()
 
-    # =========================================================
-# BLOXY-BOT X (PART 5)
-# UI + Startup
-# =========================================================
+    except Exception as e:
 
-@app.get("/", response_class=HTMLResponse)
-def home():
-    return """
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+        return {
+            "error": str(e)
+        }
 
-<title>Bloxy-Bot X</title>
 
-<style>
-body{
-    margin:0;
-    background:#0b0b0b;
-    color:white;
-    font-family:Arial;
-}
+@app.get("/finnhub")
+def finnhub_stock(symbol: str):
 
-.sidebar{
-    width:300px;
-    position:fixed;
-    left:0;
-    top:0;
-    bottom:0;
-    background:#111;
-    overflow:auto;
-}
+    try:
 
-.main{
-    margin-left:300px;
-    height:100vh;
-    display:flex;
-    flex-direction:column;
-}
+        r = requests.get(
+            "https://finnhub.io/api/v1/quote",
+            params={
+                "symbol": symbol,
+                "token": FINNHUB_API_KEY
+            },
+            timeout=20
+        )
 
-.messages{
-    flex:1;
-    overflow:auto;
-    padding:20px;
-}
+        return r.json()
 
-.message{
-    padding:15px;
-    border-radius:12px;
-    margin-bottom:12px;
-}
+    except Exception as e:
 
-.user{background:#1f1f1f;}
-.bot{
-    background:#181818;
-    border-left:4px solid orange;
-}
+        return {
+            "error": str(e)
+        }
 
-.inputbar{
-    display:flex;
-    padding:15px;
-    gap:10px;
-}
 
-textarea{
-    flex:1;
-    height:70px;
-    background:#1c1c1c;
-    color:white;
-    border:none;
-    border-radius:12px;
-    padding:12px;
-}
+@app.get("/exchange-rate")
+def exchange_rate(base: str):
 
-button{
-    background:orange;
-    border:none;
-    color:white;
-    padding:12px 20px;
-    border-radius:12px;
-    cursor:pointer;
-}
-</style>
-</head>
+    try:
 
-<body>
+        r = requests.get(
+            f"https://v6.exchangerate-api.com/v6/{EXCHANGERATE_API_KEY}/latest/{base}",
+            timeout=20
+        )
 
-<div class="sidebar">
-<h2 style="padding:20px;">🤖 Bloxy-Bot X</h2>
-<button onclick="newChat()">New Chat</button>
-<div id="conversations"></div>
-</div>
+        return r.json()
 
-<div class="main">
+    except Exception as e:
 
-<div id="messages" class="messages"></div>
-
-<div class="inputbar">
-<textarea id="msg"></textarea>
-<button onclick="sendMessage()">Send</button>
-</div>
-
-</div>
-
-<script>
-
-let EMAIL="guest";
-let CONVERSATION="";
-
-async function sendMessage(){
-
-    let msg=document.getElementById("msg").value;
-
-    if(!msg) return;
-
-    let box=document.getElementById("messages");
-
-    box.innerHTML+=
-    `<div class="message user">${msg}</div>`;
-
-    document.getElementById("msg").value="";
-
-    let r=await fetch("/chat",{
-        method:"POST",
-        headers:{
-            "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-            email:EMAIL,
-            conversation_id:CONVERSATION,
-            message:msg
-        })
-    });
-
-    let d=await r.json();
-
-    box.innerHTML+=
-    `<div class="message bot">${d.reply}</div>`;
-
-    box.scrollTop=box.scrollHeight;
-}
-
-document.getElementById("msg")
-.addEventListener("keydown",function(e){
-
-    if(e.ctrlKey && e.key==="Enter"){
-        e.preventDefault();
-        sendMessage();
-    }
-});
-
-</script>
-
-</body>
-</html>
-"""
-
-# =========================================================
-# STARTUP
-# =========================================================
-
-@app.get("/health")
-def health():
-    return {
-        "status":"online",
-        "app":"Bloxy-Bot X"
-    }
-
-if __name__ == "__main__":
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=8000
-    )
-
-# =========================================================
-# END PART 5
-# =========================================================
-
-    except:
-        return {"error": "Finance unavailable"}
+        return {
+            "error": str(e)
+        }
 
 
 @app.get("/sports/epl")
@@ -796,8 +764,33 @@ def epl_table():
 
         return r.json()
 
-    except:
-        return {"error": "Sports unavailable"}
+    except Exception as e:
+
+        return {
+            "error": str(e)
+        }
+
+
+@app.get("/odds")
+def odds(sport: str = "soccer_epl"):
+
+    try:
+
+        r = requests.get(
+            f"https://api.the-odds-api.com/v4/sports/{sport}/odds",
+            params={
+                "apiKey": ODDS_API_KEY
+            },
+            timeout=20
+        )
+
+        return r.json()
+
+    except Exception as e:
+
+        return {
+            "error": str(e)
+        }
 
 
 @app.get("/movies")
@@ -816,8 +809,12 @@ def movies(query: str):
 
         return r.json()
 
-    except:
-        return {"results": []}
+    except Exception as e:
+
+        return {
+            "error": str(e),
+            "results": []
+        }
 
 
 @app.get("/wolfram")
@@ -837,8 +834,1046 @@ def wolfram(question: str):
 
         return r.json()
 
-    except:
-        return {"error": "Wolfram unavailable"}
+    except Exception as e:
 
-# ===== END PART 4 =====
-# PART 5 = Full UI + Startup + Final Merge
+        return {
+            "error": str(e)
+        }
+
+
+@app.get("/health")
+def health():
+
+    return {
+        "status": "online",
+        "service": "Bloxy-Bot X",
+        "time": now()
+    }
+
+# =========================================================
+# END PART 4
+# PART 5 = FULL UI + HTML + CSS + JAVASCRIPT + STARTUP
+# =========================================================
+
+<!-- ===================================================== -->
+<!-- BLOXY-BOT X (PART 5A) -->
+<!-- HTML LAYOUT ONLY -->
+<!-- Place inside return """ ... """ -->
+<!-- ===================================================== -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bloxy-Bot X</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* PART 5B CSS GOES HERE */
+</style>
+
+</head>
+
+<body>
+
+<div class="app">
+
+    <!-- SIDEBAR -->
+
+    <aside class="sidebar">
+
+        <div class="logo-section">
+            <h2>🤖 Bloxy‑Bot X</h2>
+        </div>
+
+        <div class="sidebar-actions">
+
+            <button id="newChatBtn">
+                + New Chat
+            </button>
+
+        </div>
+
+        <div
+            id="conversationList"
+            class="conversation-list">
+        </div>
+
+    </aside>
+
+    <!-- MAIN -->
+
+    <main class="main">
+
+        <!-- TOPBAR -->
+
+        <header class="topbar">
+
+            <div class="topbar-left">
+                <span id="chatTitle">
+                    New Chat
+                </span>
+            </div>
+
+            <div class="topbar-right">
+
+                <button id="clearBtn">
+                    Clear
+                </button>
+
+                <button id="logoutBtn">
+                    Logout
+                </button>
+
+            </div>
+
+        </header>
+
+        <!-- CHAT AREA -->
+
+        <section
+            id="messages"
+            class="messages">
+        </section>
+
+        <!-- INPUT -->
+
+        <section class="input-section">
+
+            <div class="input-wrapper">
+
+                <textarea
+                    id="messageInput"
+                    placeholder="Message Bloxy‑Bot..."
+                ></textarea>
+
+                <button id="sendBtn">
+                    Send
+                </button>
+
+            </div>
+
+            <div class="input-footer">
+
+                <span>
+                    Ctrl + Enter to send
+                </span>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+<!-- LOGIN MODAL -->
+
+<div
+    id="loginModal"
+    class="modal">
+
+    <div class="modal-content">
+
+        <h2>Login</h2>
+
+        <input
+            id="loginEmail"
+            type="email"
+            placeholder="Email">
+
+        <input
+            id="loginPassword"
+            type="password"
+            placeholder="Password">
+
+        <button id="loginBtn">
+            Login
+        </button>
+
+        <button id="showRegisterBtn">
+            Create Account
+        </button>
+
+        <button id="guestBtn">
+            Continue as Guest
+        </button>
+
+    </div>
+
+</div>
+
+<!-- REGISTER MODAL -->
+
+<div
+    id="registerModal"
+    class="modal">
+
+    <div class="modal-content">
+
+        <h2>Create Account</h2>
+
+        <input
+            id="registerUsername"
+            placeholder="Username">
+
+        <input
+            id="registerEmail"
+            type="email"
+            placeholder="Email">
+
+        <input
+            id="registerPassword"
+            type="password"
+            placeholder="Password">
+
+        <button id="registerBtn">
+            Register
+        </button>
+
+        <button id="backLoginBtn">
+            Back
+        </button>
+
+    </div>
+
+</div>
+
+<script>
+/* PART 5C JAVASCRIPT GOES HERE */
+</script>
+
+</body>
+</html>
+
+<!-- ========================= -->
+<!-- END PART 5A -->
+<!-- ========================= -->
+
+/* ===================================================== */
+/* BLOXY-BOT X (PART 5B) */
+/* CSS STYLING */
+/* ===================================================== */
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family:'Inter',sans-serif;
+    background:#0b0f17;
+    color:#ffffff;
+    height:100vh;
+    overflow:hidden;
+}
+
+.app{
+    display:flex;
+    width:100%;
+    height:100vh;
+}
+
+/* SIDEBAR */
+
+.sidebar{
+    width:280px;
+    background:#111827;
+    border-right:1px solid #1f2937;
+    display:flex;
+    flex-direction:column;
+}
+
+.logo-section{
+    padding:20px;
+    border-bottom:1px solid #1f2937;
+}
+
+.sidebar-actions{
+    padding:15px;
+}
+
+#newChatBtn{
+    width:100%;
+    padding:12px;
+    border:none;
+    border-radius:10px;
+    background:#2563eb;
+    color:white;
+    cursor:pointer;
+}
+
+#newChatBtn:hover{
+    background:#1d4ed8;
+}
+
+.conversation-list{
+    flex:1;
+    overflow-y:auto;
+    padding:10px;
+}
+
+.conversation-item{
+    padding:12px;
+    margin-bottom:8px;
+    background:#1f2937;
+    border-radius:10px;
+    cursor:pointer;
+}
+
+.conversation-item:hover{
+    background:#374151;
+}
+
+/* MAIN */
+
+.main{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+}
+
+.topbar{
+    height:70px;
+    border-bottom:1px solid #1f2937;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:0 20px;
+}
+
+.topbar-right{
+    display:flex;
+    gap:10px;
+}
+
+.topbar button{
+    padding:10px 14px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    background:#2563eb;
+    color:white;
+}
+
+.messages{
+    flex:1;
+    overflow-y:auto;
+    padding:25px;
+    display:flex;
+    flex-direction:column;
+    gap:15px;
+}
+
+.message{
+    max-width:80%;
+    padding:14px;
+    border-radius:14px;
+    line-height:1.5;
+    word-wrap:break-word;
+}
+
+.user-message{
+    align-self:flex-end;
+    background:#2563eb;
+}
+
+.bot-message{
+    align-self:flex-start;
+    background:#1f2937;
+}
+
+.input-section{
+    border-top:1px solid #1f2937;
+    padding:15px;
+}
+
+.input-wrapper{
+    display:flex;
+    gap:10px;
+}
+
+#messageInput{
+    flex:1;
+    resize:none;
+    min-height:70px;
+    max-height:200px;
+    padding:12px;
+    border:none;
+    border-radius:12px;
+    background:#1f2937;
+    color:white;
+}
+
+#sendBtn{
+    width:120px;
+    border:none;
+    border-radius:12px;
+    background:#10b981;
+    color:white;
+    cursor:pointer;
+}
+
+#sendBtn:hover{
+    background:#059669;
+}
+
+.input-footer{
+    margin-top:8px;
+    font-size:12px;
+    color:#9ca3af;
+}
+
+/* MODALS */
+
+.modal{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.7);
+    display:none;
+    justify-content:center;
+    align-items:center;
+}
+
+.modal-content{
+    width:400px;
+    background:#111827;
+    padding:25px;
+    border-radius:16px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+}
+
+.modal-content input{
+    padding:12px;
+    border:none;
+    border-radius:10px;
+    background:#1f2937;
+    color:white;
+}
+
+.modal-content button{
+    padding:12px;
+    border:none;
+    border-radius:10px;
+    background:#2563eb;
+    color:white;
+    cursor:pointer;
+}
+
+/* MOBILE */
+
+@media(max-width:768px){
+
+    .sidebar{
+        width:220px;
+    }
+
+    .message{
+        max-width:95%;
+    }
+
+    .topbar{
+        padding:0 10px;
+    }
+
+    #sendBtn{
+        width:90px;
+    }
+}
+
+/* ===================================================== */
+/* END PART 5B */
+/* ===================================================== */
+
+/* ===================================================== */
+/* BLOXY-BOT X (PART 5C)
+   JAVASCRIPT CHAT LOGIC
+/* ===================================================== */
+
+let EMAIL = "guest";
+let USERNAME = "Guest";
+let CURRENT_CHAT = "";
+let conversations = [];
+
+/* -------------------------
+   HELPERS
+------------------------- */
+
+function $(id){
+    return document.getElementById(id);
+}
+
+function scrollBottom(){
+    const box = $("messages");
+    box.scrollTop = box.scrollHeight;
+}
+
+function saveDraft(){
+    localStorage.setItem(
+        "bloxy_draft",
+        $("messageInput").value
+    );
+}
+
+function loadDraft(){
+
+    const draft =
+        localStorage.getItem(
+            "bloxy_draft"
+        );
+
+    if(draft){
+        $("messageInput").value = draft;
+    }
+}
+
+/* -------------------------
+   MESSAGE RENDERING
+------------------------- */
+
+function addUserMessage(text){
+
+    const div =
+        document.createElement("div");
+
+    div.className =
+        "message user-message";
+
+    div.textContent = text;
+
+    $("messages")
+        .appendChild(div);
+
+    scrollBottom();
+}
+
+function addBotMessage(text){
+
+    const div =
+        document.createElement("div");
+
+    div.className =
+        "message bot-message";
+
+    div.textContent = text;
+
+    $("messages")
+        .appendChild(div);
+
+    scrollBottom();
+}
+
+function clearMessages(){
+
+    $("messages").innerHTML = "";
+}
+
+/* -------------------------
+   CHAT
+------------------------- */
+
+async function sendMessage(){
+
+    const input =
+        $("messageInput");
+
+    const text =
+        input.value.trim();
+
+    if(!text){
+        return;
+    }
+
+    addUserMessage(text);
+
+    input.value = "";
+
+    saveDraft();
+
+    try{
+
+        const response =
+            await fetch(
+                "/chat",
+                {
+                    method:"POST",
+                    headers:{
+                        "Content-Type":
+                        "application/json"
+                    },
+                    body:JSON.stringify({
+                        email:EMAIL,
+                        conversation_id:
+                        CURRENT_CHAT,
+                        message:text
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
+
+        addBotMessage(
+            data.reply ||
+            "No response."
+        );
+
+    }catch(error){
+
+        addBotMessage(
+            "Connection error."
+        );
+
+        console.error(error);
+    }
+}
+
+/* -------------------------
+   CONVERSATIONS
+------------------------- */
+
+async function loadConversations(){
+
+    if(
+        EMAIL === "guest"
+    ){
+        return;
+    }
+
+    try{
+
+        const response =
+            await fetch(
+                `/conversations/${EMAIL}`
+            );
+
+        const data =
+            await response.json();
+
+        conversations =
+            data.conversations || [];
+
+        renderConversations();
+
+    }catch(error){
+
+        console.error(error);
+    }
+}
+
+function renderConversations(){
+
+    const list =
+        $("conversationList");
+
+    list.innerHTML = "";
+
+    conversations.forEach(
+        conversation => {
+
+        const item =
+            document.createElement("div");
+
+        item.className =
+            "conversation-item";
+
+        item.textContent =
+            conversation.title;
+
+        item.onclick = () => {
+
+            CURRENT_CHAT =
+            conversation.conversation_id;
+
+            $("chatTitle")
+                .textContent =
+                conversation.title;
+
+            clearMessages();
+        };
+
+        list.appendChild(item);
+    });
+}
+
+async function createChat(){
+
+    if(
+        EMAIL === "guest"
+    ){
+        return;
+    }
+
+    try{
+
+        const response =
+            await fetch(
+                "/new-chat",
+                {
+                    method:"POST",
+                    headers:{
+                        "Content-Type":
+                        "application/json"
+                    },
+                    body:JSON.stringify({
+                        email:EMAIL,
+                        conversation_id:""
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
+
+        CURRENT_CHAT =
+            data.conversation_id;
+
+        await loadConversations();
+
+    }catch(error){
+
+        console.error(error);
+    }
+}
+
+/* -------------------------
+   LOGIN
+------------------------- */
+
+async function login(){
+
+    try{
+
+        const response =
+            await fetch(
+                "/login",
+                {
+                    method:"POST",
+                    headers:{
+                        "Content-Type":
+                        "application/json"
+                    },
+                    body:JSON.stringify({
+                        email:
+                        $("loginEmail").value,
+
+                        password:
+                        $("loginPassword").value
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if(!data.success){
+
+            alert(
+                "Login failed"
+            );
+
+            return;
+        }
+
+        EMAIL =
+            $("loginEmail").value;
+
+        USERNAME =
+            data.username;
+
+        $("loginModal")
+            .style.display =
+            "none";
+
+        loadConversations();
+
+    }catch(error){
+
+        console.error(error);
+    }
+}
+
+/* -------------------------
+   REGISTER
+------------------------- */
+
+async function register(){
+
+    try{
+
+        const response =
+            await fetch(
+                "/register",
+                {
+                    method:"POST",
+                    headers:{
+                        "Content-Type":
+                        "application/json"
+                    },
+                    body:JSON.stringify({
+                        username:
+                        $("registerUsername").value,
+
+                        email:
+                        $("registerEmail").value,
+
+                        password:
+                        $("registerPassword").value
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if(!data.success){
+
+            alert(
+                "Registration failed"
+            );
+
+            return;
+        }
+
+        EMAIL =
+            $("registerEmail").value;
+
+        CURRENT_CHAT =
+            data.conversation_id;
+
+        $("registerModal")
+            .style.display =
+            "none";
+
+        await loadConversations();
+
+    }catch(error){
+
+        console.error(error);
+    }
+}
+
+/* -------------------------
+   GUEST MODE
+------------------------- */
+
+function guestMode(){
+
+    EMAIL = "guest";
+
+    USERNAME = "Guest";
+
+    $("loginModal")
+        .style.display =
+        "none";
+}
+
+/* -------------------------
+   EVENTS
+------------------------- */
+
+$("sendBtn")
+?.addEventListener(
+    "click",
+    sendMessage
+);
+
+$("newChatBtn")
+?.addEventListener(
+    "click",
+    createChat
+);
+
+$("loginBtn")
+?.addEventListener(
+    "click",
+    login
+);
+
+$("registerBtn")
+?.addEventListener(
+    "click",
+    register
+);
+
+$("guestBtn")
+?.addEventListener(
+    "click",
+    guestMode
+);
+
+$("showRegisterBtn")
+?.addEventListener(
+    "click",
+    () => {
+
+    $("loginModal")
+        .style.display =
+        "none";
+
+    $("registerModal")
+        .style.display =
+        "flex";
+});
+
+$("backLoginBtn")
+?.addEventListener(
+    "click",
+    () => {
+
+    $("registerModal")
+        .style.display =
+        "none";
+
+    $("loginModal")
+        .style.display =
+        "flex";
+});
+
+$("messageInput")
+?.addEventListener(
+    "keydown",
+    function(e){
+
+    saveDraft();
+
+    if(
+        e.ctrlKey &&
+        e.key === "Enter"
+    ){
+
+        e.preventDefault();
+
+        sendMessage();
+    }
+});
+
+/* -------------------------
+   STARTUP
+------------------------- */
+
+window.onload = () => {
+
+    loadDraft();
+
+    $("loginModal")
+        .style.display =
+        "flex";
+};
+
+/* ===================================================== */
+/* END PART 5C */
+/* ===================================================== */
+
+# =========================================================
+# BLOXY-BOT X (PART 5D)
+# FASTAPI UI ROUTE + STARTUP
+# =========================================================
+
+@app.get("/", response_class=HTMLResponse)
+def home():
+
+    return """
+    <!--
+    PASTE PART 5A HTML HERE
+
+    Inside Part 5A:
+
+    <style>
+    PASTE PART 5B CSS HERE
+    </style>
+
+    <script>
+    PASTE PART 5C JAVASCRIPT HERE
+    </script>
+    -->
+    """
+
+
+# =========================================================
+# EXTRA ROUTES
+# =========================================================
+
+@app.get("/health")
+def health():
+
+    return {
+        "status": "online",
+        "service": "Bloxy-Bot X",
+        "version": "1.0"
+    }
+
+
+@app.get("/ping")
+def ping():
+
+    return {
+        "message": "pong"
+    }
+
+
+# =========================================================
+# DATABASE SAFETY
+# =========================================================
+
+def close_database():
+
+    try:
+        conn.commit()
+        conn.close()
+
+    except Exception:
+        pass
+
+
+# =========================================================
+# STARTUP
+# =========================================================
+
+@app.on_event("startup")
+def startup_event():
+
+    print("================================")
+    print("Bloxy-Bot X Starting...")
+    print("================================")
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+
+    close_database()
+
+    print("================================")
+    print("Bloxy-Bot X Shutdown")
+    print("================================")
+
+
+# =========================================================
+# MAIN ENTRY
+# =========================================================
+
+if __name__ == "__main__":
+
+    import uvicorn
+
+    uvicorn.run(
+        "app:app",
+        host="0.0.0.0",
+        port=int(
+            os.getenv(
+                "PORT",
+                8000
+            )
+        ),
+        reload=False
+    )
+
+# =========================================================
+# END PART 5D
+# END OF FILE
+# =========================================================
