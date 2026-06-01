@@ -1777,24 +1777,8 @@ window.onload = () => {
 
 @app.get("/", response_class=HTMLResponse)
 def home():
-
     return """
-    <!--
-    PASTE PART 5A HTML HERE
-
-    Inside Part 5A:
-
-    <style>
-    PASTE PART 5B CSS HERE
-    </style>
-
-    <script>
-    PASTE PART 5C JAVASCRIPT HERE
-    </script>
-    -->
-    """
-
-
+    
 # =========================================================
 # EXTRA ROUTES
 # =========================================================
