@@ -870,9 +870,7 @@ def health():
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-<style>
-/* PART 5B CSS GOES HERE */
-</style>
+
 
 </head>
 
@@ -1778,6 +1776,12 @@ window.onload = () => {
 @app.get("/", response_class=HTMLResponse)
 def home():
     return """
+    <html>
+    <body>
+    <h1>Bloxy Bot Working</h1>
+    </body>
+    </html>
+    """
     
 # =========================================================
 # EXTRA ROUTES
