@@ -1040,7 +1040,7 @@ def health():
 </div>
 
 <script>
-/* PART 5C JAVASCRIPT GOES HERE */
+
 </script>
 
 </body>
