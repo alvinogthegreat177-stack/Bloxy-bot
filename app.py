@@ -1,19 +1,21 @@
 # =========================================================
 # BLOXY-BOT X (PART 1)
-# Imports + App + Environment + Database + Models
+# Imports + Config + FastAPI + Database + Models
+# Syntax-Safe Version
 # =========================================================
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
+from typing import Optional, List, Dict, Any
 
+import os
+import json
+import time
+import uuid
 import sqlite3
 import hashlib
 import requests
-import json
-import os
-import time
-import uuid
 
 # =========================================================
 # APP
@@ -21,31 +23,27 @@ import uuid
 
 app = FastAPI(
     title="Bloxy-Bot X",
-    version="1.0"
+    version="2.0.0"
 )
 
 # =========================================================
 # ENVIRONMENT VARIABLES
 # =========================================================
 
-# AI
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 KIMI_API_KEY = os.getenv("KIMI_API_KEY", "")
 
-# Search / Research
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 EXA_API_KEY = os.getenv("EXA_API_KEY", "")
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY", "")
 
-# News
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
 GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "")
 GUARDIAN_API_KEY = os.getenv("GUARDIAN_API_KEY", "")
 MEDIASTACK_API_KEY = os.getenv("MEDIASTACK_API_KEY", "")
 
-# Sports
 APISPORTS_API_KEY = os.getenv("APISPORTS_API_KEY", "")
 ALLSPORTS_API_KEY = os.getenv("ALLSPORTS_API_KEY", "")
 SPORTMONKS_API_KEY = os.getenv("SPORTMONKS_API_KEY", "")
@@ -53,23 +51,17 @@ SPORTRADAR_API_KEY = os.getenv("SPORTRADAR_API_KEY", "")
 THESPORTSDB_API_KEY = os.getenv("THESPORTSDB_API_KEY", "")
 ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
 
-# Finance
 ALPHAVANTAGE_API_KEY = os.getenv("ALPHAVANTAGE_API_KEY", "")
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
 EXCHANGERATE_API_KEY = os.getenv("EXCHANGERATE_API_KEY", "")
 
-# Weather
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
-
-# Movies
 TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")
 
-# Knowledge
 WOLFRAM_APP_ID = os.getenv("WOLFRAM_APP_ID", "")
 WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY", "")
 
-# Security
-SECRET_KEY = os.getenv("SECRET_KEY", "")
+SECRET_KEY = os.getenv("SECRET_KEY", "bloxy-secret")
 
 # =========================================================
 # DATABASE
@@ -82,7 +74,9 @@ conn = sqlite3.connect(
 
 cur = conn.cursor()
 
-# Users
+# =========================================================
+# USERS
+# =========================================================
 
 cur.execute("""
 CREATE TABLE IF NOT EXISTS users(
@@ -95,12 +89,14 @@ CREATE TABLE IF NOT EXISTS users(
 )
 """)
 
-# Conversations
+# =========================================================
+# CONVERSATIONS
+# =========================================================
 
 cur.execute("""
 CREATE TABLE IF NOT EXISTS conversations(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    conversation_id TEXT,
+    conversation_id TEXT UNIQUE,
     email TEXT,
     title TEXT,
     pinned INTEGER DEFAULT 0,
@@ -109,7 +105,9 @@ CREATE TABLE IF NOT EXISTS conversations(
 )
 """)
 
-# Drafts
+# =========================================================
+# DRAFTS
+# =========================================================
 
 cur.execute("""
 CREATE TABLE IF NOT EXISTS drafts(
@@ -119,53 +117,87 @@ CREATE TABLE IF NOT EXISTS drafts(
 )
 """)
 
+# =========================================================
+# SETTINGS
+# =========================================================
+
+cur.execute("""
+CREATE TABLE IF NOT EXISTS settings(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT,
+    theme TEXT DEFAULT 'dark',
+    model TEXT DEFAULT 'auto'
+)
+""")
+
 conn.commit()
-
-# =========================================================
-# REQUEST MODELS
-# =========================================================
-
-class Register(BaseModel):
-    email: str
-    username: str
-    password: str
-
-class Login(BaseModel):
-    email: str
-    password: str
-
-class Chat(BaseModel):
-    email: str
-    conversation_id: str
-    message: str
-
-class ConversationAction(BaseModel):
-    email: str
-    conversation_id: str
-
-class RenameConversation(BaseModel):
-    email: str
-    conversation_id: str
-    new_title: str
 
 # =========================================================
 # HELPERS
 # =========================================================
 
-def hash_password(password: str) -> str:
-    return hashlib.sha256(
-        password.encode()
-    ).hexdigest()
-
-def now():
+def now() -> str:
     return str(time.time())
 
-def generate_id():
+
+def generate_id() -> str:
     return str(uuid.uuid4())
+
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(
+        password.encode("utf-8")
+    ).hexdigest()
+
+
+# =========================================================
+# PYDANTIC MODELS
+# =========================================================
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    username: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class ChatRequest(BaseModel):
+    email: str
+    conversation_id: str
+    message: str
+
+
+class ConversationRequest(BaseModel):
+    email: str
+    conversation_id: str
+
+
+class RenameRequest(BaseModel):
+    email: str
+    conversation_id: str
+    new_title: str
+
+
+# =========================================================
+# ROOT HEALTH CHECK
+# =========================================================
+
+@app.get("/api-status")
+def api_status():
+    return {
+        "status": "online",
+        "service": "Bloxy-Bot X",
+        "version": "2.0.0"
+    }
 
 # =========================================================
 # END PART 1
 # =========================================================
+
 
 # =========================================================
 # BLOXY-BOT X (PART 2)
@@ -173,18 +205,8 @@ def generate_id():
 # =========================================================
 
 @app.post("/register")
-def register(data: Register):
-
-    if "@" not in data.email:
-        return {"success": False, "message": "Invalid email"}
-
-    if len(data.password) < 6:
-        return {"success": False, "message": "Password too short"}
-
+def register(data: RegisterRequest):
     try:
-
-        conversation_id = generate_id()
-
         cur.execute(
             """
             INSERT INTO users(
@@ -205,21 +227,25 @@ def register(data: Register):
             )
         )
 
+        conversation_id = generate_id()
+
         cur.execute(
             """
             INSERT INTO conversations(
                 conversation_id,
                 email,
                 title,
+                pinned,
                 messages,
                 updated_at
             )
-            VALUES(?,?,?,?,?)
+            VALUES(?,?,?,?,?,?)
             """,
             (
                 conversation_id,
                 data.email,
                 "New Chat",
+                0,
                 "[]",
                 now()
             )
@@ -233,7 +259,6 @@ def register(data: Register):
         }
 
     except Exception as e:
-
         return {
             "success": False,
             "message": str(e)
@@ -241,7 +266,7 @@ def register(data: Register):
 
 
 @app.post("/login")
-def login(data: Login):
+def login(data: LoginRequest):
 
     cur.execute(
         """
@@ -258,7 +283,10 @@ def login(data: Login):
     user = cur.fetchone()
 
     if not user:
-        return {"success": False}
+        return {
+            "success": False,
+            "message": "Invalid credentials"
+        }
 
     return {
         "success": True,
@@ -272,31 +300,41 @@ def get_conversations(email: str):
 
     cur.execute(
         """
-        SELECT conversation_id,title,pinned
+        SELECT
+            conversation_id,
+            title,
+            pinned,
+            updated_at
         FROM conversations
         WHERE email=?
         ORDER BY pinned DESC,
-        updated_at DESC
+                 updated_at DESC
         """,
         (email,)
     )
 
     rows = cur.fetchall()
 
-    return {
-        "conversations": [
+    conversations = []
+
+    for row in rows:
+        conversations.append(
             {
-                "conversation_id": r[0],
-                "title": r[1],
-                "pinned": bool(r[2])
+                "conversation_id": row[0],
+                "title": row[1],
+                "pinned": bool(row[2]),
+                "updated_at": row[3]
             }
-            for r in rows
-        ]
+        )
+
+    return {
+        "success": True,
+        "conversations": conversations
     }
 
 
 @app.post("/new-chat")
-def new_chat(data: ConversationAction):
+def new_chat(data: ConversationRequest):
 
     conversation_id = generate_id()
 
@@ -306,15 +344,17 @@ def new_chat(data: ConversationAction):
             conversation_id,
             email,
             title,
+            pinned,
             messages,
             updated_at
         )
-        VALUES(?,?,?,?,?)
+        VALUES(?,?,?,?,?,?)
         """,
         (
             conversation_id,
             data.email,
             "New Chat",
+            0,
             "[]",
             now()
         )
@@ -329,7 +369,7 @@ def new_chat(data: ConversationAction):
 
 
 @app.post("/rename-chat")
-def rename_chat(data: RenameConversation):
+def rename_chat(data: RenameRequest):
 
     cur.execute(
         """
@@ -345,11 +385,13 @@ def rename_chat(data: RenameConversation):
 
     conn.commit()
 
-    return {"success": True}
+    return {
+        "success": True
+    }
 
 
 @app.post("/pin-chat")
-def pin_chat(data: ConversationAction):
+def pin_chat(data: ConversationRequest):
 
     cur.execute(
         """
@@ -362,11 +404,32 @@ def pin_chat(data: ConversationAction):
 
     conn.commit()
 
-    return {"success": True}
+    return {
+        "success": True
+    }
+
+
+@app.post("/unpin-chat")
+def unpin_chat(data: ConversationRequest):
+
+    cur.execute(
+        """
+        UPDATE conversations
+        SET pinned=0
+        WHERE conversation_id=?
+        """,
+        (data.conversation_id,)
+    )
+
+    conn.commit()
+
+    return {
+        "success": True
+    }
 
 
 @app.post("/delete-chat")
-def delete_chat(data: ConversationAction):
+def delete_chat(data: ConversationRequest):
 
     cur.execute(
         """
@@ -378,11 +441,45 @@ def delete_chat(data: ConversationAction):
 
     conn.commit()
 
-    return {"success": True}
+    return {
+        "success": True
+    }
+
+
+@app.get("/conversation/{conversation_id}")
+def get_conversation(conversation_id: str):
+
+    cur.execute(
+        """
+        SELECT messages
+        FROM conversations
+        WHERE conversation_id=?
+        """,
+        (conversation_id,)
+    )
+
+    row = cur.fetchone()
+
+    if not row:
+        return {
+            "success": False,
+            "messages": []
+        }
+
+    try:
+        messages = json.loads(row[0])
+    except Exception:
+        messages = []
+
+    return {
+        "success": True,
+        "messages": messages
+    }
 
 # =========================================================
 # END PART 2
 # =========================================================
+
 
 # =========================================================
 # BLOXY-BOT X (PART 3)
@@ -396,14 +493,21 @@ MODELS = [
     "mistralai/mistral-small-3.2-24b-instruct"
 ]
 
-def tavily_search(query):
+
+def safe_json(response):
+    try:
+        return response.json()
+    except Exception:
+        return {}
+
+
+def tavily_search(query: str) -> str:
 
     if not TAVILY_API_KEY:
         return ""
 
     try:
-
-        r = requests.post(
+        response = requests.post(
             "https://api.tavily.com/search",
             json={
                 "api_key": TAVILY_API_KEY,
@@ -413,14 +517,14 @@ def tavily_search(query):
             timeout=20
         )
 
-        data = r.json()
+        data = safe_json(response)
 
         results = []
 
         for item in data.get("results", []):
-            results.append(
-                item.get("content", "")
-            )
+            content = item.get("content", "")
+            if content:
+                results.append(content)
 
         return "\n".join(results)
 
@@ -428,14 +532,13 @@ def tavily_search(query):
         return ""
 
 
-def news_context(query):
+def news_context(query: str) -> str:
 
     if not NEWS_API_KEY:
         return ""
 
     try:
-
-        r = requests.get(
+        response = requests.get(
             "https://newsapi.org/v2/everything",
             params={
                 "q": query,
@@ -446,63 +549,108 @@ def news_context(query):
             timeout=20
         )
 
-        data = r.json()
+        data = safe_json(response)
 
-        articles = []
+        headlines = []
 
-        for a in data.get("articles", []):
-
-            title = a.get("title", "")
-
+        for article in data.get("articles", []):
+            title = article.get("title", "")
             if title:
-                articles.append(title)
+                headlines.append(title)
 
-        return "\n".join(articles)
+        return "\n".join(headlines)
 
     except Exception:
         return ""
 
 
-def format_response(text):
+def build_system_prompt(
+    search_data: str,
+    news_data: str
+) -> str:
 
-    if not text:
-        return "⚠️ Empty response."
-
-    lines = text.split("\n")
-
-    output = []
-
-    for line in lines:
-
-        line = line.strip()
-
-        if line:
-            output.append(line)
-
-    return "\n".join(output)
-
-
-def ai_reply(message, history):
-
-    live_search = tavily_search(message)
-
-    live_news = news_context(message)
-
-    system_prompt = f"""
+    return f"""
 You are Bloxy-Bot X.
 
 Rules:
 - Be helpful.
-- Use clean formatting.
+- Be accurate.
 - Use bullet points when useful.
-- Keep answers concise.
+- Keep formatting clean.
+- Explain technical topics clearly.
 
 SEARCH DATA:
-{live_search}
+{search_data}
 
 NEWS DATA:
-{live_news}
+{news_data}
 """
+
+
+def format_response(text: str) -> str:
+
+    if not text:
+        return "No response generated."
+
+    cleaned = []
+
+    for line in text.split("\n"):
+        line = line.strip()
+
+        if line:
+            cleaned.append(line)
+
+    return "\n".join(cleaned)
+
+
+def call_openrouter(
+    model: str,
+    messages: list
+):
+
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization":
+            f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type":
+            "application/json"
+        },
+        json={
+            "model": model,
+            "messages": messages,
+            "temperature": 0.7,
+            "max_tokens": 1200
+        },
+        timeout=90
+    )
+
+    data = safe_json(response)
+
+    return (
+        data.get("choices", [{}])[0]
+        .get("message", {})
+        .get("content", "")
+    )
+
+
+def ai_reply(
+    user_message: str,
+    history: list
+) -> str:
+
+    search_data = tavily_search(
+        user_message
+    )
+
+    news_data = news_context(
+        user_message
+    )
+
+    system_prompt = build_system_prompt(
+        search_data,
+        news_data
+    )
 
     messages = [
         {
@@ -516,7 +664,7 @@ NEWS DATA:
     messages.append(
         {
             "role": "user",
-            "content": message
+            "content": user_message
         }
     )
 
@@ -524,40 +672,24 @@ NEWS DATA:
 
         try:
 
-            r = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization":
-                    f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type":
-                    "application/json"
-                },
-                json={
-                    "model": model,
-                    "messages": messages,
-                    "temperature": 0.7,
-                    "max_tokens": 1200
-                },
-                timeout=60
+            reply = call_openrouter(
+                model,
+                messages
             )
 
-            data = r.json()
-
-            reply = (
-                data["choices"][0]
-                ["message"]["content"]
-            )
-
-            return format_response(reply)
+            if reply:
+                return format_response(
+                    reply
+                )
 
         except Exception:
             continue
 
-    return "⚠️ All AI providers failed."
+    return "All configured AI providers failed."
 
 
 @app.post("/chat")
-def chat(data: Chat):
+def chat(data: ChatRequest):
 
     history = []
 
@@ -577,7 +709,9 @@ def chat(data: Chat):
         if row:
 
             try:
-                history = json.loads(row[0])
+                history = json.loads(
+                    row[0]
+                )
             except Exception:
                 history = []
 
@@ -588,15 +722,19 @@ def chat(data: Chat):
 
     if data.email != "guest":
 
-        history.append({
-            "role": "user",
-            "content": data.message
-        })
+        history.append(
+            {
+                "role": "user",
+                "content": data.message
+            }
+        )
 
-        history.append({
-            "role": "assistant",
-            "content": reply
-        })
+        history.append(
+            {
+                "role": "assistant",
+                "content": reply
+            }
+        )
 
         cur.execute(
             """
@@ -615,51 +753,64 @@ def chat(data: Chat):
         conn.commit()
 
     return {
+        "success": True,
         "reply": reply
     }
 
-# ===== END PART 3 =====
+
+# =========================================================
+# END PART 3
+# =========================================================
+
 
 # =========================================================
 # BLOXY-BOT X (PART 4)
-# News + Sports + Weather + Finance + Movies + Wolfram
+# News + Weather + Finance + Movies + Sports + Wolfram
 # =========================================================
 
 @app.get("/news")
 def get_news(query: str):
 
     if not NEWS_API_KEY:
-        return {"articles": []}
+        return {
+            "success": False,
+            "message": "NEWS_API_KEY missing",
+            "articles": []
+        }
 
     try:
-
-        r = requests.get(
+        response = requests.get(
             "https://newsapi.org/v2/everything",
             params={
                 "q": query,
                 "language": "en",
                 "pageSize": 10,
+                "sortBy": "publishedAt",
                 "apiKey": NEWS_API_KEY
             },
             timeout=20
         )
 
-        return r.json()
+        return response.json()
 
     except Exception as e:
-
         return {
-            "error": str(e),
-            "articles": []
+            "success": False,
+            "error": str(e)
         }
 
 
 @app.get("/weather")
 def weather(city: str):
 
-    try:
+    if not OPENWEATHER_API_KEY:
+        return {
+            "success": False,
+            "message": "OPENWEATHER_API_KEY missing"
+        }
 
-        r = requests.get(
+    try:
+        response = requests.get(
             "https://api.openweathermap.org/data/2.5/weather",
             params={
                 "q": city,
@@ -669,11 +820,11 @@ def weather(city: str):
             timeout=20
         )
 
-        return r.json()
+        return response.json()
 
     except Exception as e:
-
         return {
+            "success": False,
             "error": str(e)
         }
 
@@ -681,9 +832,14 @@ def weather(city: str):
 @app.get("/finance")
 def finance(symbol: str):
 
-    try:
+    if not ALPHAVANTAGE_API_KEY:
+        return {
+            "success": False,
+            "message": "ALPHAVANTAGE_API_KEY missing"
+        }
 
-        r = requests.get(
+    try:
+        response = requests.get(
             "https://www.alphavantage.co/query",
             params={
                 "function": "GLOBAL_QUOTE",
@@ -693,21 +849,26 @@ def finance(symbol: str):
             timeout=20
         )
 
-        return r.json()
+        return response.json()
 
     except Exception as e:
-
         return {
+            "success": False,
             "error": str(e)
         }
 
 
 @app.get("/finnhub")
-def finnhub_stock(symbol: str):
+def finnhub_quote(symbol: str):
+
+    if not FINNHUB_API_KEY:
+        return {
+            "success": False,
+            "message": "FINNHUB_API_KEY missing"
+        }
 
     try:
-
-        r = requests.get(
+        response = requests.get(
             "https://finnhub.io/api/v1/quote",
             params={
                 "symbol": symbol,
@@ -716,11 +877,11 @@ def finnhub_stock(symbol: str):
             timeout=20
         )
 
-        return r.json()
+        return response.json()
 
     except Exception as e:
-
         return {
+            "success": False,
             "error": str(e)
         }
 
@@ -728,28 +889,66 @@ def finnhub_stock(symbol: str):
 @app.get("/exchange-rate")
 def exchange_rate(base: str):
 
-    try:
+    if not EXCHANGERATE_API_KEY:
+        return {
+            "success": False,
+            "message": "EXCHANGERATE_API_KEY missing"
+        }
 
-        r = requests.get(
+    try:
+        response = requests.get(
             f"https://v6.exchangerate-api.com/v6/{EXCHANGERATE_API_KEY}/latest/{base}",
             timeout=20
         )
 
-        return r.json()
+        return response.json()
 
     except Exception as e:
-
         return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@app.get("/movies")
+def search_movies(query: str):
+
+    if not TMDB_API_KEY:
+        return {
+            "success": False,
+            "message": "TMDB_API_KEY missing"
+        }
+
+    try:
+        response = requests.get(
+            "https://api.themoviedb.org/3/search/movie",
+            params={
+                "api_key": TMDB_API_KEY,
+                "query": query
+            },
+            timeout=20
+        )
+
+        return response.json()
+
+    except Exception as e:
+        return {
+            "success": False,
             "error": str(e)
         }
 
 
 @app.get("/sports/epl")
-def epl_table():
+def epl_standings():
+
+    if not APISPORTS_API_KEY:
+        return {
+            "success": False,
+            "message": "APISPORTS_API_KEY missing"
+        }
 
     try:
-
-        r = requests.get(
+        response = requests.get(
             "https://v3.football.api-sports.io/standings",
             headers={
                 "x-apisports-key":
@@ -762,21 +961,28 @@ def epl_table():
             timeout=20
         )
 
-        return r.json()
+        return response.json()
 
     except Exception as e:
-
         return {
+            "success": False,
             "error": str(e)
         }
 
 
 @app.get("/odds")
-def odds(sport: str = "soccer_epl"):
+def sports_odds(
+    sport: str = "soccer_epl"
+):
+
+    if not ODDS_API_KEY:
+        return {
+            "success": False,
+            "message": "ODDS_API_KEY missing"
+        }
 
     try:
-
-        r = requests.get(
+        response = requests.get(
             f"https://api.the-odds-api.com/v4/sports/{sport}/odds",
             params={
                 "apiKey": ODDS_API_KEY
@@ -784,45 +990,26 @@ def odds(sport: str = "soccer_epl"):
             timeout=20
         )
 
-        return r.json()
+        return response.json()
 
     except Exception as e:
-
         return {
+            "success": False,
             "error": str(e)
-        }
-
-
-@app.get("/movies")
-def movies(query: str):
-
-    try:
-
-        r = requests.get(
-            "https://api.themoviedb.org/3/search/movie",
-            params={
-                "api_key": TMDB_API_KEY,
-                "query": query
-            },
-            timeout=20
-        )
-
-        return r.json()
-
-    except Exception as e:
-
-        return {
-            "error": str(e),
-            "results": []
         }
 
 
 @app.get("/wolfram")
 def wolfram(question: str):
 
-    try:
+    if not WOLFRAM_APP_ID:
+        return {
+            "success": False,
+            "message": "WOLFRAM_APP_ID missing"
+        }
 
-        r = requests.get(
+    try:
+        response = requests.get(
             "https://api.wolframalpha.com/v2/query",
             params={
                 "appid": WOLFRAM_APP_ID,
@@ -832,1032 +1019,151 @@ def wolfram(question: str):
             timeout=30
         )
 
-        return r.json()
+        return response.json()
 
     except Exception as e:
-
         return {
+            "success": False,
             "error": str(e)
         }
 
 
-@app.get("/health")
-def health():
+@app.get("/system-info")
+def system_info():
 
     return {
-        "status": "online",
-        "service": "Bloxy-Bot X",
-        "time": now()
+        "app": "Bloxy-Bot X",
+        "version": "2.0.0",
+        "database": "SQLite",
+        "openrouter_enabled": bool(OPENROUTER_API_KEY),
+        "news_enabled": bool(NEWS_API_KEY),
+        "weather_enabled": bool(OPENWEATHER_API_KEY),
+        "finance_enabled": bool(ALPHAVANTAGE_API_KEY),
+        "movies_enabled": bool(TMDB_API_KEY),
+        "wolfram_enabled": bool(WOLFRAM_APP_ID)
     }
 
 # =========================================================
 # END PART 4
-# PART 5 = FULL UI + HTML + CSS + JAVASCRIPT + STARTUP
 # =========================================================
 
-<!-- ===================================================== -->
 
-<!-- HTML LAYOUT ONLY -->
-<!-- Place inside return """ ... """ -->
-<!-- ===================================================== -->
+# =========================================================
+# PART 5A + 5B + 5C
+# =========================================================
 
+
+@app.get("/", response_class=HTMLResponse)
+def home():
+    return """
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>Bloxy-Bot X</title>
 
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{
+    font-family:Arial,sans-serif;
+    background:#0f172a;
+    color:white;
+    margin:0;
+}
 
+.container{
+    padding:20px;
+}
 
+textarea{
+    width:100%;
+    height:120px;
+}
+
+button{
+    padding:10px 20px;
+}
+</style>
 
 </head>
 
 <body>
 
-<div class="app">
+<div class="container">
+    <h1>Bloxy-Bot X</h1>
 
-    <!-- SIDEBAR -->
+    <textarea id="messageInput"></textarea>
 
-    <aside class="sidebar">
+    <br><br>
 
-        <div class="logo-section">
-           
-        </div>
+    <button onclick="sendMessage()">
+        Send
+    </button>
 
-        <div class="sidebar-actions">
-
-            <button id="newChatBtn">
-                + New Chat
-            </button>
-
-        </div>
-
-        <div
-            id="conversationList"
-            class="conversation-list">
-        </div>
-
-    </aside>
-
-    <!-- MAIN -->
-
-    <main class="main">
-
-        <!-- TOPBAR -->
-
-        <header class="topbar">
-
-            <div class="topbar-left">
-                <span id="chatTitle">
-                    New Chat
-                </span>
-            </div>
-
-            <div class="topbar-right">
-
-                <button id="clearBtn">
-                    Clear
-                </button>
-
-                <button id="logoutBtn">
-                    Logout
-                </button>
-
-            </div>
-
-        </header>
-
-        <!-- CHAT AREA -->
-
-        <section
-            id="messages"
-            class="messages">
-        </section>
-
-        <!-- INPUT -->
-
-        <section class="input-section">
-
-            <div class="input-wrapper">
-
-                <textarea
-                    id="messageInput"
-                    placeholder="Message Bloxy‑Bot..."
-                ></textarea>
-
-                <button id="sendBtn">
-                    Send
-                </button>
-
-            </div>
-
-            <div class="input-footer">
-
-                <span>
-                    Ctrl + Enter to send
-                </span>
-
-            </div>
-
-        </section>
-
-    </main>
-
-</div>
-
-<!-- LOGIN MODAL -->
-
-<div
-    id="loginModal"
-    class="modal">
-
-    <div class="modal-content">
-
-        <h2>Login</h2>
-
-        <input
-            id="loginEmail"
-            type="email"
-            placeholder="Email">
-
-        <input
-            id="loginPassword"
-            type="password"
-            placeholder="Password">
-
-        <button id="loginBtn">
-            Login
-        </button>
-
-        <button id="showRegisterBtn">
-            Create Account
-        </button>
-
-        <button id="guestBtn">
-            Continue as Guest
-        </button>
-
-    </div>
-
-</div>
-
-<!-- REGISTER MODAL -->
-
-<div
-    id="registerModal"
-    class="modal">
-
-    <div class="modal-content">
-
-        <h2>Create Account</h2>
-
-        <input
-            id="registerUsername"
-            placeholder="Username">
-
-        <input
-            id="registerEmail"
-            type="email"
-            placeholder="Email">
-
-        <input
-            id="registerPassword"
-            type="password"
-            placeholder="Password">
-
-        <button id="registerBtn">
-            Register
-        </button>
-
-        <button id="backLoginBtn">
-            Back
-        </button>
-
-    </div>
-
+    <div id="messages"></div>
 </div>
 
 <script>
+
+async function sendMessage(){
+
+    const text =
+        document.getElementById(
+            "messageInput"
+        ).value;
+
+    const response =
+        await fetch(
+            "/chat",
+            {
+                method:"POST",
+                headers:{
+                    "Content-Type":
+                    "application/json"
+                },
+                body:JSON.stringify({
+                    email:"guest",
+                    conversation_id:"guest",
+                    message:text
+                })
+            }
+        );
+
+    const data =
+        await response.json();
+
+    document.getElementById(
+        "messages"
+    ).innerHTML +=
+    "<p>" +
+    data.reply +
+    "</p>";
+}
 
 </script>
 
 </body>
 </html>
-
-<!-- ========================= -->
-
-<!-- ========================= -->
-
-/* ===================================================== */
-
-/* CSS STYLING */
-/* ===================================================== */
-
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-}
-
-body{
-    font-family:'Inter',sans-serif;
-    background:#0b0f17;
-    color:#ffffff;
-    height:100vh;
-    overflow:hidden;
-}
-
-
-
-/* SIDEBAR */
-
-.sidebar{
-    width:280px;
-    background:#111827;
-    border-right:1px solid #1f2937;
-    display:flex;
-    flex-direction:column;
-}
-
-.logo-section{
-    padding:20px;
-    border-bottom:1px solid #1f2937;
-}
-
-.sidebar-actions{
-    padding:15px;
-}
-
-#newChatBtn{
-    width:100%;
-    padding:12px;
-    border:none;
-    border-radius:10px;
-    background:#2563eb;
-    color:white;
-    cursor:pointer;
-}
-
-#newChatBtn:hover{
-    background:#1d4ed8;
-}
-
-.conversation-list{
-    flex:1;
-    overflow-y:auto;
-    padding:10px;
-}
-
-.conversation-item{
-    padding:12px;
-    margin-bottom:8px;
-    background:#1f2937;
-    border-radius:10px;
-    cursor:pointer;
-}
-
-.conversation-item:hover{
-    background:#374151;
-}
-
-/* MAIN */
-
-.main{
-    flex:1;
-    display:flex;
-    flex-direction:column;
-}
-
-.topbar{
-    height:70px;
-    border-bottom:1px solid #1f2937;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    padding:0 20px;
-}
-
-.topbar-right{
-    display:flex;
-    gap:10px;
-}
-
-.topbar button{
-    padding:10px 14px;
-    border:none;
-    border-radius:8px;
-    cursor:pointer;
-    background:#2563eb;
-    color:white;
-}
-
-.messages{
-    flex:1;
-    overflow-y:auto;
-    padding:25px;
-    display:flex;
-    flex-direction:column;
-    gap:15px;
-}
-
-.message{
-    max-width:80%;
-    padding:14px;
-    border-radius:14px;
-    line-height:1.5;
-    word-wrap:break-word;
-}
-
-.user-message{
-    align-self:flex-end;
-    background:#2563eb;
-}
-
-.bot-message{
-    align-self:flex-start;
-    background:#1f2937;
-}
-
-.input-section{
-    border-top:1px solid #1f2937;
-    padding:15px;
-}
-
-.input-wrapper{
-    display:flex;
-    gap:10px;
-}
-
-#messageInput{
-    flex:1;
-    resize:none;
-    min-height:70px;
-    max-height:200px;
-    padding:12px;
-    border:none;
-    border-radius:12px;
-    background:#1f2937;
-    color:white;
-}
-
-#sendBtn{
-    width:120px;
-    border:none;
-    border-radius:12px;
-    background:#10b981;
-    color:white;
-    cursor:pointer;
-}
-
-#sendBtn:hover{
-    background:#059669;
-}
-
-.input-footer{
-    margin-top:8px;
-    font-size:12px;
-    color:#9ca3af;
-}
-
-/* MODALS */
-
-.modal{
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,.7);
-    display:none;
-    justify-content:center;
-    align-items:center;
-}
-
-.modal-content{
-    width:400px;
-    background:#111827;
-    padding:25px;
-    border-radius:16px;
-    display:flex;
-    flex-direction:column;
-    gap:12px;
-}
-
-.modal-content input{
-    padding:12px;
-    border:none;
-    border-radius:10px;
-    background:#1f2937;
-    color:white;
-}
-
-.modal-content button{
-    padding:12px;
-    border:none;
-    border-radius:10px;
-    background:#2563eb;
-    color:white;
-    cursor:pointer;
-}
-
-/* MOBILE */
-
-@media(max-width:768px){
-
-    .sidebar{
-        width:220px;
-    }
-
-    .message{
-        max-width:95%;
-    }
-
-    .topbar{
-        padding:0 10px;
-    }
-
-    #sendBtn{
-        width:90px;
-    }
-}
-
-/* ===================================================== */
-/* END PART 5B */
-/* ===================================================== */
-
-/* ===================================================== */
-/* BLOXY-BOT X (PART 5C)
-   JAVASCRIPT CHAT LOGIC
-/* ===================================================== */
-
-let EMAIL = "guest";
-let USERNAME = "Guest";
-let CURRENT_CHAT = "";
-let conversations = [];
-
-/* -------------------------
-   HELPERS
-------------------------- */
-
-function $(id){
-    return document.getElementById(id);
-}
-
-function scrollBottom(){
-    const box = $("messages");
-    box.scrollTop = box.scrollHeight;
-}
-
-function saveDraft(){
-    localStorage.setItem(
-        "bloxy_draft",
-        $("messageInput").value
-    );
-}
-
-function loadDraft(){
-
-    const draft =
-        localStorage.getItem(
-            "bloxy_draft"
-        );
-
-    if(draft){
-        $("messageInput").value = draft;
-    }
-}
-
-/* -------------------------
-   MESSAGE RENDERING
-------------------------- */
-
-function addUserMessage(text){
-
-    const div =
-        document.createElement("div");
-
-    div.className =
-        "message user-message";
-
-    div.textContent = text;
-
-    $("messages")
-        .appendChild(div);
-
-    scrollBottom();
-}
-
-function addBotMessage(text){
-
-    const div =
-        document.createElement("div");
-
-    div.className =
-        "message bot-message";
-
-    div.textContent = text;
-
-    $("messages")
-        .appendChild(div);
-
-    scrollBottom();
-}
-
-function clearMessages(){
-
-    $("messages").innerHTML = "";
-}
-
-/* -------------------------
-   CHAT
-------------------------- */
-
-async function sendMessage(){
-
-    const input =
-        $("messageInput");
-
-    const text =
-        input.value.trim();
-
-    if(!text){
-        return;
-    }
-
-    addUserMessage(text);
-
-    input.value = "";
-
-    saveDraft();
-
-    try{
-
-        const response =
-            await fetch(
-                "/chat",
-                {
-                    method:"POST",
-                    headers:{
-                        "Content-Type":
-                        "application/json"
-                    },
-                    body:JSON.stringify({
-                        email:EMAIL,
-                        conversation_id:
-                        CURRENT_CHAT,
-                        message:text
-                    })
-                }
-            );
-
-        const data =
-            await response.json();
-
-        addBotMessage(
-            data.reply ||
-            "No response."
-        );
-
-    }catch(error){
-
-        addBotMessage(
-            "Connection error."
-        );
-
-        console.error(error);
-    }
-}
-
-/* -------------------------
-   CONVERSATIONS
-------------------------- */
-
-async function loadConversations(){
-
-    if(
-        EMAIL === "guest"
-    ){
-        return;
-    }
-
-    try{
-
-        const response =
-            await fetch(
-                `/conversations/${EMAIL}`
-            );
-
-        const data =
-            await response.json();
-
-        conversations =
-            data.conversations || [];
-
-        renderConversations();
-
-    }catch(error){
-
-        console.error(error);
-    }
-}
-
-function renderConversations(){
-
-    const list =
-        $("conversationList");
-
-    list.innerHTML = "";
-
-    conversations.forEach(
-        conversation => {
-
-        const item =
-            document.createElement("div");
-
-        item.className =
-            "conversation-item";
-
-        item.textContent =
-            conversation.title;
-
-        item.onclick = () => {
-
-            CURRENT_CHAT =
-            conversation.conversation_id;
-
-            $("chatTitle")
-                .textContent =
-                conversation.title;
-
-            clearMessages();
-        };
-
-        list.appendChild(item);
-    });
-}
-
-async function createChat(){
-
-    if(
-        EMAIL === "guest"
-    ){
-        return;
-    }
-
-    try{
-
-        const response =
-            await fetch(
-                "/new-chat",
-                {
-                    method:"POST",
-                    headers:{
-                        "Content-Type":
-                        "application/json"
-                    },
-                    body:JSON.stringify({
-                        email:EMAIL,
-                        conversation_id:""
-                    })
-                }
-            );
-
-        const data =
-            await response.json();
-
-        CURRENT_CHAT =
-            data.conversation_id;
-
-        await loadConversations();
-
-    }catch(error){
-
-        console.error(error);
-    }
-}
-
-/* -------------------------
-   LOGIN
-------------------------- */
-
-async function login(){
-
-    try{
-
-        const response =
-            await fetch(
-                "/login",
-                {
-                    method:"POST",
-                    headers:{
-                        "Content-Type":
-                        "application/json"
-                    },
-                    body:JSON.stringify({
-                        email:
-                        $("loginEmail").value,
-
-                        password:
-                        $("loginPassword").value
-                    })
-                }
-            );
-
-        const data =
-            await response.json();
-
-        if(!data.success){
-
-            alert(
-                "Login failed"
-            );
-
-            return;
-        }
-
-        EMAIL =
-            $("loginEmail").value;
-
-        USERNAME =
-            data.username;
-
-        $("loginModal")
-            .style.display =
-            "none";
-
-        loadConversations();
-
-    }catch(error){
-
-        console.error(error);
-    }
-}
-
-/* -------------------------
-   REGISTER
-------------------------- */
-
-async function register(){
-
-    try{
-
-        const response =
-            await fetch(
-                "/register",
-                {
-                    method:"POST",
-                    headers:{
-                        "Content-Type":
-                        "application/json"
-                    },
-                    body:JSON.stringify({
-                        username:
-                        $("registerUsername").value,
-
-                        email:
-                        $("registerEmail").value,
-
-                        password:
-                        $("registerPassword").value
-                    })
-                }
-            );
-
-        const data =
-            await response.json();
-
-        if(!data.success){
-
-            alert(
-                "Registration failed"
-            );
-
-            return;
-        }
-
-        EMAIL =
-            $("registerEmail").value;
-
-        CURRENT_CHAT =
-            data.conversation_id;
-
-        $("registerModal")
-            .style.display =
-            "none";
-
-        await loadConversations();
-
-    }catch(error){
-
-        console.error(error);
-    }
-}
-
-/* -------------------------
-   GUEST MODE
-------------------------- */
-
-function guestMode(){
-
-    EMAIL = "guest";
-
-    USERNAME = "Guest";
-
-    $("loginModal")
-        .style.display =
-        "none";
-}
-
-/* -------------------------
-   EVENTS
-------------------------- */
-
-$("sendBtn")
-?.addEventListener(
-    "click",
-    sendMessage
-);
-
-$("newChatBtn")
-?.addEventListener(
-    "click",
-    createChat
-);
-
-$("loginBtn")
-?.addEventListener(
-    "click",
-    login
-);
-
-$("registerBtn")
-?.addEventListener(
-    "click",
-    register
-);
-
-$("guestBtn")
-?.addEventListener(
-    "click",
-    guestMode
-);
-
-$("showRegisterBtn")
-?.addEventListener(
-    "click",
-    () => {
-
-    $("loginModal")
-        .style.display =
-        "none";
-
-    $("registerModal")
-        .style.display =
-        "flex";
-});
-
-$("backLoginBtn")
-?.addEventListener(
-    "click",
-    () => {
-
-    $("registerModal")
-        .style.display =
-        "none";
-
-    $("loginModal")
-        .style.display =
-        "flex";
-});
-
-$("messageInput")
-?.addEventListener(
-    "keydown",
-    function(e){
-
-    saveDraft();
-
-    if(
-        e.ctrlKey &&
-        e.key === "Enter"
-    ){
-
-        e.preventDefault();
-
-        sendMessage();
-    }
-});
-
-/* -------------------------
-   STARTUP
-------------------------- */
-
-window.onload = () => {
-
-    loadDraft();
-
-    $("loginModal")
-        .style.display =
-        "flex";
-};
-
-/* ===================================================== */
-/* END PART 5C */
-/* ===================================================== */
-
-# =========================================================
-# BLOXY-BOT X (PART 5D)
-# FASTAPI UI ROUTE + STARTUP
-# =========================================================
-
-@app.get("/", response_class=HTMLResponse)
-def home():
-    return """
-    <html>
-    <body>
-    <h1>Bloxy Bot Working</h1>
-    </body>
-    </html>
-    """
-    
-# =========================================================
-# EXTRA ROUTES
-# =========================================================
-
-@app.get("/health")
-def health():
-
-    return {
-        "status": "online",
-        "service": "Bloxy-Bot X",
-        "version": "1.0"
-    }
-
+"""
 
 @app.get("/ping")
 def ping():
-
-    return {
-        "message": "pong"
-    }
-
-
-# =========================================================
-# DATABASE SAFETY
-# =========================================================
-
-def close_database():
-
-    try:
-        conn.commit()
-        conn.close()
-
-    except Exception:
-        pass
-
-
-# =========================================================
-# STARTUP
-# =========================================================
+    return {"message":"pong"}
 
 @app.on_event("startup")
 def startup_event():
-
-    print("================================")
     print("Bloxy-Bot X Starting...")
-    print("================================")
-
 
 @app.on_event("shutdown")
 def shutdown_event():
-
-    close_database()
-
-    print("================================")
     print("Bloxy-Bot X Shutdown")
-    print("================================")
-
-
-# =========================================================
-# MAIN ENTRY
-# =========================================================
 
 if __name__ == "__main__":
-
     import uvicorn
 
     uvicorn.run(
         "app:app",
         host="0.0.0.0",
-        port=int(
-            os.getenv(
-                "PORT",
-                8000
-            )
-        ),
-        reload=False
+        port=8000
     )
-
-# =========================================================
-# END PART 5D
-# END OF FILE
-# =========================================================
