@@ -883,7 +883,7 @@ def health():
     <aside class="sidebar">
 
         <div class="logo-section">
-            <h2>🤖 Bloxy‑Bot X</h2>
+           
         </div>
 
         <div class="sidebar-actions">
