@@ -809,9 +809,6 @@ def bot_info():
 # @app.get("/", response_class=HTMLResponse)
 # def home():
 #     return """
-#
-# =========================================================
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
