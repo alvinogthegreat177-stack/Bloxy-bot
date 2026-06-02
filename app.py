@@ -66,3 +66,40 @@ def chat(data: Chat):
 
     except Exception as e:
         return {"reply": f"Error: {e}"}
+
+
+import uuid
+
+users = {}
+sessions = {}
+
+class Auth(BaseModel):
+    email: str
+    password: str
+
+@app.post("/signup")
+def signup(data: Auth):
+    if data.email in users:
+        return {"error": "Account already exists"}
+
+    users[data.email] = {
+        "password": data.password
+    }
+
+    return {"ok": True}
+
+@app.post("/login")
+def login(data: Auth):
+    if data.email not in users:
+        return {"error": "Account not found"}
+
+    if users[data.email]["password"] != data.password:
+        return {"error": "Wrong password"}
+
+    session_id = str(uuid.uuid4())
+    sessions[session_id] = data.email
+
+    return {
+        "session_id": session_id,
+        "email": data.email
+    }
