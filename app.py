@@ -1336,8 +1336,8 @@ def chat_stats(user_id: str):
         (user_id,)
     )
 
-    total =
-    cur.fetchone()[0]
+    total = cur.fetchone()[0]
+  
 
     conn.close()
 
