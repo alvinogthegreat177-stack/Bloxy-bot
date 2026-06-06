@@ -361,221 +361,288 @@ def delete_conversation(conversation_id: str):
 
 # =========================================================
 # PART 5A
-# COMPLETE UI FOUNDATION
+# COMPLETE FRONTEND REPLACEMENT
+# MODERN CHATGPT-STYLE LAYOUT
+# REPLACE YOUR ENTIRE CURRENT:
+#
+# @app.get("/", response_class=HTMLResponse)
+# def home():
+#
+# SECTION WITH THIS
 # =========================================================
 
 from fastapi.responses import HTMLResponse
 
 @app.get("/", response_class=HTMLResponse)
 def home():
+
     return """
 <!DOCTYPE html>
 <html>
 <head>
 
 <meta charset="utf-8">
-
-<meta
-name="viewport"
-content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 
 <title>Bloxy-Bot X</title>
 
-<link
-rel="stylesheet"
-href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
 
 *{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:'Inter',sans-serif;
 }
 
 body{
-    font-family:Arial,sans-serif;
-    background:#0f1117;
-    color:white;
-    height:100vh;
-    overflow:hidden;
+background:#0b0f19;
+color:white;
+height:100vh;
+overflow:hidden;
 }
 
 .app{
-    display:flex;
-    height:100vh;
+display:flex;
+height:100vh;
+width:100%;
 }
 
+/* ==========================
+SIDEBAR
+========================== */
+
 .sidebar{
-    width:280px;
-    background:#171923;
-    border-right:1px solid #2a2d36;
-    display:flex;
-    flex-direction:column;
+width:280px;
+background:#111827;
+border-right:1px solid #1f2937;
+display:flex;
+flex-direction:column;
 }
 
 .logo{
-    padding:20px;
-    font-size:22px;
-    font-weight:bold;
-    border-bottom:1px solid #2a2d36;
+padding:20px;
+font-size:22px;
+font-weight:700;
+border-bottom:1px solid #1f2937;
 }
 
 .new-chat{
-    margin:15px;
-    padding:12px;
-    border:none;
-    border-radius:10px;
-    background:#2563eb;
-    color:white;
-    cursor:pointer;
+margin:15px;
+padding:12px;
+background:#2563eb;
+border:none;
+color:white;
+border-radius:10px;
+cursor:pointer;
+font-weight:600;
+}
+
+.new-chat:hover{
+background:#1d4ed8;
 }
 
 .search-box{
-    margin:0 15px 15px;
+padding:0 15px 15px 15px;
 }
 
 .search-box input{
-    width:100%;
-    padding:10px;
-    border:none;
-    border-radius:8px;
-    background:#222733;
-    color:white;
+width:100%;
+padding:12px;
+background:#1f2937;
+border:none;
+border-radius:10px;
+color:white;
 }
 
 .conversations{
-    flex:1;
-    overflow-y:auto;
+flex:1;
+overflow-y:auto;
+padding:10px;
 }
 
 .chat-item{
-    padding:12px 15px;
-    cursor:pointer;
-    border-bottom:1px solid #222;
+padding:12px;
+border-radius:10px;
+cursor:pointer;
+margin-bottom:5px;
+background:#1f2937;
 }
 
 .chat-item:hover{
-    background:#222733;
+background:#2b3648;
 }
 
-.bottom-menu{
-    border-top:1px solid #2a2d36;
-    padding:15px;
-}
-
-.menu-btn{
-    width:100%;
-    margin-bottom:10px;
-    padding:10px;
-    border:none;
-    border-radius:8px;
-    background:#222733;
-    color:white;
-    cursor:pointer;
-}
+/* ==========================
+MAIN CHAT
+========================== */
 
 .main{
-    flex:1;
-    display:flex;
-    flex-direction:column;
+flex:1;
+display:flex;
+flex-direction:column;
+background:#0b0f19;
 }
 
 .topbar{
-    height:60px;
-    border-bottom:1px solid #2a2d36;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:0 20px;
+height:65px;
+border-bottom:1px solid #1f2937;
+display:flex;
+align-items:center;
+justify-content:space-between;
+padding:0 20px;
+}
+
+.model-select{
+background:#1f2937;
+border:none;
+padding:10px;
+border-radius:8px;
+color:white;
 }
 
 .chat-area{
-    flex:1;
-    overflow-y:auto;
-    padding:20px;
+flex:1;
+overflow-y:auto;
+padding:30px;
 }
 
-.welcome{
-    max-width:800px;
-    margin:auto;
-    text-align:center;
-    padding-top:100px;
+.message{
+max-width:900px;
+margin:auto;
+margin-bottom:20px;
+padding:16px;
+border-radius:12px;
+line-height:1.7;
 }
 
-.input-area{
-    padding:20px;
-    border-top:1px solid #2a2d36;
+.user{
+background:#1e293b;
 }
+
+.assistant{
+background:#111827;
+border:1px solid #1f2937;
+}
+
+.code{
+background:#05070c;
+padding:15px;
+border-radius:10px;
+overflow-x:auto;
+margin-top:10px;
+}
+
+/* ==========================
+INPUT
+========================== */
 
 .input-wrapper{
-    max-width:900px;
-    margin:auto;
-    display:flex;
-    gap:10px;
+padding:20px;
+border-top:1px solid #1f2937;
 }
 
-.input-wrapper input{
-    flex:1;
-    padding:14px;
-    border:none;
-    border-radius:12px;
-    background:#222733;
-    color:white;
+.input-box{
+max-width:950px;
+margin:auto;
+display:flex;
+gap:10px;
+}
+
+.input-box textarea{
+flex:1;
+height:60px;
+resize:none;
+border:none;
+outline:none;
+background:#111827;
+color:white;
+padding:15px;
+border-radius:14px;
 }
 
 .send-btn{
-    width:55px;
-    border:none;
-    border-radius:12px;
-    background:#2563eb;
-    color:white;
-    cursor:pointer;
+width:60px;
+border:none;
+border-radius:14px;
+background:#2563eb;
+color:white;
+cursor:pointer;
+font-size:18px;
 }
 
-.settings-modal{
-    display:none;
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,.7);
+.send-btn:hover{
+background:#1d4ed8;
 }
 
-.settings-content{
-    width:600px;
-    max-width:95%;
-    margin:50px auto;
-    background:#171923;
-    border-radius:15px;
-    padding:25px;
+/* ==========================
+ACCOUNT
+========================== */
+
+.account{
+padding:15px;
+border-top:1px solid #1f2937;
 }
 
-.settings-title{
-    font-size:22px;
-    margin-bottom:20px;
+.account button{
+width:100%;
+padding:12px;
+border:none;
+background:#1f2937;
+color:white;
+border-radius:10px;
+cursor:pointer;
 }
 
-.close-btn{
-    margin-top:20px;
-    padding:10px 15px;
-    border:none;
-    border-radius:8px;
-    background:#ef4444;
-    color:white;
-    cursor:pointer;
+/* ==========================
+SETTINGS MODAL
+========================== */
+
+.modal{
+display:none;
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.7);
 }
+
+.modal-content{
+width:600px;
+max-width:95%;
+background:#111827;
+margin:50px auto;
+padding:25px;
+border-radius:15px;
+}
+
+.setting-row{
+margin-top:15px;
+}
+
+.setting-row input,
+.setting-row select{
+width:100%;
+padding:12px;
+margin-top:5px;
+background:#1f2937;
+border:none;
+color:white;
+border-radius:8px;
+}
+
+/* ==========================
+MOBILE
+========================== */
 
 @media(max-width:768px){
 
 .sidebar{
-    width:80px;
+display:none;
 }
 
-.logo{
-    font-size:16px;
-}
-
-.search-box{
-    display:none;
+.main{
+width:100%;
 }
 
 }
@@ -594,39 +661,33 @@ body{
 🤖 Bloxy-Bot X
 </div>
 
-<button
-class="new-chat"
+<button class="new-chat"
 onclick="newChat()">
 + New Chat
 </button>
 
 <div class="search-box">
 <input
-type="text"
-placeholder="Search chats">
+placeholder="Search conversations..."
+id="searchChats"
+>
 </div>
 
 <div
+class="conversations"
 id="conversationList"
-class="conversations">
+>
 
 <div class="chat-item">
-Welcome Chat
+New Conversation
 </div>
 
 </div>
 
-<div class="bottom-menu">
+<div class="account">
 
-<button
-class="menu-btn"
-onclick="openSettings()">
+<button onclick="openSettings()">
 ⚙ Settings
-</button>
-
-<button
-class="menu-btn">
-👤 Account
 </button>
 
 </div>
@@ -637,47 +698,44 @@ class="menu-btn">
 
 <div class="topbar">
 
-<div>
-Bloxy-Bot X
-</div>
+<h3>Bloxy-Bot X</h3>
 
-<div>
-GPT Model
-</div>
+<select
+class="model-select"
+id="model"
+>
+<option>OpenRouter</option>
+<option>GPT-4o</option>
+<option>Groq</option>
+<option>Kimi</option>
+</select>
 
 </div>
 
 <div
-id="chatArea"
-class="chat-area">
+class="chat-area"
+id="chat"
+>
 
-<div class="welcome">
-
-<h1>
-Welcome to Bloxy-Bot X
-</h1>
-
-<br>
-
-<p>
-Ask anything...
-</p>
-
+<div class="message assistant">
+👋 Welcome to Bloxy-Bot X
 </div>
 
 </div>
-
-<div class="input-area">
 
 <div class="input-wrapper">
 
-<input
-id="messageInput"
-placeholder="Message Bloxy-Bot X">
+<div class="input-box">
+
+<textarea
+id="message"
+placeholder="Message Bloxy-Bot X..."
+></textarea>
 
 <button
 class="send-btn"
-onclick="sendMessage()">
+onclick="sendMessage()"
+>
 ➤
 </button>
 
@@ -690,43 +748,49 @@ onclick="sendMessage()">
 </div>
 
 <div
+class="modal"
 id="settingsModal"
-class="settings-modal">
+>
 
-<div class="settings-content">
+<div class="modal-content">
 
-<div class="settings-title">
-Settings
-</div>
+<h2>Settings</h2>
 
-<p>Theme</p>
-<br>
-
+<div class="setting-row">
+<label>Theme</label>
 <select>
 <option>Dark</option>
-<option>Light</option>
-<option>Ocean</option>
 <option>Midnight</option>
+<option>Ocean</option>
+<option>Emerald</option>
 </select>
+</div>
 
-<br><br>
+<div class="setting-row">
+<label>Temperature</label>
+<input
+type="range"
+min="0"
+max="2"
+step="0.1"
+value="0.7"
+>
+</div>
 
-<p>Model</p>
+<div class="setting-row">
+<label>System Prompt</label>
+<input
+placeholder="You are a helpful AI..."
+>
+</div>
+
 <br>
 
-<select>
-<option>OpenRouter</option>
-<option>OpenAI</option>
-<option>Groq</option>
-<option>Kimi</option>
-</select>
-
-<br><br>
-
 <button
-class="close-btn"
-onclick="closeSettings()">
-Close
+class="new-chat"
+onclick="closeSettings()"
+>
+Save
 </button>
 
 </div>
@@ -736,56 +800,110 @@ Close
 <script>
 
 function openSettings(){
-    document
-    .getElementById(
-        "settingsModal"
-    ).style.display="block";
+document.getElementById(
+"settingsModal"
+).style.display="block";
 }
 
 function closeSettings(){
-    document
-    .getElementById(
-        "settingsModal"
-    ).style.display="none";
+document.getElementById(
+"settingsModal"
+).style.display="none";
 }
 
 function newChat(){
 
-    const list =
-    document.getElementById(
-        "conversationList"
-    );
+document.getElementById(
+"chat"
+).innerHTML=
+'<div class="message assistant">New conversation started.</div>';
 
-    list.innerHTML +=
-    '<div class="chat-item">New Chat</div>';
 }
 
-function sendMessage(){
+async function sendMessage(){
 
-    const input =
-    document.getElementById(
-        "messageInput"
-    );
+const input =
+document.getElementById(
+"message"
+);
 
-    const text =
-    input.value.trim();
+const text =
+input.value.trim();
 
-    if(!text){
-        return;
-    }
+if(!text) return;
 
-    const area =
-    document.getElementById(
-        "chatArea"
-    );
+const chat =
+document.getElementById(
+"chat"
+);
 
-    area.innerHTML +=
-    '<div style="text-align:right;margin:10px;"><b>You:</b> '
-    + text +
-    '</div>';
+chat.innerHTML +=
+'<div class="message user">'+
+text+
+'</div>';
 
-    input.value = "";
+input.value="";
+
+chat.scrollTop=
+chat.scrollHeight;
+
+try{
+
+const response =
+await fetch(
+"/api/chat",
+{
+method:"POST",
+headers:{
+"Content-Type":
+"application/json"
+},
+body:JSON.stringify({
+user_id:"guest",
+conversation_id:"default",
+message:text
+})
 }
+);
+
+const data =
+await response.json();
+
+chat.innerHTML +=
+'<div class="message assistant">'+
+(data.response || "No response")+
+'</div>';
+
+chat.scrollTop=
+chat.scrollHeight;
+
+}catch(err){
+
+chat.innerHTML +=
+'<div class="message assistant">Error contacting AI.</div>';
+
+}
+
+}
+
+document
+.getElementById("message")
+.addEventListener(
+"keydown",
+function(e){
+
+if(
+e.key==="Enter" &&
+!e.shiftKey
+){
+
+e.preventDefault();
+sendMessage();
+
+}
+
+}
+);
 
 </script>
 
@@ -796,2063 +914,2812 @@ function sendMessage(){
 
 # =========================================================
 # PART 5B
-# ADVANCED CHAT UI FEATURES
-# PASTE BELOW PART 5A
+# ADVANCED SIDEBAR + CONVERSATION MANAGEMENT
+# PASTE INSIDE THE HTML FROM PART 5A
 # =========================================================
 
-class MessageBubble:
+# REPLACE:
 
-    @staticmethod
-    def user(content):
-        return f"""
-        <div
-        style="
-        display:flex;
-        justify-content:flex-end;
-        margin:15px 0;
-        ">
-            <div
-            style="
-            max-width:75%;
-            background:#2563eb;
-            padding:12px;
-            border-radius:15px;
-            ">
-                {content}
-            </div>
-        </div>
-        """
+<div
+class="conversations"
+id="conversationList"
+>
 
-    @staticmethod
-    def assistant(content):
-        return f"""
-        <div
-        style="
-        display:flex;
-        justify-content:flex-start;
-        margin:15px 0;
-        ">
-            <div
-            style="
-            max-width:75%;
-            background:#1e293b;
-            padding:12px;
-            border-radius:15px;
-            ">
-                {content}
-            </div>
-        </div>
-        """
+<div class="chat-item">
+New Conversation
+</div>
+
+</div>
+
+# WITH:
+
+<div class="sidebar-tools">
+
+<button onclick="newChat()">
+➕ New Chat
+</button>
+
+<button onclick="loadChats()">
+🔄 Refresh
+</button>
+
+</div>
+
+<div class="conversation-section">
+
+<div class="section-title">
+Chats
+</div>
+
+<div
+class="conversations"
+id="conversationList"
+>
+</div>
+
+</div>
 
 # =========================================================
-# CHAT STREAMING PLACEHOLDER
+# ADD TO CSS
 # =========================================================
 
-@app.get("/api/ui/config")
-def ui_config():
-    return {
-        "success": True,
-        "features": {
-            "markdown": True,
-            "code_blocks": True,
-            "copy_button": True,
-            "attachments": True,
-            "voice_input": True,
-            "voice_output": True,
-            "streaming": True
-        }
-    }
-
-# =========================================================
-# MARKDOWN SUPPORT
-# =========================================================
-
-MARKDOWN_JS = """
-<script src='https://cdn.jsdelivr.net/npm/marked/marked.min.js'></script>
-"""
-
-# =========================================================
-# CODE HIGHLIGHTING
-# =========================================================
-
-HIGHLIGHT_JS = """
-<link
-rel='stylesheet'
-href='https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css'>
-
-<script src='https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js'></script>
-
-<script>
-hljs.highlightAll();
-</script>
-"""
-
-# =========================================================
-# CHAT ACTIONS
-# =========================================================
-
-@app.get("/api/chat/actions")
-def chat_actions():
-    return {
-        "success": True,
-        "actions": [
-            "copy",
-            "edit",
-            "regenerate",
-            "delete",
-            "share"
-        ]
-    }
-
-# =========================================================
-# TYPING INDICATOR
-# =========================================================
-
-@app.get("/api/chat/typing")
-def typing_indicator():
-    return {
-        "success": True,
-        "typing": True,
-        "message": "AI is thinking..."
-    }
-
-# =========================================================
-# AUTO SCROLL CONFIG
-# =========================================================
-
-@app.get("/api/chat/autoscroll")
-def autoscroll():
-    return {
-        "success": True,
-        "enabled": True
-    }
-
-# =========================================================
-# MESSAGE TIMESTAMPS
-# =========================================================
-
-@app.get("/api/chat/timestamps")
-def timestamps():
-    return {
-        "success": True,
-        "format": "HH:MM"
-    }
-
-# =========================================================
-# COPY CODE FEATURE
-# =========================================================
-
-COPY_CODE_JS = """
-<script>
-
-function copyCode(btn){
-
-    const code =
-    btn.previousElementSibling.innerText;
-
-    navigator.clipboard.writeText(code);
-
-    btn.innerText = "Copied";
-
-    setTimeout(() => {
-
-        btn.innerText = "Copy";
-
-    },1500);
+.sidebar-tools{
+padding:10px;
+display:flex;
+gap:8px;
 }
 
-</script>
-"""
+.sidebar-tools button{
+flex:1;
+padding:10px;
+border:none;
+background:#1f2937;
+color:white;
+border-radius:8px;
+cursor:pointer;
+}
+
+.sidebar-tools button:hover{
+background:#374151;
+}
+
+.section-title{
+padding:12px;
+font-size:12px;
+font-weight:600;
+color:#9ca3af;
+text-transform:uppercase;
+}
+
+.chat-item{
+position:relative;
+padding:12px;
+border-radius:10px;
+background:#1f2937;
+margin-bottom:6px;
+cursor:pointer;
+transition:.2s;
+}
+
+.chat-item:hover{
+background:#2d3748;
+}
+
+.chat-actions{
+position:absolute;
+right:10px;
+top:10px;
+display:flex;
+gap:5px;
+}
+
+.chat-actions button{
+background:none;
+border:none;
+color:#9ca3af;
+cursor:pointer;
+}
+
+.chat-actions button:hover{
+color:white;
+}
+
+.active-chat{
+background:#2563eb !important;
+}
 
 # =========================================================
-# MESSAGE SEARCH
+# ADD TO JAVASCRIPT
 # =========================================================
 
-@app.get("/api/chat/search/{conversation_id}")
-def search_messages(
-    conversation_id: str,
-    query: str = ""
-):
-    return {
-        "success": True,
-        "conversation_id": conversation_id,
-        "query": query
-    }
+let currentConversation = null;
+
+async function loadChats(){
+
+try{
+
+const response =
+await fetch(
+"/api/conversations/guest"
+);
+
+const data =
+await response.json();
+
+const container =
+document.getElementById(
+"conversationList"
+);
+
+container.innerHTML = "";
+
+if(
+!data.conversations ||
+data.conversations.length === 0
+){
+
+container.innerHTML =
+'<div class="chat-item">No Chats Yet</div>';
+
+return;
+
+}
+
+data.conversations.forEach(chat=>{
+
+container.innerHTML += `
+<div
+class="chat-item"
+onclick="selectChat('${chat.id}')"
+>
+
+${chat.title}
+
+<div class="chat-actions">
+
+<button
+onclick="
+event.stopPropagation();
+renameChat('${chat.id}');
+"
+>
+✏️
+</button>
+
+<button
+onclick="
+event.stopPropagation();
+deleteChat('${chat.id}');
+"
+>
+🗑️
+</button>
+
+</div>
+
+</div>
+`;
+
+});
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+function selectChat(id){
+
+currentConversation = id;
+
+document
+.querySelectorAll(".chat-item")
+.forEach(
+item=>{
+item.classList.remove(
+"active-chat"
+);
+}
+);
+
+}
+
+async function renameChat(id){
+
+const title =
+prompt(
+"New conversation name:"
+);
+
+if(!title) return;
+
+await fetch(
+"/api/conversations/rename",
+{
+method:"PUT",
+headers:{
+"Content-Type":
+"application/json"
+},
+body:JSON.stringify({
+conversation_id:id,
+title:title
+})
+}
+);
+
+loadChats();
+
+}
+
+async function deleteChat(id){
+
+if(
+!confirm(
+"Delete conversation?"
+)
+) return;
+
+await fetch(
+"/api/conversations/"+id,
+{
+method:"DELETE"
+}
+);
+
+loadChats();
+
+}
+
+function newChat(){
+
+currentConversation =
+crypto.randomUUID();
+
+document
+.getElementById("chat")
+.innerHTML =
+'<div class="message assistant">New conversation started.</div>';
+
+}
+
+window.onload = () => {
+
+loadChats();
+
+};
 
 # =========================================================
-# PINNED MESSAGES
-# =========================================================
-
-@app.get("/api/chat/pinned/{conversation_id}")
-def pinned_messages(
-    conversation_id: str
-):
-    return {
-        "success": True,
-        "conversation_id": conversation_id,
-        "messages": []
-    }
-
-# =========================================================
-# CHAT EXPORT
-# =========================================================
-
-@app.get("/api/chat/export/{conversation_id}")
-def export_chat(
-    conversation_id: str
-):
-    return {
-        "success": True,
-        "conversation_id": conversation_id,
-        "format": "json"
-    }
-
-# =========================================================
-# READY FOR PART 5C
-# Conversation Management
-# Sidebar Features
-# Rename/Delete/Search Chats
+# END PART 5B
+# NEXT = PART 5C
+# ADVANCED CHAT WINDOW + MESSAGE ACTIONS
 # =========================================================
 
 
 # =========================================================
 # PART 5C
-# CONVERSATION MANAGEMENT
+# ADVANCED CHAT WINDOW + MESSAGE ACTIONS
 # PASTE BELOW PART 5B
 # =========================================================
 
-class ConversationRequest(BaseModel):
-    user_id: str
-    title: str
-
 # =========================================================
-# CREATE CONVERSATION
+# ADD TO CSS
 # =========================================================
 
-@app.post("/api/chat/new")
-def create_new_chat(
-    data: ConversationRequest
-):
+.message{
+position:relative;
+max-width:900px;
+margin:auto;
+margin-bottom:20px;
+padding:18px;
+border-radius:14px;
+line-height:1.8;
+word-wrap:break-word;
+}
 
-    conversation_id = generate_id()
+.message-toolbar{
+display:flex;
+gap:10px;
+margin-top:12px;
+opacity:0;
+transition:.2s;
+}
 
-    conn = get_db()
-    cur = conn.cursor()
+.message:hover .message-toolbar{
+opacity:1;
+}
 
-    cur.execute(
-        """
-        INSERT INTO conversations
-        VALUES(?,?,?,?,?)
-        """,
-        (
-            conversation_id,
-            data.user_id,
-            data.title,
-            now(),
-            now()
-        )
-    )
+.message-toolbar button{
+background:#1f2937;
+border:none;
+color:white;
+padding:8px 10px;
+border-radius:8px;
+cursor:pointer;
+}
 
-    conn.commit()
-    conn.close()
+.message-toolbar button:hover{
+background:#374151;
+}
 
-    return {
-        "success": True,
-        "conversation_id": conversation_id
-    }
+.message-time{
+font-size:12px;
+color:#9ca3af;
+margin-top:8px;
+}
+
+.typing{
+display:flex;
+gap:6px;
+padding:10px;
+}
+
+.typing span{
+width:8px;
+height:8px;
+background:#60a5fa;
+border-radius:50%;
+animation:bounce 1s infinite;
+}
+
+.typing span:nth-child(2){
+animation-delay:.2s;
+}
+
+.typing span:nth-child(3){
+animation-delay:.4s;
+}
+
+@keyframes bounce{
+
+0%,100%{
+transform:translateY(0);
+}
+
+50%{
+transform:translateY(-5px);
+}
+
+}
+
+.chat-header{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:20px;
+}
+
+.chat-title{
+font-size:20px;
+font-weight:600;
+}
+
+.chat-controls{
+display:flex;
+gap:10px;
+}
+
+.chat-controls button{
+background:#1f2937;
+border:none;
+padding:10px;
+border-radius:8px;
+color:white;
+cursor:pointer;
+}
+
+.chat-controls button:hover{
+background:#374151;
+}
 
 # =========================================================
-# GET CONVERSATIONS
+# REPLACE CHAT AREA CONTENT
 # =========================================================
 
-@app.get("/api/chat/list/{user_id}")
-def chat_list(user_id: str):
+<div
+class="chat-area"
+id="chat"
+>
 
-    conn = get_db()
-    cur = conn.cursor()
+<div class="chat-header">
 
-    cur.execute(
-        """
-        SELECT *
-        FROM conversations
-        WHERE user_id=?
-        ORDER BY updated_at DESC
-        """,
-        (user_id,)
-    )
+<div class="chat-title">
+New Conversation
+</div>
 
-    rows = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
+<div class="chat-controls">
 
-    conn.close()
+<button onclick="clearChat()">
+🗑 Clear
+</button>
 
-    return {
-        "success": True,
-        "conversations": rows
-    }
+<button onclick="exportChat()">
+📄 Export
+</button>
 
-# =========================================================
-# RENAME CHAT
-# =========================================================
+</div>
 
-class RenameChatRequest(BaseModel):
-    conversation_id: str
-    title: str
+</div>
 
-@app.put("/api/chat/rename")
-def rename_chat(
-    data: RenameChatRequest
-):
+<div class="message assistant">
 
-    conn = get_db()
-    cur = conn.cursor()
+👋 Welcome to Bloxy-Bot X
 
-    cur.execute(
-        """
-        UPDATE conversations
-        SET title=?,
-        updated_at=?
-        WHERE id=?
-        """,
-        (
-            data.title,
-            now(),
-            data.conversation_id
-        )
-    )
+<div class="message-time">
+Just now
+</div>
 
-    conn.commit()
-    conn.close()
+</div>
 
-    return {
-        "success": True
-    }
+</div>
 
 # =========================================================
-# DELETE CHAT
+# ADD TO JAVASCRIPT
 # =========================================================
 
-@app.delete(
-"/api/chat/delete/{conversation_id}"
+function getTime(){
+
+return new Date()
+.toLocaleTimeString(
+[],
+{
+hour:'2-digit',
+minute:'2-digit'
+}
+);
+
+}
+
+function appendUserMessage(text){
+
+const chat =
+document.getElementById(
+"chat"
+);
+
+chat.innerHTML += `
+<div class="message user">
+
+${text}
+
+<div class="message-toolbar">
+
+<button onclick="copyText(this)">
+📋 Copy
+</button>
+
+<button onclick="editMessage(this)">
+✏️ Edit
+</button>
+
+</div>
+
+<div class="message-time">
+${getTime()}
+</div>
+
+</div>
+`;
+
+}
+
+function appendAIMessage(text){
+
+const chat =
+document.getElementById(
+"chat"
+);
+
+chat.innerHTML += `
+<div class="message assistant">
+
+${text}
+
+<div class="message-toolbar">
+
+<button onclick="copyText(this)">
+📋 Copy
+</button>
+
+<button onclick="regenerateLast()">
+🔄 Retry
+</button>
+
+</div>
+
+<div class="message-time">
+${getTime()}
+</div>
+
+</div>
+`;
+
+}
+
+function showTyping(){
+
+const chat =
+document.getElementById(
+"chat"
+);
+
+chat.innerHTML += `
+<div
+class="message assistant"
+id="typingIndicator"
+>
+
+<div class="typing">
+
+<span></span>
+<span></span>
+<span></span>
+
+</div>
+
+</div>
+`;
+
+}
+
+function removeTyping(){
+
+const typing =
+document.getElementById(
+"typingIndicator"
+);
+
+if(typing){
+
+typing.remove();
+
+}
+
+}
+
+function copyText(button){
+
+const text =
+button
+.parentElement
+.parentElement
+.innerText;
+
+navigator.clipboard
+.writeText(text);
+
+}
+
+function editMessage(button){
+
+const message =
+button
+.parentElement
+.parentElement;
+
+const oldText =
+message.childNodes[0]
+.textContent
+.trim();
+
+const updated =
+prompt(
+"Edit message",
+oldText
+);
+
+if(updated){
+
+message.childNodes[0]
+.textContent =
+updated;
+
+}
+
+}
+
+function clearChat(){
+
+if(
+!confirm(
+"Clear chat?"
 )
-def delete_chat(
-    conversation_id: str
-):
+){
+return;
+}
 
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        DELETE FROM messages
-        WHERE conversation_id=?
-        """,
-        (conversation_id,)
-    )
-
-    cur.execute(
-        """
-        DELETE FROM conversations
-        WHERE id=?
-        """,
-        (conversation_id,)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# SEARCH CHATS
-# =========================================================
-
-@app.get("/api/chat/search")
-def search_chats(
-    user_id: str,
-    query: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM conversations
-        WHERE user_id=?
-        AND title LIKE ?
-        """,
-        (
-            user_id,
-            f"%{query}%"
-        )
-    )
-
-    results = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "results": results
-    }
-
-# =========================================================
-# FAVORITE CHATS
-# =========================================================
-
-def create_favorites_table():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS favorites(
-        conversation_id TEXT PRIMARY KEY,
-        user_id TEXT,
-        created_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_favorites_table()
-
-@app.post(
-"/api/chat/favorite/{conversation_id}"
+document
+.getElementById(
+"chat"
 )
-def favorite_chat(
-    conversation_id: str,
-    user_id: str
-):
+.innerHTML = "";
 
-    conn = get_db()
-    cur = conn.cursor()
+}
 
-    cur.execute(
-        """
-        INSERT OR REPLACE
-        INTO favorites
-        VALUES(?,?,?)
-        """,
-        (
-            conversation_id,
-            user_id,
-            now()
-        )
-    )
+function exportChat(){
 
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# CHAT ARCHIVE
-# =========================================================
-
-def create_archive_table():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS archived_chats(
-        conversation_id TEXT PRIMARY KEY,
-        user_id TEXT,
-        archived_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_archive_table()
-
-@app.post(
-"/api/chat/archive/{conversation_id}"
+const content =
+document
+.getElementById(
+"chat"
 )
-def archive_chat(
-    conversation_id: str,
-    user_id: str
-):
+.innerText;
 
-    conn = get_db()
-    cur = conn.cursor()
+const blob =
+new Blob(
+[content],
+{
+type:"text/plain"
+}
+);
 
-    cur.execute(
-        """
-        INSERT OR REPLACE
-        INTO archived_chats
-        VALUES(?,?,?)
-        """,
-        (
-            conversation_id,
-            user_id,
-            now()
-        )
-    )
+const a =
+document.createElement("a");
 
-    conn.commit()
-    conn.close()
+a.href =
+URL.createObjectURL(blob);
 
-    return {
-        "success": True
-    }
+a.download =
+"conversation.txt";
 
-# =========================================================
-# CHAT STATISTICS
-# =========================================================
+a.click();
 
-@app.get("/api/chat/stats/{user_id}")
-def chat_stats(user_id: str):
+}
 
-    conn = get_db()
-    cur = conn.cursor()
+async function regenerateLast(){
 
-    cur.execute(
-        """
-        SELECT COUNT(*)
-        FROM conversations
-        WHERE user_id=?
-        """,
-        (user_id,)
-    )
+alert(
+"Response regeneration coming in Part 7 integration."
+);
 
-    total = cur.fetchone()[0]
-  
-
-    conn.close()
-
-    return {
-        "success": True,
-        "total_chats": total
-    }
+}
 
 # =========================================================
-# END OF PART 5C
+# REPLACE sendMessage()
+# =========================================================
+
+async function sendMessage(){
+
+const input =
+document.getElementById(
+"message"
+);
+
+const text =
+input.value.trim();
+
+if(!text){
+return;
+}
+
+appendUserMessage(text);
+
+input.value="";
+
+showTyping();
+
+try{
+
+const response =
+await fetch(
+"/api/chat",
+{
+method:"POST",
+headers:{
+"Content-Type":
+"application/json"
+},
+body:JSON.stringify({
+user_id:"guest",
+conversation_id:
+currentConversation ||
+"default",
+message:text
+})
+}
+);
+
+const data =
+await response.json();
+
+removeTyping();
+
+appendAIMessage(
+data.response ||
+"No response"
+);
+
+}catch(err){
+
+removeTyping();
+
+appendAIMessage(
+"Error contacting AI."
+);
+
+}
+
+const chat =
+document.getElementById(
+"chat"
+);
+
+chat.scrollTop =
+chat.scrollHeight;
+
+}
+
+# =========================================================
+# END PART 5C
 # NEXT = PART 5D
-# SETTINGS PANEL + USER PREFERENCES UI
+# SETTINGS PANEL + ADVANCED USER PREFERENCES
 # =========================================================
 
 
 # =========================================================
 # PART 5D
-# SETTINGS PANEL + USER PREFERENCES UI
+# ADVANCED SETTINGS PANEL + USER PREFERENCES
 # PASTE BELOW PART 5C
 # =========================================================
 
-class SettingsRequest(BaseModel):
-    user_id: str
-    theme: str
-    ai_model: str
-    temperature: float
-
 # =========================================================
-# SETTINGS TABLE
+# REPLACE SETTINGS MODAL HTML
 # =========================================================
 
-def create_ui_settings_table():
+<div
+class="modal"
+id="settingsModal"
+>
 
-    conn = get_db()
-    cur = conn.cursor()
+<div class="modal-content">
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS ui_settings(
-        user_id TEXT PRIMARY KEY,
-        theme TEXT,
-        ai_model TEXT,
-        temperature REAL,
-        updated_at TEXT
-    )
-    """)
+<h2>⚙ Settings</h2>
 
-    conn.commit()
-    conn.close()
+<div class="setting-row">
+<label>Theme</label>
+<select id="themeSelect">
+<option value="dark">Dark</option>
+<option value="midnight">Midnight</option>
+<option value="ocean">Ocean</option>
+<option value="emerald">Emerald</option>
+<option value="purple">Purple</option>
+</select>
+</div>
 
-create_ui_settings_table()
+<div class="setting-row">
+<label>AI Model</label>
+<select id="modelSelect">
 
-# =========================================================
-# SAVE SETTINGS
-# =========================================================
+<option value="gpt-5.5">
+GPT-5.5
+</option>
 
-@app.post("/api/ui/settings/save")
-def save_ui_settings(
-    data: SettingsRequest
-):
+<option value="openrouter">
+OpenRouter
+</option>
 
-    conn = get_db()
-    cur = conn.cursor()
+<option value="groq">
+Groq
+</option>
 
-    cur.execute(
-        """
-        INSERT OR REPLACE INTO ui_settings
-        VALUES(?,?,?,?,?)
-        """,
-        (
-            data.user_id,
-            data.theme,
-            data.ai_model,
-            data.temperature,
-            now()
-        )
-    )
+<option value="kimi">
+Kimi
+</option>
 
-    conn.commit()
-    conn.close()
+</select>
+</div>
 
-    return {
-        "success": True
-    }
+<div class="setting-row">
+<label>Temperature</label>
 
-# =========================================================
-# LOAD SETTINGS
-# =========================================================
+<input
+id="temperature"
+type="range"
+min="0"
+max="2"
+step="0.1"
+value="0.7"
+>
 
-@app.get("/api/ui/settings/{user_id}")
-def load_ui_settings(user_id: str):
+<span id="tempValue">
+0.7
+</span>
 
-    conn = get_db()
-    cur = conn.cursor()
+</div>
 
-    cur.execute(
-        """
-        SELECT *
-        FROM ui_settings
-        WHERE user_id=?
-        """,
-        (user_id,)
-    )
+<div class="setting-row">
 
-    row = cur.fetchone()
+<label>
+System Prompt
+</label>
 
-    conn.close()
+<textarea
+id="systemPrompt"
+style="
+width:100%;
+height:120px;
+background:#1f2937;
+color:white;
+border:none;
+padding:12px;
+border-radius:10px;
+"
+></textarea>
 
-    return {
-        "success": True,
-        "settings":
-        dict(row) if row else None
-    }
+</div>
 
-# =========================================================
-# AVAILABLE THEMES
-# =========================================================
+<div class="setting-row">
 
-@app.get("/api/ui/themes")
-def themes():
+<label>
 
-    return {
-        "success": True,
-        "themes":[
-            "dark",
-            "light",
-            "midnight",
-            "ocean",
-            "emerald",
-            "purple",
-            "crimson",
-            "sunset"
-        ]
-    }
+<input
+type="checkbox"
+id="memoryEnabled"
+checked
+>
 
-# =========================================================
-# AVAILABLE MODELS
-# =========================================================
+Enable Memory
 
-@app.get("/api/ui/models")
-def models():
+</label>
 
-    return {
-        "success": True,
-        "models":[
-            "openrouter",
-            "openai",
-            "groq",
-            "kimi",
-            "deepseek",
-            "claude"
-        ]
-    }
+</div>
 
-# =========================================================
-# RESET SETTINGS
-# =========================================================
+<br>
 
-@app.post("/api/ui/settings/reset/{user_id}")
-def reset_ui_settings(
-    user_id: str
-):
+<button
+class="new-chat"
+onclick="saveSettings()"
+>
 
-    conn = get_db()
-    cur = conn.cursor()
+💾 Save Settings
 
-    cur.execute(
-        """
-        DELETE FROM ui_settings
-        WHERE user_id=?
-        """,
-        (user_id,)
-    )
+</button>
 
-    conn.commit()
-    conn.close()
+<button
+class="new-chat"
+onclick="resetSettings()"
+style="
+background:#dc2626;
+margin-top:10px;
+"
+>
 
-    return {
-        "success": True
-    }
+🔄 Reset
+
+</button>
+
+<button
+class="new-chat"
+onclick="closeSettings()"
+style="
+background:#374151;
+margin-top:10px;
+"
+>
+
+Close
+
+</button>
+
+</div>
+
+</div>
 
 # =========================================================
-# SIDEBAR SETTINGS DATA
+# ADD CSS
 # =========================================================
 
-@app.get("/api/ui/sidebar")
-def sidebar_settings():
+.setting-row{
+margin-top:18px;
+}
 
-    return {
-        "success": True,
-        "items":[
-            "New Chat",
-            "Search",
-            "Favorites",
-            "Archived",
-            "Settings",
-            "Account"
-        ]
-    }
+.setting-row label{
+display:block;
+margin-bottom:8px;
+font-weight:600;
+}
+
+.setting-row select,
+.setting-row textarea,
+.setting-row input[type=text]{
+
+width:100%;
+padding:12px;
+background:#1f2937;
+color:white;
+border:none;
+border-radius:10px;
+
+}
+
+.modal-content{
+max-height:90vh;
+overflow-y:auto;
+}
+
+#tempValue{
+display:inline-block;
+margin-top:10px;
+font-weight:bold;
+color:#60a5fa;
+}
 
 # =========================================================
-# END OF PART 5D
+# ADD JAVASCRIPT
+# =========================================================
+
+document
+.getElementById(
+"temperature"
+)
+.addEventListener(
+"input",
+function(){
+
+document
+.getElementById(
+"tempValue"
+)
+.innerText =
+this.value;
+
+}
+);
+
+async function saveSettings(){
+
+const payload = {
+
+user_id:"guest",
+
+theme:
+document
+.getElementById(
+"themeSelect"
+)
+.value,
+
+ai_model:
+document
+.getElementById(
+"modelSelect"
+)
+.value,
+
+temperature:
+parseFloat(
+document
+.getElementById(
+"temperature"
+)
+.value
+),
+
+system_prompt:
+document
+.getElementById(
+"systemPrompt"
+)
+.value,
+
+memory_enabled:
+document
+.getElementById(
+"memoryEnabled"
+)
+.checked
+
+};
+
+try{
+
+await fetch(
+"/api/preferences/chat",
+{
+method:"POST",
+headers:{
+"Content-Type":
+"application/json"
+},
+body:JSON.stringify(
+payload
+)
+}
+);
+
+localStorage.setItem(
+"bloxy_settings",
+JSON.stringify(
+payload
+)
+);
+
+alert(
+"Settings Saved"
+);
+
+}catch(err){
+
+alert(
+"Failed To Save"
+);
+
+}
+
+}
+
+function resetSettings(){
+
+document
+.getElementById(
+"themeSelect"
+)
+.value =
+"dark";
+
+document
+.getElementById(
+"modelSelect"
+)
+.value =
+"gpt-5.5";
+
+document
+.getElementById(
+"temperature"
+)
+.value =
+0.7;
+
+document
+.getElementById(
+"tempValue"
+)
+.innerText =
+"0.7";
+
+document
+.getElementById(
+"systemPrompt"
+)
+.value =
+"";
+
+document
+.getElementById(
+"memoryEnabled"
+)
+.checked =
+true;
+
+}
+
+function loadSettings(){
+
+const saved =
+localStorage.getItem(
+"bloxy_settings"
+);
+
+if(!saved){
+return;
+}
+
+const settings =
+JSON.parse(saved);
+
+document
+.getElementById(
+"themeSelect"
+)
+.value =
+settings.theme || "dark";
+
+document
+.getElementById(
+"modelSelect"
+)
+.value =
+settings.ai_model || "gpt-5.5";
+
+document
+.getElementById(
+"temperature"
+)
+.value =
+settings.temperature || 0.7;
+
+document
+.getElementById(
+"tempValue"
+)
+.innerText =
+settings.temperature || 0.7;
+
+document
+.getElementById(
+"systemPrompt"
+)
+.value =
+settings.system_prompt || "";
+
+document
+.getElementById(
+"memoryEnabled"
+)
+.checked =
+settings.memory_enabled;
+
+}
+
+window.addEventListener(
+"load",
+loadSettings
+);
+
+# =========================================================
+# END PART 5D
 # NEXT = PART 5E
-# FILE UPLOADS + ATTACHMENTS
+# ACCOUNT PANEL + PROFILE MANAGEMENT
 # =========================================================
 
 
 # =========================================================
 # PART 5E
-# FILE UPLOADS + ATTACHMENTS
+# ACCOUNT PANEL + PROFILE MANAGEMENT
 # PASTE BELOW PART 5D
 # =========================================================
 
-class FileUploadRequest(BaseModel):
-    conversation_id: str
-    filename: str
-    file_type: str
-    file_size: int
-
 # =========================================================
-# ATTACHMENTS TABLE
+# REPLACE ACCOUNT HTML
 # =========================================================
 
-def create_attachments_table():
+<div class="account">
 
-    conn = get_db()
-    cur = conn.cursor()
+<div class="account-card">
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS attachments(
-        id TEXT PRIMARY KEY,
-        conversation_id TEXT,
-        filename TEXT,
-        file_type TEXT,
-        file_size INTEGER,
-        uploaded_at TEXT
-    )
-    """)
+<div class="avatar">
+👤
+</div>
 
-    conn.commit()
-    conn.close()
+<div class="account-info">
 
-create_attachments_table()
+<div id="usernameDisplay">
+Guest
+</div>
 
-# =========================================================
-# UPLOAD FILE
-# =========================================================
+<div id="emailDisplay">
+guest@bloxybotx.local
+</div>
 
-@app.post("/api/files/upload")
-def upload_file(
-    data: FileUploadRequest
-):
+</div>
 
-    file_id = generate_id()
+</div>
 
-    conn = get_db()
-    cur = conn.cursor()
+<button onclick="openAccountModal()">
+Manage Account
+</button>
 
-    cur.execute(
-        """
-        INSERT INTO attachments
-        VALUES(?,?,?,?,?,?)
-        """,
-        (
-            file_id,
-            data.conversation_id,
-            data.filename,
-            data.file_type,
-            data.file_size,
-            now()
-        )
-    )
+</div>
 
-    conn.commit()
-    conn.close()
+<div
+class="modal"
+id="accountModal"
+>
 
-    return {
-        "success": True,
-        "file_id": file_id
-    }
+<div class="modal-content">
 
-# =========================================================
-# GET FILES
-# =========================================================
+<h2>Account Settings</h2>
 
-@app.get("/api/files/{conversation_id}")
-def get_files(
-    conversation_id: str
-):
+<div class="setting-row">
 
-    conn = get_db()
-    cur = conn.cursor()
+<label>Username</label>
 
-    cur.execute(
-        """
-        SELECT *
-        FROM attachments
-        WHERE conversation_id=?
-        ORDER BY uploaded_at DESC
-        """,
-        (conversation_id,)
-    )
+<input
+id="accountUsername"
+type="text"
+placeholder="Username"
+>
 
-    files = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
+</div>
 
-    conn.close()
+<div class="setting-row">
 
-    return {
-        "success": True,
-        "files": files
-    }
+<label>Email</label>
 
-# =========================================================
-# DELETE FILE
-# =========================================================
+<input
+id="accountEmail"
+type="email"
+placeholder="Email"
+>
 
-@app.delete("/api/files/delete/{file_id}")
-def delete_file(file_id: str):
+</div>
 
-    conn = get_db()
-    cur = conn.cursor()
+<div class="setting-row">
 
-    cur.execute(
-        """
-        DELETE FROM attachments
-        WHERE id=?
-        """,
-        (file_id,)
-    )
+<label>New Password</label>
 
-    conn.commit()
-    conn.close()
+<input
+id="accountPassword"
+type="password"
+placeholder="Password"
+>
 
-    return {
-        "success": True
-    }
+</div>
+
+<button
+class="new-chat"
+onclick="saveAccountSettings()"
+>
+
+Save Changes
+
+</button>
+
+<button
+class="new-chat"
+style="background:#374151;margin-top:10px;"
+onclick="closeAccountModal()"
+>
+
+Close
+
+</button>
+
+</div>
+
+</div>
 
 # =========================================================
-# FILE TYPES
+# ADD CSS
 # =========================================================
 
-@app.get("/api/files/types")
-def supported_file_types():
+.account-card{
+display:flex;
+align-items:center;
+gap:12px;
+margin-bottom:12px;
+}
 
-    return {
-        "success": True,
-        "types":[
-            "pdf",
-            "docx",
-            "txt",
-            "csv",
-            "xlsx",
-            "png",
-            "jpg",
-            "jpeg",
-            "gif",
-            "webp",
-            "mp3",
-            "wav",
-            "mp4"
-        ]
-    }
+.avatar{
+width:45px;
+height:45px;
+border-radius:50%;
+background:#2563eb;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:20px;
+}
 
-# =========================================================
-# STORAGE INFO
-# =========================================================
+.account-info{
+font-size:13px;
+}
 
-@app.get("/api/files/storage")
-def storage_info():
+#usernameDisplay{
+font-weight:600;
+}
 
-    return {
-        "success": True,
-        "max_upload_mb": 100,
-        "allowed": True
-    }
+#emailDisplay{
+color:#9ca3af;
+}
 
 # =========================================================
-# END OF PART 5E
+# ADD JAVASCRIPT
+# =========================================================
+
+function openAccountModal(){
+
+document
+.getElementById(
+"accountModal"
+)
+.style.display="block";
+
+}
+
+function closeAccountModal(){
+
+document
+.getElementById(
+"accountModal"
+)
+.style.display="none";
+
+}
+
+async function saveAccountSettings(){
+
+const username =
+document
+.getElementById(
+"accountUsername"
+)
+.value;
+
+const email =
+document
+.getElementById(
+"accountEmail"
+)
+.value;
+
+const password =
+document
+.getElementById(
+"accountPassword"
+)
+.value;
+
+if(username){
+
+await fetch(
+"/api/account/username",
+{
+method:"PUT",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+user_id:"guest",
+username:username
+})
+}
+);
+
+document
+.getElementById(
+"usernameDisplay"
+)
+.innerText =
+username;
+
+}
+
+if(email){
+
+await fetch(
+"/api/account/email",
+{
+method:"PUT",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+user_id:"guest",
+email:email
+})
+}
+);
+
+document
+.getElementById(
+"emailDisplay"
+)
+.innerText =
+email;
+
+}
+
+if(password){
+
+await fetch(
+"/api/account/password",
+{
+method:"PUT",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+user_id:"guest",
+password:password
+})
+}
+);
+
+}
+
+alert("Account Updated");
+
+closeAccountModal();
+
+}
+
+# =========================================================
+# END PART 5E
 # NEXT = PART 5F
-# VOICE + SPEECH FEATURES
 # =========================================================
+
 
 # =========================================================
 # PART 5F
-# RESERVED FOR FUTURE FEATURES
+# ADVANCED THEME ENGINE + APPEARANCE CUSTOMIZATION
+# PASTE BELOW PART 5E
 # =========================================================
 
-@app.get("/api/features")
-def feature_status():
+# =========================================================
+# ADD TO SETTINGS MODAL HTML
+# =========================================================
 
-    return {
-        "success": True,
-        "enabled": {
-            "chat": True,
-            "conversations": True,
-            "settings": True,
-            "themes": True,
-            "attachments": True,
-            "voice": False,
-            "speech_to_text": False,
-            "text_to_speech": False
-        }
-    }
+<div class="setting-row">
+
+<label>Accent Color</label>
+
+<select id="accentColor">
+
+<option value="#2563eb">Blue</option>
+<option value="#10b981">Emerald</option>
+<option value="#f59e0b">Amber</option>
+<option value="#ef4444">Red</option>
+<option value="#8b5cf6">Purple</option>
+
+</select>
+
+</div>
+
+<div class="setting-row">
+
+<label>Font Size</label>
+
+<select id="fontSize">
+
+<option value="14">Small</option>
+<option value="16" selected>Normal</option>
+<option value="18">Large</option>
+
+</select>
+
+</div>
+
+<div class="setting-row">
+
+<label>
+
+<input
+type="checkbox"
+id="compactMode"
+>
+
+Compact Mode
+
+</label>
+
+</div>
 
 # =========================================================
-# END OF PART 5F
+# ADD TO CSS
+# =========================================================
+
+:root{
+
+--accent:#2563eb;
+--font-size:16px;
+
+}
+
+body{
+
+font-size:var(--font-size);
+
+}
+
+.new-chat,
+.send-btn{
+
+background:var(--accent);
+
+}
+
+.active-chat{
+
+background:var(--accent)!important;
+
+}
+
+.compact .message{
+
+padding:10px;
+margin-bottom:10px;
+
+}
+
+.compact .chat-item{
+
+padding:8px;
+
+}
+
+# =========================================================
+# ADD JAVASCRIPT
+# =========================================================
+
+function applyThemeSettings(){
+
+const accent =
+localStorage.getItem(
+"accentColor"
+) || "#2563eb";
+
+const fontSize =
+localStorage.getItem(
+"fontSize"
+) || "16";
+
+const compact =
+localStorage.getItem(
+"compactMode"
+) || "false";
+
+document
+.documentElement
+.style
+.setProperty(
+"--accent",
+accent
+);
+
+document
+.documentElement
+.style
+.setProperty(
+"--font-size",
+fontSize + "px"
+);
+
+if(compact === "true"){
+
+document.body
+.classList.add(
+"compact"
+);
+
+}else{
+
+document.body
+.classList.remove(
+"compact"
+);
+
+}
+
+}
+
+function saveAppearance(){
+
+localStorage.setItem(
+"accentColor",
+document
+.getElementById(
+"accentColor"
+)
+.value
+);
+
+localStorage.setItem(
+"fontSize",
+document
+.getElementById(
+"fontSize"
+)
+.value
+);
+
+localStorage.setItem(
+"compactMode",
+document
+.getElementById(
+"compactMode"
+)
+.checked
+);
+
+applyThemeSettings();
+
+}
+
+const oldSaveSettings =
+saveSettings;
+
+saveSettings = async function(){
+
+await oldSaveSettings();
+
+saveAppearance();
+
+};
+
+window.addEventListener(
+"load",
+applyThemeSettings
+);
+
+# =========================================================
+# END PART 5F
 # NEXT = PART 5G
-# IMAGE GENERATION + IMAGE UPLOADS
+# ACCOUNT DROPDOWN + SESSION MANAGEMENT
 # =========================================================
 
 
 # =========================================================
 # PART 5G
-# CHAT UTILITIES
+# ACCOUNT DROPDOWN + SESSION MANAGEMENT + QUICK ACTIONS
 # PASTE BELOW PART 5F
 # =========================================================
 
 # =========================================================
-# BOOKMARKED MESSAGES
+# REPLACE ACCOUNT SECTION
 # =========================================================
 
-def create_bookmarks_table():
+<div class="account">
 
-    conn = get_db()
-    cur = conn.cursor()
+<div
+class="account-summary"
+onclick="toggleAccountMenu()"
+>
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS bookmarks(
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        message_id TEXT,
-        created_at TEXT
-    )
-    """)
+<div class="avatar">
+👤
+</div>
 
-    conn.commit()
-    conn.close()
+<div class="account-text">
 
-create_bookmarks_table()
+<div id="usernameDisplay">
+Guest
+</div>
 
-@app.post("/api/bookmarks/add")
-def add_bookmark(
-    user_id: str,
-    message_id: str
-):
+<div class="account-plan">
+Free Plan
+</div>
 
-    conn = get_db()
-    cur = conn.cursor()
+</div>
 
-    cur.execute(
-        """
-        INSERT INTO bookmarks
-        VALUES(?,?,?,?)
-        """,
-        (
-            generate_id(),
-            user_id,
-            message_id,
-            now()
-        )
-    )
+<div>
+▼
+</div>
 
-    conn.commit()
-    conn.close()
+</div>
 
-    return {"success": True}
+<div
+class="account-menu"
+id="accountMenu"
+>
 
-# =========================================================
-# RECENT SEARCHES
-# =========================================================
+<button onclick="openAccountModal()">
+👤 Profile
+</button>
 
-def create_search_history_table():
+<button onclick="openSettings()">
+⚙ Settings
+</button>
 
-    conn = get_db()
-    cur = conn.cursor()
+<button onclick="exportAllChats()">
+📄 Export Data
+</button>
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS search_history(
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        query TEXT,
-        created_at TEXT
-    )
-    """)
+<button onclick="clearAllDrafts()">
+📝 Clear Drafts
+</button>
 
-    conn.commit()
-    conn.close()
+<button onclick="logoutUser()">
+🚪 Logout
+</button>
 
-create_search_history_table()
+</div>
 
-@app.get("/api/search/history/{user_id}")
-def search_history(user_id: str):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM search_history
-        WHERE user_id=?
-        ORDER BY created_at DESC
-        LIMIT 20
-        """,
-        (user_id,)
-    )
-
-    results = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "history": results
-    }
+</div>
 
 # =========================================================
-# CLEAR CHAT
+# ADD CSS
 # =========================================================
 
-@app.delete(
-"/api/chat/clear/{conversation_id}"
+.account-summary{
+
+display:flex;
+align-items:center;
+justify-content:space-between;
+cursor:pointer;
+padding:10px;
+background:#1f2937;
+border-radius:10px;
+
+}
+
+.account-summary:hover{
+
+background:#2d3748;
+
+}
+
+.account-text{
+
+flex:1;
+margin-left:10px;
+
+}
+
+.account-plan{
+
+font-size:12px;
+color:#9ca3af;
+
+}
+
+.account-menu{
+
+display:none;
+margin-top:10px;
+
+}
+
+.account-menu button{
+
+width:100%;
+padding:12px;
+margin-bottom:6px;
+border:none;
+border-radius:8px;
+background:#1f2937;
+color:white;
+cursor:pointer;
+
+}
+
+.account-menu button:hover{
+
+background:#374151;
+
+}
+
+# =========================================================
+# ADD JAVASCRIPT
+# =========================================================
+
+function toggleAccountMenu(){
+
+const menu =
+document.getElementById(
+"accountMenu"
+);
+
+if(
+menu.style.display ===
+"block"
+){
+
+menu.style.display =
+"none";
+
+}else{
+
+menu.style.display =
+"block";
+
+}
+
+}
+
+function logoutUser(){
+
+if(
+!confirm(
+"Logout?"
 )
-def clear_chat(
-    conversation_id: str
-):
+){
+return;
+}
 
-    conn = get_db()
-    cur = conn.cursor()
+localStorage.clear();
 
-    cur.execute(
-        """
-        DELETE FROM messages
-        WHERE conversation_id=?
-        """,
-        (conversation_id,)
-    )
+location.reload();
 
-    conn.commit()
-    conn.close()
+}
 
-    return {
-        "success": True
-    }
+function exportAllChats(){
 
-# =========================================================
-# CHAT SHARING
-# =========================================================
+const content =
+document.getElementById(
+"chat"
+).innerText;
 
-@app.get(
-"/api/chat/share/{conversation_id}"
+const blob =
+new Blob(
+[content],
+{
+type:"text/plain"
+}
+);
+
+const url =
+URL.createObjectURL(
+blob
+);
+
+const a =
+document.createElement(
+"a"
+);
+
+a.href = url;
+
+a.download =
+"bloxybotx_export.txt";
+
+a.click();
+
+}
+
+function clearAllDrafts(){
+
+localStorage.removeItem(
+"chat_draft"
+);
+
+alert(
+"Drafts Cleared"
+);
+
+}
+
+window.addEventListener(
+"click",
+function(e){
+
+const menu =
+document.getElementById(
+"accountMenu"
+);
+
+const account =
+document.querySelector(
+".account-summary"
+);
+
+if(
+menu &&
+account &&
+!account.contains(
+e.target
 )
-def share_chat(
-    conversation_id: str
-):
+){
 
-    return {
-        "success": True,
-        "share_url":
-        f"/shared/{conversation_id}"
-    }
+menu.style.display =
+"none";
 
-# =========================================================
-# CHAT SUMMARY
-# =========================================================
+}
 
-@app.get(
-"/api/chat/summary/{conversation_id}"
-)
-def chat_summary(
-    conversation_id: str
-):
-
-    return {
-        "success": True,
-        "summary":
-        "Conversation summary placeholder"
-    }
+}
+);
 
 # =========================================================
-# USER DASHBOARD
-# =========================================================
-
-@app.get("/api/dashboard/{user_id}")
-def dashboard(
-    user_id: str
-):
-
-    return {
-        "success": True,
-        "user_id": user_id,
-        "features": [
-            "recent_chats",
-            "favorites",
-            "bookmarks",
-            "settings"
-        ]
-    }
-
-# =========================================================
-# END OF PART 5G
+# END PART 5G
 # NEXT = PART 5H
-# WEB SEARCH + EXTERNAL TOOLS
+# MARKDOWN + CODE BLOCK RENDERING
 # =========================================================
 
 
 # =========================================================
 # PART 5H
-# WEB SEARCH + EXTERNAL TOOLS
+# MARKDOWN + CODE BLOCK RENDERING
 # PASTE BELOW PART 5G
 # =========================================================
 
-import os
-
 # =========================================================
-# API PROVIDERS
+# ADD TO <head>
 # =========================================================
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-KIMI_API_KEY = os.getenv("KIMI_API_KEY")
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js/lib/common.min.js"></script>
 
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-EXA_API_KEY = os.getenv("EXA_API_KEY")
-FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
-
-NEWS_API_KEY = os.getenv("NEWS_API_KEY")
-GNEWS_API_KEY = os.getenv("GNEWS_API_KEY")
-GUARDIAN_API_KEY = os.getenv("GUARDIAN_API_KEY")
-MEDIASTACK_API_KEY = os.getenv("MEDIASTACK_API_KEY")
-
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
-EXCHANGERATE_API_KEY = os.getenv("EXCHANGERATE_API_KEY")
-WOLFRAM_API_KEY = os.getenv("WOLFRAM_API_KEY")
-
-ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
-FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
-
-TMDB_API_KEY = os.getenv("TMDB_API_KEY")
-
-SPORTMONK_API_KEY = os.getenv("SPORTMONK_API_KEY")
-SPORTRADAR_API_KEY = os.getenv("SPORTRADAR_API_KEY")
-THESPORTSDB_API_KEY = os.getenv("THESPORTSDB_API_KEY")
-ALLSPORTS_API_KEY = os.getenv("ALLSPORTS_API_KEY")
-ODDS_API_KEY = os.getenv("ODDS_API_KEY")
-APISPORTS_API_KEY = os.getenv("APISPORTS_API_KEY")
+<link
+rel="stylesheet"
+href="https://cdn.jsdelivr.net/npm/highlight.js/styles/github-dark.min.css"
+>
 
 # =========================================================
-# TOOL REGISTRY
+# ADD CSS
 # =========================================================
 
-@app.get("/api/tools")
-def available_tools():
+.markdown-content{
+line-height:1.8;
+}
 
-    return {
-        "success": True,
-        "tools": {
-            "ai": True,
-            "web_search": True,
-            "news": True,
-            "weather": True,
-            "finance": True,
-            "movies": True,
-            "sports": True,
-            "calculator": True
-        }
-    }
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3{
+margin:15px 0;
+}
 
-# =========================================================
-# WEB SEARCH
-# =========================================================
+.markdown-content p{
+margin:10px 0;
+}
 
-@app.get("/api/search")
-def web_search(query: str):
+.markdown-content pre{
+position:relative;
+background:#0d1117;
+border-radius:12px;
+padding:15px;
+overflow:auto;
+margin-top:12px;
+}
 
-    return {
-        "success": True,
-        "provider": "tavily/exa/firecrawl",
-        "query": query,
-        "results": []
-    }
+.markdown-content code{
+font-family:monospace;
+}
 
-# =========================================================
-# NEWS SEARCH
-# =========================================================
+.copy-code-btn{
+position:absolute;
+top:10px;
+right:10px;
+border:none;
+background:#374151;
+color:white;
+padding:6px 10px;
+border-radius:8px;
+cursor:pointer;
+}
 
-@app.get("/api/news")
-def news(query: str):
+.copy-code-btn:hover{
+background:#4b5563;
+}
 
-    return {
-        "success": True,
-        "query": query,
-        "provider": "newsapi/gnews/guardian",
-        "articles": []
-    }
+.markdown-content blockquote{
+border-left:4px solid var(--accent);
+padding-left:12px;
+opacity:.9;
+margin:12px 0;
+}
 
-# =========================================================
-# WEATHER
-# =========================================================
-
-@app.get("/api/weather")
-def weather(city: str):
-
-    return {
-        "success": True,
-        "city": city,
-        "provider": "openweather"
-    }
+.markdown-content ul,
+.markdown-content ol{
+padding-left:25px;
+}
 
 # =========================================================
-# FINANCE
+# ADD JAVASCRIPT
 # =========================================================
 
-@app.get("/api/stocks")
-def stocks(symbol: str):
+function renderMarkdown(text){
 
-    return {
-        "success": True,
-        "symbol": symbol,
-        "provider": "alphavantage/finnhub"
-    }
+const html =
+marked.parse(text);
+
+return `
+<div class="markdown-content">
+${html}
+</div>
+`;
+
+}
+
+function highlightBlocks(){
+
+document
+.querySelectorAll("pre code")
+.forEach(block=>{
+
+hljs.highlightElement(
+block
+);
+
+const pre =
+block.parentElement;
+
+if(
+pre.querySelector(
+".copy-code-btn"
+)
+){
+return;
+}
+
+const btn =
+document.createElement(
+"button"
+);
+
+btn.innerText =
+"Copy";
+
+btn.className =
+"copy-code-btn";
+
+btn.onclick = ()=>{
+
+navigator.clipboard
+.writeText(
+block.innerText
+);
+
+btn.innerText =
+"Copied";
+
+setTimeout(()=>{
+
+btn.innerText =
+"Copy";
+
+},1500);
+
+};
+
+pre.appendChild(btn);
+
+});
+
+}
 
 # =========================================================
-# SPORTS
+# REPLACE appendAIMessage()
 # =========================================================
 
-@app.get("/api/sports")
-def sports(team: str):
+function appendAIMessage(text){
 
-    return {
-        "success": True,
-        "team": team,
-        "provider":
-        "sportmonks/sportradar/thesportsdb"
-    }
+const chat =
+document.getElementById(
+"chat"
+);
 
-# =========================================================
-# MOVIES
-# =========================================================
+chat.innerHTML += `
+<div class="message assistant">
 
-@app.get("/api/movies")
-def movies(title: str):
+${renderMarkdown(text)}
 
-    return {
-        "success": True,
-        "title": title,
-        "provider": "tmdb"
-    }
+<div class="message-toolbar">
 
-# =========================================================
-# CALCULATOR
-# =========================================================
+<button onclick="copyText(this)">
+📋 Copy
+</button>
 
-@app.get("/api/calculate")
-def calculate(a: float, b: float):
+<button onclick="regenerateLast()">
+🔄 Retry
+</button>
 
-    return {
-        "success": True,
-        "add": a + b,
-        "subtract": a - b,
-        "multiply": a * b,
-        "divide": a / b if b != 0 else None
-    }
+</div>
+
+<div class="message-time">
+${getTime()}
+</div>
+
+</div>
+`;
+
+highlightBlocks();
+
+}
 
 # =========================================================
-# FEATURE FLAGS
-# =========================================================
-
-@app.get("/api/capabilities")
-def capabilities():
-
-    return {
-        "success": True,
-        "chat": True,
-        "attachments": True,
-        "web_search": True,
-        "news": True,
-        "weather": True,
-        "finance": True,
-        "sports": True,
-        "movies": True,
-        "settings": True
-    }
-
-# =========================================================
-# END OF PART 5H
+# END PART 5H
 # NEXT = PART 5I
-# NOTIFICATIONS + ALERTS
+# CHAT SEARCH + FILTERS
 # =========================================================
 
 
 # =========================================================
 # PART 5I
-# NOTIFICATIONS + ALERTS
+# CHAT SEARCH + FILTERS + QUICK NAVIGATION
 # PASTE BELOW PART 5H
 # =========================================================
 
-class NotificationRequest(BaseModel):
-    user_id: str
-    title: str
-    message: str
-
 # =========================================================
-# NOTIFICATIONS TABLE
+# ADD HTML
 # =========================================================
 
-def create_notifications_table():
+<div class="search-panel">
 
-    conn = get_db()
-    cur = conn.cursor()
+<input
+type="text"
+id="chatSearch"
+placeholder="Search messages..."
+>
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS notifications(
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        title TEXT,
-        message TEXT,
-        is_read INTEGER DEFAULT 0,
-        created_at TEXT
-    )
-    """)
+<select id="searchFilter">
 
-    conn.commit()
-    conn.close()
+<option value="all">
+All
+</option>
 
-create_notifications_table()
+<option value="user">
+User Messages
+</option>
 
-# =========================================================
-# CREATE NOTIFICATION
-# =========================================================
+<option value="assistant">
+AI Messages
+</option>
 
-@app.post("/api/notifications/create")
-def create_notification(
-    data: NotificationRequest
-):
+</select>
 
-    notification_id = generate_id()
+<button onclick="searchMessages()">
+🔍 Search
+</button>
 
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO notifications
-        VALUES(?,?,?,?,?,?)
-        """,
-        (
-            notification_id,
-            data.user_id,
-            data.title,
-            data.message,
-            0,
-            now()
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True,
-        "notification_id": notification_id
-    }
+</div>
 
 # =========================================================
-# GET NOTIFICATIONS
+# ADD CSS
 # =========================================================
 
-@app.get("/api/notifications/{user_id}")
-def get_notifications(
-    user_id: str
-):
+.search-panel{
 
-    conn = get_db()
-    cur = conn.cursor()
+display:flex;
+gap:10px;
+padding:10px;
+margin-bottom:15px;
 
-    cur.execute(
-        """
-        SELECT *
-        FROM notifications
-        WHERE user_id=?
-        ORDER BY created_at DESC
-        """,
-        (user_id,)
-    )
+}
 
-    notifications = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
+.search-panel input{
 
-    conn.close()
+flex:1;
+padding:12px;
+background:#1f2937;
+color:white;
+border:none;
+border-radius:10px;
 
-    return {
-        "success": True,
-        "notifications": notifications
-    }
+}
+
+.search-panel select{
+
+padding:12px;
+background:#1f2937;
+color:white;
+border:none;
+border-radius:10px;
+
+}
+
+.search-panel button{
+
+padding:12px 18px;
+border:none;
+border-radius:10px;
+background:var(--accent);
+color:white;
+cursor:pointer;
+
+}
+
+.search-highlight{
+
+outline:2px solid #f59e0b;
+box-shadow:0 0 10px #f59e0b;
+
+}
 
 # =========================================================
-# MARK AS READ
+# ADD JAVASCRIPT
 # =========================================================
 
-@app.put(
-"/api/notifications/read/{notification_id}"
+function clearHighlights(){
+
+document
+.querySelectorAll(
+".search-highlight"
 )
-def mark_notification_read(
-    notification_id: str
-):
+.forEach(el=>{
 
-    conn = get_db()
-    cur = conn.cursor()
+el.classList.remove(
+"search-highlight"
+);
 
-    cur.execute(
-        """
-        UPDATE notifications
-        SET is_read=1
-        WHERE id=?
-        """,
-        (notification_id,)
-    )
+});
 
-    conn.commit()
-    conn.close()
+}
 
-    return {
-        "success": True
-    }
+function searchMessages(){
 
-# =========================================================
-# DELETE NOTIFICATION
-# =========================================================
+clearHighlights();
 
-@app.delete(
-"/api/notifications/delete/{notification_id}"
+const term =
+document
+.getElementById(
+"chatSearch"
 )
-def delete_notification(
-    notification_id: str
-):
+.value
+.toLowerCase();
 
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        DELETE FROM notifications
-        WHERE id=?
-        """,
-        (notification_id,)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# UNREAD COUNT
-# =========================================================
-
-@app.get(
-"/api/notifications/unread/{user_id}"
+const filter =
+document
+.getElementById(
+"searchFilter"
 )
-def unread_notifications(
-    user_id: str
-):
+.value;
 
-    conn = get_db()
-    cur = conn.cursor()
+if(!term){
+return;
+}
 
-    cur.execute(
-        """
-        SELECT COUNT(*)
-        FROM notifications
-        WHERE user_id=?
-        AND is_read=0
-        """,
-        (user_id,)
-    )
+const messages =
+document
+.querySelectorAll(
+".message"
+);
 
-    count = cur.fetchone()[0]
+let firstMatch = null;
 
-    conn.close()
+messages.forEach(msg=>{
 
-    return {
-        "success": True,
-        "unread": count
-    }
+const text =
+msg.innerText
+.toLowerCase();
+
+const isUser =
+msg.classList.contains(
+"user"
+);
+
+const isAssistant =
+msg.classList.contains(
+"assistant"
+);
+
+let allowed = false;
+
+if(filter==="all"){
+allowed=true;
+}
+
+if(filter==="user" && isUser){
+allowed=true;
+}
+
+if(filter==="assistant" && isAssistant){
+allowed=true;
+}
+
+if(
+allowed &&
+text.includes(term)
+){
+
+msg.classList.add(
+"search-highlight"
+);
+
+if(!firstMatch){
+
+firstMatch = msg;
+
+}
+
+}
+
+});
+
+if(firstMatch){
+
+firstMatch.scrollIntoView({
+behavior:"smooth",
+block:"center"
+});
+
+}
+
+}
+
+document
+.getElementById(
+"chatSearch"
+)
+.addEventListener(
+"keydown",
+function(e){
+
+if(
+e.key==="Enter"
+){
+
+searchMessages();
+
+}
+
+}
+);
 
 # =========================================================
-# SYSTEM ALERTS
-# =========================================================
-
-@app.get("/api/system/alerts")
-def system_alerts():
-
-    return {
-        "success": True,
-        "alerts": [
-            {
-                "type": "info",
-                "message": "System operational"
-            }
-        ]
-    }
-
-# =========================================================
-# END OF PART 5I
+# END PART 5I
 # NEXT = PART 5J
-# ADMIN PANEL
-# =========================================================
-
-
-# =========================================================
-# PART 5J
-# ADMIN PANEL
-# PASTE BELOW PART 5I
-# =========================================================
-
-# =========================================================
-# ADMIN USERS TABLE
-# =========================================================
-
-def create_admin_table():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS admins(
-        user_id TEXT PRIMARY KEY,
-        role TEXT,
-        created_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_admin_table()
-
-# =========================================================
-# ADMIN DASHBOARD
-# =========================================================
-
-@app.get("/api/admin/dashboard")
-def admin_dashboard():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        "SELECT COUNT(*) FROM users"
-    )
-    users = cur.fetchone()[0]
-
-    cur.execute(
-        "SELECT COUNT(*) FROM conversations"
-    )
-    conversations = cur.fetchone()[0]
-
-    cur.execute(
-        "SELECT COUNT(*) FROM messages"
-    )
-    messages = cur.fetchone()[0]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "stats": {
-            "users": users,
-            "conversations": conversations,
-            "messages": messages
-        }
-    }
-
-# =========================================================
-# GET ALL USERS
-# =========================================================
-
-@app.get("/api/admin/users")
-def admin_users():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    SELECT
-    id,
-    username,
-    email,
-    created_at
-    FROM users
-    ORDER BY created_at DESC
-    """)
-
-    users = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "users": users
-    }
-
-# =========================================================
-# DELETE USER
-# =========================================================
-
-@app.delete("/api/admin/user/{user_id}")
-def admin_delete_user(
-    user_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        "DELETE FROM users WHERE id=?",
-        (user_id,)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# SYSTEM STATUS
-# =========================================================
-
-@app.get("/api/admin/status")
-def admin_status():
-
-    return {
-        "success": True,
-        "server": "online",
-        "database": "connected",
-        "api": "running"
-    }
-
-# =========================================================
-# END OF PART 5J
-# NEXT = PART 5K
-# ANALYTICS + USAGE STATISTICS
+# CONVERSATION ACTIONS + PIN + FAVORITES
 # =========================================================
 
 
 # =========================================================
 # PART 5K
-# ANALYTICS + USAGE STATISTICS
+# ADVANCED THEME PRESETS + CUSTOM COLORS + UI MODES
 # PASTE BELOW PART 5J
 # =========================================================
 
 # =========================================================
-# ANALYTICS TABLE
+# ADD TO SETTINGS HTML
 # =========================================================
 
-def create_analytics_table():
+<div class="setting-row">
 
-    conn = get_db()
-    cur = conn.cursor()
+<label>Theme Preset</label>
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS analytics(
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        event_type TEXT,
-        event_value TEXT,
-        created_at TEXT
-    )
-    """)
+<select id="themePreset">
 
-    conn.commit()
-    conn.close()
+<option value="dark">
+Dark
+</option>
 
-create_analytics_table()
+<option value="midnight">
+Midnight
+</option>
 
-# =========================================================
-# LOG EVENT
-# =========================================================
+<option value="ocean">
+Ocean
+</option>
 
-@app.post("/api/analytics/log")
-def log_event(
-    user_id: str,
-    event_type: str,
-    event_value: str = ""
-):
+<option value="emerald">
+Emerald
+</option>
 
-    conn = get_db()
-    cur = conn.cursor()
+<option value="sunset">
+Sunset
+</option>
 
-    cur.execute(
-        """
-        INSERT INTO analytics
-        VALUES(?,?,?,?,?)
-        """,
-        (
-            generate_id(),
-            user_id,
-            event_type,
-            event_value,
-            now()
-        )
-    )
+<option value="purple">
+Purple
+</option>
 
-    conn.commit()
-    conn.close()
+</select>
 
-    return {
-        "success": True
-    }
+</div>
 
 # =========================================================
-# USER STATS
+# ADD CSS VARIABLES
 # =========================================================
 
-@app.get("/api/analytics/user/{user_id}")
-def user_analytics(user_id: str):
+:root{
 
-    conn = get_db()
-    cur = conn.cursor()
+--bg:#0b0f19;
+--sidebar:#111827;
+--card:#1f2937;
+--text:#ffffff;
+--accent:#2563eb;
 
-    cur.execute(
-        """
-        SELECT COUNT(*)
-        FROM conversations
-        WHERE user_id=?
-        """,
-        (user_id,)
-    )
+}
 
-    conversations = cur.fetchone()[0]
+body{
+background:var(--bg);
+color:var(--text);
+}
 
-    cur.execute(
-        """
-        SELECT COUNT(*)
-        FROM analytics
-        WHERE user_id=?
-        """,
-        (user_id,)
-    )
+.sidebar{
+background:var(--sidebar);
+}
 
-    events = cur.fetchone()[0]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "stats": {
-            "conversations": conversations,
-            "events": events
-        }
-    }
+.message{
+background:var(--card);
+}
 
 # =========================================================
-# PLATFORM STATS
+# ADD JAVASCRIPT
 # =========================================================
 
-@app.get("/api/analytics/platform")
-def platform_analytics():
+const THEMES = {
 
-    conn = get_db()
-    cur = conn.cursor()
+dark:{
+bg:"#0b0f19",
+sidebar:"#111827",
+card:"#1f2937",
+accent:"#2563eb"
+},
 
-    cur.execute(
-        "SELECT COUNT(*) FROM users"
-    )
-    users = cur.fetchone()[0]
+midnight:{
+bg:"#020617",
+sidebar:"#0f172a",
+card:"#1e293b",
+accent:"#3b82f6"
+},
 
-    cur.execute(
-        "SELECT COUNT(*) FROM conversations"
-    )
-    conversations = cur.fetchone()[0]
+ocean:{
+bg:"#082f49",
+sidebar:"#0c4a6e",
+card:"#075985",
+accent:"#38bdf8"
+},
 
-    cur.execute(
-        "SELECT COUNT(*) FROM messages"
-    )
-    messages = cur.fetchone()[0]
+emerald:{
+bg:"#022c22",
+sidebar:"#064e3b",
+card:"#065f46",
+accent:"#10b981"
+},
 
-    conn.close()
+sunset:{
+bg:"#431407",
+sidebar:"#7c2d12",
+card:"#9a3412",
+accent:"#f97316"
+},
 
-    return {
-        "success": True,
-        "users": users,
-        "conversations": conversations,
-        "messages": messages
-    }
+purple:{
+bg:"#2e1065",
+sidebar:"#4c1d95",
+card:"#5b21b6",
+accent:"#8b5cf6"
+}
+
+};
+
+function applyThemePreset(){
+
+const preset =
+document
+.getElementById(
+"themePreset"
+)
+.value;
+
+const theme =
+THEMES[preset];
+
+document
+.documentElement
+.style
+.setProperty(
+"--bg",
+theme.bg
+);
+
+document
+.documentElement
+.style
+.setProperty(
+"--sidebar",
+theme.sidebar
+);
+
+document
+.documentElement
+.style
+.setProperty(
+"--card",
+theme.card
+);
+
+document
+.documentElement
+.style
+.setProperty(
+"--accent",
+theme.accent
+);
+
+localStorage.setItem(
+"themePreset",
+preset
+);
+
+}
+
+document
+.getElementById(
+"themePreset"
+)
+?.addEventListener(
+"change",
+applyThemePreset
+);
+
+window.addEventListener(
+"load",
+()=>{
+
+const preset =
+localStorage.getItem(
+"themePreset"
+) || "dark";
+
+const select =
+document.getElementById(
+"themePreset"
+);
+
+if(select){
+
+select.value = preset;
+
+applyThemePreset();
+
+}
+
+}
+);
 
 # =========================================================
-# MOST USED MODELS
-# =========================================================
-
-@app.get("/api/analytics/models")
-def model_analytics():
-
-    return {
-        "success": True,
-        "models": [
-            "openrouter",
-            "openai",
-            "groq",
-            "kimi"
-        ]
-    }
-
-# =========================================================
-# DAILY ACTIVITY
-# =========================================================
-
-@app.get("/api/analytics/activity")
-def activity():
-
-    return {
-        "success": True,
-        "daily_activity": []
-    }
-
-# =========================================================
-# END OF PART 5K
+# END PART 5K
 # NEXT = PART 5L
-# FRONTEND INTEGRATION + UI FINALIZATION
+# STREAMING RESPONSES + LIVE GENERATION
 # =========================================================
 
 
 # =========================================================
 # PART 5L
-# FRONTEND INTEGRATION + UI FINALIZATION
+# STREAMING RESPONSES + LIVE GENERATION EFFECT
 # PASTE BELOW PART 5K
 # =========================================================
 
 # =========================================================
-# UI SETTINGS TABLE
+# ADD CSS
 # =========================================================
 
-def create_ui_table():
+.streaming-cursor{
+display:inline-block;
+width:8px;
+height:18px;
+background:var(--accent);
+margin-left:2px;
+animation:blink 1s infinite;
+}
 
-    conn = get_db()
-    cur = conn.cursor()
+@keyframes blink{
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS ui_settings(
-        user_id TEXT PRIMARY KEY,
-        sidebar_open INTEGER DEFAULT 1,
-        compact_mode INTEGER DEFAULT 0,
-        show_timestamps INTEGER DEFAULT 1,
-        updated_at TEXT
-    )
-    """)
+0%,50%{
+opacity:1;
+}
 
-    conn.commit()
-    conn.close()
+51%,100%{
+opacity:0;
+}
 
-create_ui_table()
+}
 
-# =========================================================
-# SAVE UI SETTINGS
-# =========================================================
+.generating{
 
-class UISettingsRequest(BaseModel):
-    user_id: str
-    sidebar_open: bool
-    compact_mode: bool
-    show_timestamps: bool
+border-left:3px solid var(--accent);
 
-@app.post("/api/ui/save")
-def save_ui(data: UISettingsRequest):
+}
 
-    conn = get_db()
-    cur = conn.cursor()
+.stop-btn{
 
-    cur.execute(
-        """
-        INSERT OR REPLACE INTO ui_settings
-        VALUES(?,?,?,?,?)
-        """,
-        (
-            data.user_id,
-            int(data.sidebar_open),
-            int(data.compact_mode),
-            int(data.show_timestamps),
-            now()
-        )
-    )
+background:#dc2626;
+color:white;
+border:none;
+padding:10px 14px;
+border-radius:8px;
+cursor:pointer;
 
-    conn.commit()
-    conn.close()
+}
 
-    return {
-        "success": True
-    }
+.stop-btn:hover{
+
+background:#b91c1c;
+
+}
 
 # =========================================================
-# LOAD UI SETTINGS
+# ADD HTML NEXT TO SEND BUTTON
 # =========================================================
 
-@app.get("/api/ui/{user_id}")
-def load_ui(user_id: str):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM ui_settings
-        WHERE user_id=?
-        """,
-        (user_id,)
-    )
-
-    row = cur.fetchone()
-
-    conn.close()
-
-    return {
-        "success": True,
-        "settings":
-        dict(row) if row else None
-    }
+<button
+class="stop-btn"
+id="stopGenerationBtn"
+style="display:none"
+onclick="stopGeneration()"
+>
+Stop
+</button>
 
 # =========================================================
-# SIDEBAR DATA
+# ADD JAVASCRIPT
 # =========================================================
 
-@app.get("/api/sidebar/{user_id}")
-def sidebar_data(user_id: str):
+let generationStopped = false;
 
-    conn = get_db()
-    cur = conn.cursor()
+function stopGeneration(){
 
-    cur.execute(
-        """
-        SELECT *
-        FROM conversations
-        WHERE user_id=?
-        ORDER BY updated_at DESC
-        LIMIT 50
-        """,
-        (user_id,)
-    )
+generationStopped = true;
 
-    conversations = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
+document
+.getElementById(
+"stopGenerationBtn"
+)
+.style.display =
+"none";
 
-    conn.close()
+}
 
-    return {
-        "success": True,
-        "conversations": conversations
-    }
+async function streamText(
+container,
+text
+){
 
-# =========================================================
-# QUICK ACTIONS
-# =========================================================
+container.innerHTML = "";
 
-@app.get("/api/ui/actions")
-def quick_actions():
+for(
+let i = 0;
+i < text.length;
+i++
+){
 
-    return {
-        "success": True,
-        "actions": [
-            "new_chat",
-            "search",
-            "settings",
-            "clear_chat",
-            "export_chat",
-            "delete_chat"
-        ]
-    }
+if(
+generationStopped
+){
 
-# =========================================================
-# APPLICATION VERSION
-# =========================================================
+break;
 
-@app.get("/api/version")
-def version():
+}
 
-    return {
-        "success": True,
-        "app": "Bloxy-Bot X",
-        "version": "1.0.0"
-    }
+container.innerHTML =
+text.substring(
+0,
+i + 1
+) +
+'<span class="streaming-cursor"></span>';
+
+await new Promise(
+r=>setTimeout(
+r,
+8
+)
+);
+
+}
+
+container.innerHTML = text;
+
+}
 
 # =========================================================
-# UI STATUS
+# REPLACE appendAIMessage()
 # =========================================================
 
-@app.get("/api/ui/status")
-def ui_status():
+async function appendAIMessage(text){
 
-    return {
-        "success": True,
-        "features": {
-            "sidebar": True,
-            "themes": True,
-            "attachments": True,
-            "notifications": True,
-            "search": True,
-            "settings": True,
-            "drafts": False
-        }
-    }
+const chat =
+document.getElementById(
+"chat"
+);
+
+const id =
+"msg_" +
+Date.now();
+
+chat.innerHTML += `
+<div
+class="message assistant generating"
+id="${id}"
+>
+
+<div class="markdown-content">
+</div>
+
+<div class="message-toolbar">
+
+<button onclick="copyText(this)">
+📋 Copy
+</button>
+
+<button onclick="regenerateLast()">
+🔄 Retry
+</button>
+
+</div>
+
+<div class="message-time">
+${getTime()}
+</div>
+
+</div>
+`;
+
+const wrapper =
+document
+.querySelector(
+"#" + id +
+" .markdown-content"
+);
+
+generationStopped = false;
+
+document
+.getElementById(
+"stopGenerationBtn"
+)
+.style.display =
+"inline-block";
+
+await streamText(
+wrapper,
+text
+);
+
+wrapper.innerHTML =
+renderMarkdown(text);
+
+highlightBlocks();
+
+document
+.getElementById(
+id
+)
+.classList.remove(
+"generating"
+);
+
+document
+.getElementById(
+"stopGenerationBtn"
+)
+.style.display =
+"none";
+
+}
 
 # =========================================================
-# END OF PART 5L
+# REPLACE sendMessage()
+# =========================================================
+
+async function sendMessage(){
+
+const input =
+document.getElementById(
+"message"
+);
+
+const text =
+input.value.trim();
+
+if(!text){
+return;
+}
+
+appendUserMessage(text);
+
+input.value = "";
+
+showTyping();
+
+try{
+
+const response =
+await fetch(
+"/api/chat",
+{
+method:"POST",
+headers:{
+"Content-Type":
+"application/json"
+},
+body:JSON.stringify({
+user_id:"guest",
+conversation_id:
+currentConversation ||
+"default",
+message:text
+})
+}
+);
+
+const data =
+await response.json();
+
+removeTyping();
+
+await appendAIMessage(
+data.response ||
+"No response"
+);
+
+}catch(err){
+
+removeTyping();
+
+await appendAIMessage(
+"Error contacting AI."
+);
+
+}
+
+}
+
+# =========================================================
+# END PART 5L
 # NEXT = PART 5M
 # DRAFT SAVING + AUTO RECOVERY
 # =========================================================
@@ -2860,220 +3727,234 @@ def ui_status():
 
 # =========================================================
 # PART 5M
-# DRAFT SAVING + AUTO RECOVERY
+# DRAFT SAVING + AUTO RECOVERY + UNSENT MESSAGE PROTECTION
 # PASTE BELOW PART 5L
 # =========================================================
 
 # =========================================================
-# DRAFTS TABLE
+# ADD JAVASCRIPT
 # =========================================================
 
-def create_drafts_table():
+const DRAFT_KEY =
+"bloxybotx_draft";
 
-    conn = get_db()
-    cur = conn.cursor()
+function saveDraft(){
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS drafts(
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        conversation_id TEXT,
-        content TEXT,
-        updated_at TEXT
-    )
-    """)
+const input =
+document.getElementById(
+"message"
+);
 
-    conn.commit()
-    conn.close()
+if(!input){
+return;
+}
 
-create_drafts_table()
+localStorage.setItem(
+DRAFT_KEY,
+input.value
+);
 
-# =========================================================
-# DRAFT MODEL
-# =========================================================
+}
 
-class DraftRequest(BaseModel):
-    user_id: str
-    conversation_id: str
-    content: str
+function loadDraft(){
 
-# =========================================================
-# SAVE DRAFT
-# =========================================================
+const input =
+document.getElementById(
+"message"
+);
 
-@app.post("/api/drafts/save")
-def save_draft(data: DraftRequest):
+if(!input){
+return;
+}
 
-    conn = get_db()
-    cur = conn.cursor()
+const draft =
+localStorage.getItem(
+DRAFT_KEY
+);
 
-    cur.execute(
-        """
-        INSERT OR REPLACE INTO drafts
-        (
-            id,
-            user_id,
-            conversation_id,
-            content,
-            updated_at
-        )
-        VALUES(?,?,?,?,?)
-        """,
-        (
-            data.conversation_id,
-            data.user_id,
-            data.conversation_id,
-            data.content,
-            now()
-        )
-    )
+if(draft){
 
-    conn.commit()
-    conn.close()
+input.value =
+draft;
 
-    return {
-        "success": True,
-        "message": "Draft saved"
-    }
+}
 
-# =========================================================
-# LOAD DRAFT
-# =========================================================
+}
 
-@app.get("/api/drafts/{conversation_id}")
-def load_draft(conversation_id: str):
+function clearDraft(){
 
-    conn = get_db()
-    cur = conn.cursor()
+localStorage.removeItem(
+DRAFT_KEY
+);
 
-    cur.execute(
-        """
-        SELECT *
-        FROM drafts
-        WHERE conversation_id=?
-        """,
-        (conversation_id,)
-    )
+}
 
-    draft = cur.fetchone()
+window.addEventListener(
+"load",
+loadDraft
+);
 
-    conn.close()
-
-    return {
-        "success": True,
-        "draft":
-        dict(draft) if draft else None
-    }
-
-# =========================================================
-# DELETE DRAFT
-# =========================================================
-
-@app.delete("/api/drafts/{conversation_id}")
-def delete_draft(conversation_id: str):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        DELETE FROM drafts
-        WHERE conversation_id=?
-        """,
-        (conversation_id,)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# GET USER DRAFTS
-# =========================================================
-
-@app.get("/api/drafts/user/{user_id}")
-def get_user_drafts(user_id: str):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM drafts
-        WHERE user_id=?
-        ORDER BY updated_at DESC
-        """,
-        (user_id,)
-    )
-
-    drafts = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "drafts": drafts
-    }
-
-# =========================================================
-# AUTO SAVE STATUS
-# =========================================================
-
-@app.get("/api/drafts/autosave")
-def autosave_status():
-
-    return {
-        "success": True,
-        "enabled": True,
-        "interval_seconds": 10
-    }
-
-# =========================================================
-# RECOVER UNSENT MESSAGE
-# =========================================================
-
-@app.get(
-"/api/drafts/recover/{conversation_id}"
+document
+.getElementById(
+"message"
 )
-def recover_draft(conversation_id: str):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT content
-        FROM drafts
-        WHERE conversation_id=?
-        """,
-        (conversation_id,)
-    )
-
-    draft = cur.fetchone()
-
-    conn.close()
-
-    return {
-        "success": True,
-        "recovered":
-        draft["content"] if draft else ""
-    }
+?.addEventListener(
+"input",
+saveDraft
+);
 
 # =========================================================
-# END OF PART 5M
-# PART 5 COMPLETE
-#
-# NEXT:
-# PART 6 = SETTINGS SYSTEM
-# PART 7 = AI ENGINE + API PROVIDERS
+# ENTER TO SEND
+# FIXES THE ENTER KEY ISSUE
 # =========================================================
+
+document
+.getElementById(
+"message"
+)
+?.addEventListener(
+"keydown",
+function(e){
+
+if(
+e.key === "Enter" &&
+!e.shiftKey
+){
+
+e.preventDefault();
+
+sendMessage();
+
+}
+
+}
+);
+
+# =========================================================
+# MODIFY sendMessage()
+# ADD THIS AFTER:
+# input.value = "";
+# =========================================================
+
+clearDraft();
+
+# =========================================================
+# PAGE EXIT PROTECTION
+# =========================================================
+
+window.addEventListener(
+"beforeunload",
+function(e){
+
+const draft =
+localStorage.getItem(
+DRAFT_KEY
+);
+
+if(
+draft &&
+draft.trim().length > 0
+){
+
+e.preventDefault();
+
+e.returnValue = "";
+
+}
+
+}
+);
+
+# =========================================================
+# CHAT AUTO SAVE
+# =========================================================
+
+function saveChatSnapshot(){
+
+const chat =
+document.getElementById(
+"chat"
+);
+
+if(!chat){
+return;
+}
+
+localStorage.setItem(
+"chat_snapshot",
+chat.innerHTML
+);
+
+}
+
+function restoreChatSnapshot(){
+
+const snapshot =
+localStorage.getItem(
+"chat_snapshot"
+);
+
+if(!snapshot){
+return;
+}
+
+const chat =
+document.getElementById(
+"chat"
+);
+
+if(chat){
+
+chat.innerHTML =
+snapshot;
+
+}
+
+}
+
+window.addEventListener(
+"load",
+restoreChatSnapshot
+);
+
+setInterval(
+saveChatSnapshot,
+5000
+);
+
+# =========================================================
+# RECOVER AFTER CRASH
+# =========================================================
+
+window.addEventListener(
+"load",
+()=>{
+
+const recovered =
+localStorage.getItem(
+"chat_snapshot"
+);
+
+if(
+recovered &&
+recovered.length > 0
+){
+
+console.log(
+"Chat restored."
+);
+
+}
+
+}
+);
+
+# =========================================================
+# END PART 5M
+# NEXT = PART 6
+# PRODUCTION POLISH + BUG FIXES + FINAL SYSTEMS
+# =========================================================
+
 
 
 # =========================================================
@@ -3330,6 +4211,173 @@ def export_settings(user_id: str):
         "success": True,
         "settings": dict(settings)
     }
+
+
+# =========================================================
+# PART 6F
+# REAL AI MODEL ROUTER + MULTI-PROVIDER SUPPORT
+# PASTE IN BACKEND (app.py)
+# =========================================================
+
+from pydantic import BaseModel
+import requests
+import os
+
+# =========================================================
+# MODEL CONFIG
+# =========================================================
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+# =========================================================
+# REQUEST MODEL
+# =========================================================
+
+class ChatRequest(BaseModel):
+    user_id: str
+    conversation_id: str
+    message: str
+    model: str = "gpt-5.5"
+    temperature: float = 0.7
+
+# =========================================================
+# AI ROUTER
+# =========================================================
+
+def generate_ai_response(
+    message,
+    model="gpt-5.5",
+    temperature=0.7
+):
+
+    try:
+
+        # =================================================
+        # OPENAI
+        # =================================================
+
+        if model == "gpt-5.5":
+
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization":
+                    f"Bearer {OPENAI_API_KEY}",
+                    "Content-Type":
+                    "application/json"
+                },
+                json={
+                    "model":"gpt-5.5",
+                    "messages":[
+                        {
+                            "role":"user",
+                            "content":message
+                        }
+                    ],
+                    "temperature":
+                    temperature
+                },
+                timeout=120
+            )
+
+            data = response.json()
+
+            return data["choices"][0]["message"]["content"]
+
+        # =================================================
+        # OPENROUTER
+        # =================================================
+
+        elif model == "openrouter":
+
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization":
+                    f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type":
+                    "application/json"
+                },
+                json={
+                    "model":
+                    "deepseek/deepseek-chat",
+                    "messages":[
+                        {
+                            "role":"user",
+                            "content":message
+                        }
+                    ]
+                },
+                timeout=120
+            )
+
+            data = response.json()
+
+            return data["choices"][0]["message"]["content"]
+
+        # =================================================
+        # GROQ
+        # =================================================
+
+        elif model == "groq":
+
+            response = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization":
+                    f"Bearer {GROQ_API_KEY}",
+                    "Content-Type":
+                    "application/json"
+                },
+                json={
+                    "model":
+                    "llama-3.3-70b-versatile",
+                    "messages":[
+                        {
+                            "role":"user",
+                            "content":message
+                        }
+                    ]
+                },
+                timeout=120
+            )
+
+            data = response.json()
+
+            return data["choices"][0]["message"]["content"]
+
+        else:
+
+            return "Model not supported."
+
+    except Exception as e:
+
+        return f"AI Error: {str(e)}"
+
+# =========================================================
+# MAIN CHAT ENDPOINT
+# REPLACE YOUR EXISTING /api/chat
+# =========================================================
+
+@app.post("/api/chat")
+def chat(request: ChatRequest):
+
+    response_text = generate_ai_response(
+        request.message,
+        request.model,
+        request.temperature
+    )
+
+    return {
+        "success": True,
+        "response": response_text
+    }
+
+# =========================================================
+# END PART 6F
+# =========================================================
 
 
 # =========================================================
