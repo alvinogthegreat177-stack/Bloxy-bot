@@ -71,12 +71,6 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
-@app.get("/")
-def root():
-    return {
-        "app": "Bloxy-Bot X",
-        "status": "online"
-    }
 
 @app.get("/health")
 def health():
