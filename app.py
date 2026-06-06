@@ -940,7 +940,7 @@ new_chat_label = "➕ New Chat"
 </button>
 
 <button onclick="loadChats()">
-🔄 Refresh
+new_chat_label = "🔄 New Chat"
 </button>
 
 </div>
