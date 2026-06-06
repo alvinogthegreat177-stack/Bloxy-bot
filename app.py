@@ -936,7 +936,7 @@ New Conversation
 <div class="sidebar-tools">
 
 <button onclick="newChat()">
-➕ New Chat
+new_chat_label = "➕ New Chat"
 </button>
 
 <button onclick="loadChats()">
