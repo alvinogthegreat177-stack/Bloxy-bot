@@ -969,15 +969,7 @@ display:flex;
 gap:8px;
 }
 
-.sidebar-tools button{
-flex:1;
-padding:10px;
-border:none;
-background:#1f2937;
-color:white;
-border-radius:8px;
-cursor:pointer;
-}
+
 
 .sidebar-tools button:hover{
 background:#374151;
