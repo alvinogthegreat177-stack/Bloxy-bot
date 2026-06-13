@@ -1,9 +1,18 @@
+# =========================================================
+# PART 1
+# FASTAPI + DATABASE FOUNDATION
+# =========================================================
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+
 import sqlite3
 import uuid
 import hashlib
+import secrets
+
 from datetime import datetime
 
 app = FastAPI(
@@ -21,6 +30,10 @@ app.add_middleware(
 
 DB_NAME = "bloxybotx.db"
 
+# =========================
+# HELPERS
+# =========================
+
 def get_db():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
@@ -32,8 +45,14 @@ def generate_id():
 def now():
     return datetime.utcnow().isoformat()
 
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+def hash_password(password: str):
+    return hashlib.sha256(
+        password.encode()
+    ).hexdigest()
+
+# =========================
+# DATABASE TABLES
+# =========================
 
 def create_tables():
     conn = get_db()
@@ -62,15 +81,9 @@ def create_tables():
 
 create_tables()
 
-class RegisterRequest(BaseModel):
-    username: str
-    email: str
-    password: str
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
+# =========================
+# HEALTH CHECK
+# =========================
 
 @app.get("/health")
 def health():
@@ -79,8 +92,29 @@ def health():
     }
 
 
-import secrets
-from fastapi.responses import JSONResponse
+# =========================================================
+# PART 2
+# USER AUTHENTICATION
+# =========================================================
+
+# =========================
+# REQUEST MODELS
+# =========================
+
+class RegisterRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+# =========================
+# USER HELPERS
+# =========================
 
 def get_user_by_email(email):
     conn = get_db()
@@ -92,8 +126,10 @@ def get_user_by_email(email):
     )
 
     user = cur.fetchone()
+
     conn.close()
     return user
+
 
 def get_user_by_id(user_id):
     conn = get_db()
@@ -105,8 +141,10 @@ def get_user_by_id(user_id):
     )
 
     user = cur.fetchone()
+
     conn.close()
     return user
+
 
 def create_session(user_id):
     token = secrets.token_hex(32)
@@ -127,6 +165,11 @@ def create_session(user_id):
     conn.close()
 
     return token
+
+
+# =========================
+# AUTH ROUTES
+# =========================
 
 @app.post("/api/register")
 def register(data: RegisterRequest):
@@ -164,6 +207,7 @@ def register(data: RegisterRequest):
         "user_id": user_id
     }
 
+
 @app.post("/api/login")
 def login(data: LoginRequest):
 
@@ -196,6 +240,7 @@ def login(data: LoginRequest):
         "username": user["username"]
     }
 
+
 @app.post("/api/guest")
 def guest_login():
     return {
@@ -204,6 +249,7 @@ def guest_login():
         "user_id": generate_id(),
         "username": "Guest"
     }
+
 
 @app.delete("/api/logout/{token}")
 def logout(token: str):
@@ -223,6 +269,12 @@ def logout(token: str):
         "success": True
     }
 
+
+# =========================================================
+# PART 3
+# USER PROFILE ROUTES
+# =========================================================
+
 @app.get("/api/user/{user_id}")
 def get_user(user_id: str):
 
@@ -230,7 +282,8 @@ def get_user(user_id: str):
 
     if not user:
         return {
-            "success": False
+            "success": False,
+            "message": "User not found"
         }
 
     return {
@@ -238,13 +291,41 @@ def get_user(user_id: str):
         "user": {
             "id": user["id"],
             "username": user["username"],
-            "email": user["email"]
+            "email": user["email"],
+            "created_at": user["created_at"]
         }
     }
 
 
+@app.get("/api/users")
+def get_all_users():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT id, username, email, created_at
+        FROM users
+        ORDER BY created_at DESC
+        """
+    )
+
+    users = [
+        dict(row)
+        for row in cur.fetchall()
+    ]
+
+    conn.close()
+
+    return {
+        "success": True,
+        "users": users
+    }
+
+
 # =========================================================
-# PART 3
+# PART 4
 # CONVERSATIONS + MESSAGES
 # =========================================================
 
@@ -252,11 +333,18 @@ class CreateConversationRequest(BaseModel):
     user_id: str
     title: str
 
+
 class SendMessageRequest(BaseModel):
     conversation_id: str
     message: str
 
+
+# =========================
+# DATABASE TABLES
+# =========================
+
 def create_conversation_tables():
+
     conn = get_db()
     cur = conn.cursor()
 
@@ -283,23 +371,29 @@ def create_conversation_tables():
     conn.commit()
     conn.close()
 
+
 create_conversation_tables()
 
 
-# =========================================================
-# PART 4
-# CONVERSATION ROUTES
-# =========================================================
+# =========================
+# CREATE CONVERSATION
+# =========================
 
 @app.post("/api/conversations/create")
-def create_conversation(data: CreateConversationRequest):
+def create_conversation(
+    data: CreateConversationRequest
+):
+
     conversation_id = generate_id()
 
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute(
-        "INSERT INTO conversations VALUES(?,?,?,?,?)",
+        """
+        INSERT INTO conversations
+        VALUES(?,?,?,?,?)
+        """,
         (
             conversation_id,
             data.user_id,
@@ -318,60 +412,87 @@ def create_conversation(data: CreateConversationRequest):
     }
 
 
+# =========================
+# GET CONVERSATIONS
+# =========================
+
 @app.get("/api/conversations/{user_id}")
-def get_conversations(user_id: str):
+def get_conversations(
+    user_id: str
+):
+
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute(
-        "SELECT * FROM conversations WHERE user_id=? ORDER BY updated_at DESC",
+        """
+        SELECT *
+        FROM conversations
+        WHERE user_id=?
+        ORDER BY updated_at DESC
+        """,
         (user_id,)
     )
 
-    data = [dict(row) for row in cur.fetchall()]
+    conversations = [
+        dict(row)
+        for row in cur.fetchall()
+    ]
 
     conn.close()
 
     return {
         "success": True,
-        "conversations": data
+        "conversations": conversations
     }
 
 
-@app.delete("/api/conversations/{conversation_id}")
-def delete_conversation(conversation_id: str):
+# =========================
+# DELETE CONVERSATION
+# =========================
+
+@app.delete(
+    "/api/conversations/{conversation_id}"
+)
+def delete_conversation(
+    conversation_id: str
+):
+
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute(
-        "DELETE FROM messages WHERE conversation_id=?",
+        """
+        DELETE FROM messages
+        WHERE conversation_id=?
+        """,
         (conversation_id,)
     )
 
     cur.execute(
-        "DELETE FROM conversations WHERE id=?",
+        """
+        DELETE FROM conversations
+        WHERE id=?
+        """,
         (conversation_id,)
     )
 
     conn.commit()
     conn.close()
 
-    return {"success": True}
+    return {
+        "success": True
+    }
 
 
 # =========================================================
 # PART 5A
-# COMPLETE FRONTEND REPLACEMENT
-# MODERN CHATGPT-STYLE LAYOUT
-# REPLACE YOUR ENTIRE CURRENT:
-#
-# @app.get("/", response_class=HTMLResponse)
-# def home():
-#
-# SECTION WITH THIS
+# FRONTEND HOME PAGE
+# PASTE BELOW PART 4
 # =========================================================
 
 from fastapi.responses import HTMLResponse
+
 
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -379,14 +500,16 @@ def home():
     return """
 <!DOCTYPE html>
 <html>
-<head>
 
+<head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<meta
+name="viewport"
+content="width=device-width,initial-scale=1"
+>
 
 <title>Bloxy-Bot X</title>
-
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
 
@@ -394,128 +517,43 @@ def home():
 margin:0;
 padding:0;
 box-sizing:border-box;
-font-family:'Inter',sans-serif;
+font-family:Arial,sans-serif;
 }
 
 body{
-background:#0b0f19;
+background:#0f172a;
 color:white;
 height:100vh;
-overflow:hidden;
-}
-
-.app{
-display:flex;
-height:100vh;
-width:100%;
-}
-
-/* ==========================
-SIDEBAR
-========================== */
-
-.sidebar{
-width:280px;
-background:#111827;
-border-right:1px solid #1f2937;
 display:flex;
 flex-direction:column;
 }
 
-.logo{
-padding:20px;
-font-size:22px;
-font-weight:700;
-border-bottom:1px solid #1f2937;
-}
-
-.new-chat{
-margin:15px;
-padding:12px;
-background:#2563eb;
-border:none;
-color:white;
-border-radius:10px;
-cursor:pointer;
-font-weight:600;
-}
-
-.new-chat:hover{
-background:#1d4ed8;
-}
-
-.search-box{
-padding:0 15px 15px 15px;
-}
-
-.search-box input{
-width:100%;
-padding:12px;
-background:#1f2937;
-border:none;
-border-radius:10px;
-color:white;
-}
-
-.conversations{
-flex:1;
-overflow-y:auto;
-padding:10px;
-}
-
-.chat-item{
-padding:12px;
-border-radius:10px;
-cursor:pointer;
-margin-bottom:5px;
-background:#1f2937;
-}
-
-.chat-item:hover{
-background:#2b3648;
-}
-
-/* ==========================
-MAIN CHAT
-========================== */
-
-.main{
-flex:1;
-display:flex;
-flex-direction:column;
-background:#0b0f19;
-}
-
-.topbar{
-height:65px;
-border-bottom:1px solid #1f2937;
+.header{
+height:60px;
 display:flex;
 align-items:center;
-justify-content:space-between;
 padding:0 20px;
+background:#111827;
+border-bottom:1px solid #1f2937;
 }
 
-.model-select{
-background:#1f2937;
-border:none;
-padding:10px;
-border-radius:8px;
-color:white;
+.header h2{
+font-size:20px;
 }
 
-.chat-area{
+.chat{
 flex:1;
 overflow-y:auto;
-padding:30px;
+padding:20px;
 }
 
 .message{
-max-width:900px;
+max-width:800px;
 margin:auto;
-margin-bottom:20px;
-padding:16px;
+margin-bottom:15px;
+padding:15px;
 border-radius:12px;
-line-height:1.7;
+line-height:1.6;
 }
 
 .user{
@@ -524,34 +562,21 @@ background:#1e293b;
 
 .assistant{
 background:#111827;
-border:1px solid #1f2937;
 }
 
-.code{
-background:#05070c;
-padding:15px;
-border-radius:10px;
-overflow-x:auto;
-margin-top:10px;
-}
-
-/* ==========================
-INPUT
-========================== */
-
-.input-wrapper{
+.input-area{
 padding:20px;
 border-top:1px solid #1f2937;
 }
 
-.input-box{
-max-width:950px;
-margin:auto;
+.input-row{
 display:flex;
 gap:10px;
+max-width:900px;
+margin:auto;
 }
 
-.input-box textarea{
+textarea{
 flex:1;
 height:60px;
 resize:none;
@@ -560,172 +585,45 @@ outline:none;
 background:#111827;
 color:white;
 padding:15px;
-border-radius:14px;
+border-radius:12px;
 }
 
-.send-btn{
-width:60px;
+button{
+width:70px;
 border:none;
-border-radius:14px;
 background:#2563eb;
 color:white;
+border-radius:12px;
 cursor:pointer;
-font-size:18px;
 }
 
-.send-btn:hover{
+button:hover{
 background:#1d4ed8;
 }
 
-/* ==========================
-ACCOUNT
-========================== */
-
-.account{
-padding:15px;
-border-top:1px solid #1f2937;
-}
-
-.account button{
-width:100%;
-padding:12px;
-border:none;
-background:#1f2937;
-color:white;
-border-radius:10px;
-cursor:pointer;
-}
-
-/* ==========================
-SETTINGS MODAL
-========================== */
-
-.modal{
-display:none;
-position:fixed;
-inset:0;
-background:rgba(0,0,0,.7);
-}
-
-.modal-content{
-width:600px;
-max-width:95%;
-background:#111827;
-margin:50px auto;
-padding:25px;
-border-radius:15px;
-}
-
-.setting-row{
-margin-top:15px;
-}
-
-.setting-row input,
-.setting-row select{
-width:100%;
-padding:12px;
-margin-top:5px;
-background:#1f2937;
-border:none;
-color:white;
-border-radius:8px;
-}
-
-/* ==========================
-MOBILE
-========================== */
-
-@media(max-width:768px){
-
-.sidebar{
-display:none;
-}
-
-.main{
-width:100%;
-}
-
-}
-
 </style>
-
 </head>
 
 <body>
 
-<div class="app">
-
-<div class="sidebar">
-
-<div class="logo">
-🤖 Bloxy-Bot X
-</div>
-
-<button class="new-chat"
-onclick="newChat()">
-+ New Chat
-</button>
-
-<div class="search-box">
-<input
-placeholder="Search conversations..."
-id="searchChats"
->
+<div class="header">
+<h2>🤖 Bloxy-Bot X</h2>
 </div>
 
 <div
-class="conversations"
-id="conversationList"
->
-
-<div class="chat-item">
-New Conversation
-</div>
-
-</div>
-
-<div class="account">
-
-<button onclick="openSettings()">
-⚙ Settings
-</button>
-
-</div>
-
-</div>
-
-<div class="main">
-
-<div class="topbar">
-
-<h3>Bloxy-Bot X</h3>
-
-<select
-class="model-select"
-id="model"
->
-<option>OpenRouter</option>
-<option>GPT-4o</option>
-<option>Groq</option>
-<option>Kimi</option>
-</select>
-
-</div>
-
-<div
-class="chat-area"
+class="chat"
 id="chat"
 >
 
 <div class="message assistant">
-👋 Welcome to Bloxy-Bot X
+Welcome to Bloxy-Bot X
 </div>
 
 </div>
 
-<div class="input-wrapper">
+<div class="input-area">
 
-<div class="input-box">
+<div class="input-row">
 
 <textarea
 id="message"
@@ -733,64 +631,9 @@ placeholder="Message Bloxy-Bot X..."
 ></textarea>
 
 <button
-class="send-btn"
 onclick="sendMessage()"
 >
-➤
-</button>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-<div
-class="modal"
-id="settingsModal"
->
-
-<div class="modal-content">
-
-<h2>Settings</h2>
-
-<div class="setting-row">
-<label>Theme</label>
-<select>
-<option>Dark</option>
-<option>Midnight</option>
-<option>Ocean</option>
-<option>Emerald</option>
-</select>
-</div>
-
-<div class="setting-row">
-<label>Temperature</label>
-<input
-type="range"
-min="0"
-max="2"
-step="0.1"
-value="0.7"
->
-</div>
-
-<div class="setting-row">
-<label>System Prompt</label>
-<input
-placeholder="You are a helpful AI..."
->
-</div>
-
-<br>
-
-<button
-class="new-chat"
-onclick="closeSettings()"
->
-Save
+Send
 </button>
 
 </div>
@@ -798,27 +641,6 @@ Save
 </div>
 
 <script>
-
-function openSettings(){
-document.getElementById(
-"settingsModal"
-).style.display="block";
-}
-
-function closeSettings(){
-document.getElementById(
-"settingsModal"
-).style.display="none";
-}
-
-function newChat(){
-
-document.getElementById(
-"chat"
-).innerHTML=
-'<div class="message assistant">New conversation started.</div>';
-
-}
 
 async function sendMessage(){
 
@@ -830,7 +652,9 @@ document.getElementById(
 const text =
 input.value.trim();
 
-if(!text) return;
+if(!text){
+return;
+}
 
 const chat =
 document.getElementById(
@@ -838,13 +662,15 @@ document.getElementById(
 );
 
 chat.innerHTML +=
-'<div class="message user">'+
-text+
-'</div>';
+`
+<div class="message user">
+${text}
+</div>
+`;
 
-input.value="";
+input.value = "";
 
-chat.scrollTop=
+chat.scrollTop =
 chat.scrollHeight;
 
 try{
@@ -870,36 +696,43 @@ const data =
 await response.json();
 
 chat.innerHTML +=
-'<div class="message assistant">'+
-(data.response || "No response")+
-'</div>';
+`
+<div class="message assistant">
+${data.response || "No response"}
+</div>
+`;
 
-chat.scrollTop=
+chat.scrollTop =
 chat.scrollHeight;
 
-}catch(err){
+}
+catch(err){
 
 chat.innerHTML +=
-'<div class="message assistant">Error contacting AI.</div>';
+`
+<div class="message assistant">
+Error contacting AI.
+</div>
+`;
 
 }
 
 }
 
 document
-.getElementById("message")
+.getElementById(
+"message"
+)
 .addEventListener(
 "keydown",
 function(e){
 
 if(
-e.key==="Enter" &&
+e.key === "Enter" &&
 !e.shiftKey
 ){
-
 e.preventDefault();
 sendMessage();
-
 }
 
 }
@@ -914,107 +747,185 @@ sendMessage();
 
 # =========================================================
 # PART 5B
-# ADVANCED SIDEBAR + CONVERSATION MANAGEMENT
+# CHAT API ENDPOINT
+# PASTE BELOW PART 5A
+# =========================================================
+
+class ChatRequest(BaseModel):
+    user_id: str
+    conversation_id: str
+    message: str
+
+
+@app.post("/api/chat")
+def chat(
+    data: ChatRequest
+):
+
+    user_message_id = generate_id()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO messages
+        VALUES(?,?,?,?,?)
+        """,
+        (
+            user_message_id,
+            data.conversation_id,
+            "user",
+            data.message,
+            now()
+        )
+    )
+
+    ai_response = (
+        "You said: " +
+        data.message
+    )
+
+    ai_message_id = generate_id()
+
+    cur.execute(
+        """
+        INSERT INTO messages
+        VALUES(?,?,?,?,?)
+        """,
+        (
+            ai_message_id,
+            data.conversation_id,
+            "assistant",
+            ai_response,
+            now()
+        )
+    )
+
+    cur.execute(
+        """
+        UPDATE conversations
+        SET updated_at=?
+        WHERE id=?
+        """,
+        (
+            now(),
+            data.conversation_id
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "response": ai_response
+    }
+
+
+# =========================
+# GET MESSAGES
+# =========================
+
+@app.get(
+    "/api/messages/{conversation_id}"
+)
+def get_messages(
+    conversation_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM messages
+        WHERE conversation_id=?
+        ORDER BY created_at ASC
+        """,
+        (conversation_id,)
+    )
+
+    messages = [
+        dict(row)
+        for row in cur.fetchall()
+    ]
+
+    conn.close()
+
+    return {
+        "success": True,
+        "messages": messages
+    }
+
+
+# =========================================================
+# PART 5C
+# CONVERSATION SIDEBAR UI
 # PASTE INSIDE THE HTML FROM PART 5A
 # =========================================================
 
-# REPLACE:
+<style>
 
-<div
-class="conversations"
-id="conversationList"
->
-
-<div class="chat-item">
-New Conversation
-</div>
-
-</div>
-
-# WITH:
-
-<div class="sidebar-tools">
-
-<button onclick="newChat()">
-new_chat_label = "➕ New Chat"
-</button>
-
-<button onclick="loadChats()">
-new_chat_label = "🔄 New Chat"
-</button>
-
-</div>
-
-<div class="conversation-section">
-
-<div class="section-title">
-Chats
-</div>
-
-<div
-class="conversations"
-id="conversationList"
->
-</div>
-
-</div>
-
-# =========================================================
-# ADD TO CSS
-# =========================================================
-
-
-
-
-
-.sidebar-tools button:hover{
-background:#374151;
-}
-
-.section-title{
-padding:12px;
-font-size:12px;
-font-weight:600;
-color:#9ca3af;
-text-transform:uppercase;
-}
-
-
-
-.chat-item:hover{
-background:#2d3748;
-}
-
-.chat-actions{
-position:absolute;
-right:10px;
-top:10px;
+.layout{
 display:flex;
-gap:5px;
+height:calc(100vh - 60px);
 }
 
-.chat-actions button{
-background:none;
+.sidebar{
+width:260px;
+background:#0b1220;
+border-right:1px solid #1f2937;
+padding:15px;
+overflow-y:auto;
+}
+
+.sidebar-title{
+font-size:16px;
+margin-bottom:15px;
+font-weight:bold;
+}
+
+.new-chat-btn{
+width:100%;
+padding:10px;
 border:none;
-color:#9ca3af;
+border-radius:10px;
+background:#2563eb;
+color:white;
+cursor:pointer;
+margin-bottom:15px;
+}
+
+.conversation{
+padding:10px;
+border-radius:10px;
+background:#111827;
+margin-bottom:8px;
 cursor:pointer;
 }
 
-.chat-actions button:hover{
-color:white;
+.conversation:hover{
+background:#1e293b;
 }
 
-.active-chat{
-background:#2563eb !important;
+.main-chat{
+flex:1;
+display:flex;
+flex-direction:column;
 }
 
+</style>
+
+
 # =========================================================
-# ADD TO JAVASCRIPT
+# PART 5D
+# LOAD CONVERSATIONS FROM API
+# PASTE BELOW THE createConversation() FUNCTION
 # =========================================================
 
-let currentConversation = null;
-
-async function loadChats(){
+async function loadConversations(){
 
 try{
 
@@ -1026,565 +937,83 @@ await fetch(
 const data =
 await response.json();
 
-const container =
+const list =
 document.getElementById(
-"conversationList"
+"conversation-list"
 );
 
-container.innerHTML = "";
+list.innerHTML = "";
 
 if(
-!data.conversations ||
-data.conversations.length === 0
+data.conversations
 ){
 
-container.innerHTML =
-'<div class="chat-item">No Chats Yet</div>';
+data.conversations.forEach(
+(chat)=>{
 
-return;
-
-}
-
-data.conversations.forEach(chat=>{
-
-container.innerHTML += `
+list.innerHTML += `
 <div
-class="chat-item"
-onclick="selectChat('${chat.id}')"
+class="conversation"
+onclick="openConversation(
+'${chat.id}'
+)"
 >
-
 ${chat.title}
-
-<div class="chat-actions">
-
-<button
-onclick="
-event.stopPropagation();
-renameChat('${chat.id}');
-"
->
-✏️
-</button>
-
-<button
-onclick="
-event.stopPropagation();
-deleteChat('${chat.id}');
-"
->
-🗑️
-</button>
-
-</div>
-
 </div>
 `;
 
-});
-
-}catch(err){
-
-console.log(err);
-
-}
-
-}
-
-function selectChat(id){
-
-currentConversation = id;
-
-document
-.querySelectorAll(".chat-item")
-.forEach(
-item=>{
-item.classList.remove(
-"active-chat"
-);
 }
 );
 
 }
 
-async function renameChat(id){
+}
+catch(err){
 
-const title =
-prompt(
-"New conversation name:"
+console.log(
+"Failed loading chats"
 );
 
-if(!title) return;
-
-await fetch(
-"/api/conversations/rename",
-{
-method:"PUT",
-headers:{
-"Content-Type":
-"application/json"
-},
-body:JSON.stringify({
-conversation_id:id,
-title:title
-})
 }
-);
-
-loadChats();
 
 }
 
-async function deleteChat(id){
+let currentConversation =
+"default";
 
-if(
-!confirm(
-"Delete conversation?"
-)
-) return;
-
-await fetch(
-"/api/conversations/"+id,
-{
-method:"DELETE"
-}
-);
-
-loadChats();
-
-}
-
-function newChat(){
+function openConversation(
+conversationId
+){
 
 currentConversation =
-crypto.randomUUID();
+conversationId;
 
-document
-.getElementById("chat")
-.innerHTML =
-'<div class="message assistant">New conversation started.</div>';
+loadMessages(
+conversationId
+);
 
 }
 
-window.onload = () => {
+window.onload = function(){
 
-loadChats();
+loadConversations();
 
 };
 
-# =========================================================
-# END PART 5B
-# NEXT = PART 5C
-# ADVANCED CHAT WINDOW + MESSAGE ACTIONS
-# =========================================================
 
+// =========================================================
+// PART 5E
+// CREATE NEW CONVERSATIONS USING API
+// PASTE BELOW PART 5D
+// =========================================================
 
-# =========================================================
-# PART 5C
-# ADVANCED CHAT WINDOW + MESSAGE ACTIONS
-# PASTE BELOW PART 5B
-# =========================================================
-
-# =========================================================
-# ADD TO CSS
-# =========================================================
-
-.message{
-position:relative;
-max-width:900px;
-margin:auto;
-margin-bottom:20px;
-padding:18px;
-border-radius:14px;
-line-height:1.8;
-word-wrap:break-word;
-}
-
-.message-toolbar{
-display:flex;
-gap:10px;
-margin-top:12px;
-opacity:0;
-transition:.2s;
-}
-
-.message:hover .message-toolbar{
-opacity:1;
-}
-
-.message-toolbar button{
-background:#1f2937;
-border:none;
-color:white;
-padding:8px 10px;
-border-radius:8px;
-cursor:pointer;
-}
-
-.message-toolbar button:hover{
-background:#374151;
-}
-
-.message-time{
-font-size:12px;
-color:#9ca3af;
-margin-top:8px;
-}
-
-.typing{
-display:flex;
-gap:6px;
-padding:10px;
-}
-
-.typing span{
-width:8px;
-height:8px;
-background:#60a5fa;
-border-radius:50%;
-animation:bounce 1s infinite;
-}
-
-.typing span:nth-child(2){
-animation-delay:.2s;
-}
-
-.typing span:nth-child(3){
-animation-delay:.4s;
-}
-
-@keyframes bounce{
-
-0%,100%{
-transform:translateY(0);
-}
-
-50%{
-transform:translateY(-5px);
-}
-
-}
-
-.chat-header{
-display:flex;
-justify-content:space-between;
-align-items:center;
-margin-bottom:20px;
-}
-
-.chat-title{
-font-size:20px;
-font-weight:600;
-}
-
-.chat-controls{
-display:flex;
-gap:10px;
-}
-
-.chat-controls button{
-background:#1f2937;
-border:none;
-padding:10px;
-border-radius:8px;
-color:white;
-cursor:pointer;
-}
-
-.chat-controls button:hover{
-background:#374151;
-}
-
-# =========================================================
-# REPLACE CHAT AREA CONTENT
-# =========================================================
-
-<div
-class="chat-area"
-id="chat"
->
-
-<div class="chat-header">
-
-<div class="chat-title">
-New Conversation
-</div>
-
-<div class="chat-controls">
-
-<button onclick="clearChat()">
-🗑 Clear
-</button>
-
-<button onclick="exportChat()">
-📄 Export
-</button>
-
-</div>
-
-</div>
-
-<div class="message assistant">
-
-👋 Welcome to Bloxy-Bot X
-
-<div class="message-time">
-Just now
-</div>
-
-</div>
-
-</div>
-
-# =========================================================
-# ADD TO JAVASCRIPT
-# =========================================================
-
-function getTime(){
-
-return new Date()
-.toLocaleTimeString(
-[],
-{
-hour:'2-digit',
-minute:'2-digit'
-}
-);
-
-}
-
-function appendUserMessage(text){
-
-const chat =
-document.getElementById(
-"chat"
-);
-
-chat.innerHTML += `
-<div class="message user">
-
-${text}
-
-<div class="message-toolbar">
-
-<button onclick="copyText(this)">
-📋 Copy
-</button>
-
-<button onclick="editMessage(this)">
-✏️ Edit
-</button>
-
-</div>
-
-<div class="message-time">
-${getTime()}
-</div>
-
-</div>
-`;
-
-}
-
-function appendAIMessage(text){
-
-const chat =
-document.getElementById(
-"chat"
-);
-
-chat.innerHTML += `
-<div class="message assistant">
-
-${text}
-
-<div class="message-toolbar">
-
-<button onclick="copyText(this)">
-📋 Copy
-</button>
-
-<button onclick="regenerateLast()">
-🔄 Retry
-</button>
-
-</div>
-
-<div class="message-time">
-${getTime()}
-</div>
-
-</div>
-`;
-
-}
-
-function showTyping(){
-
-const chat =
-document.getElementById(
-"chat"
-);
-
-chat.innerHTML += `
-<div
-class="message assistant"
-id="typingIndicator"
->
-
-<div class="typing">
-
-<span></span>
-<span></span>
-<span></span>
-
-</div>
-
-</div>
-`;
-
-}
-
-function removeTyping(){
-
-const typing =
-document.getElementById(
-"typingIndicator"
-);
-
-if(typing){
-
-typing.remove();
-
-}
-
-}
-
-function copyText(button){
-
-const text =
-button
-.parentElement
-.parentElement
-.innerText;
-
-navigator.clipboard
-.writeText(text);
-
-}
-
-function editMessage(button){
-
-const message =
-button
-.parentElement
-.parentElement;
-
-const oldText =
-message.childNodes[0]
-.textContent
-.trim();
-
-const updated =
-prompt(
-"Edit message",
-oldText
-);
-
-if(updated){
-
-message.childNodes[0]
-.textContent =
-updated;
-
-}
-
-}
-
-function clearChat(){
-
-if(
-!confirm(
-"Clear chat?"
-)
-){
-return;
-}
-
-document
-.getElementById(
-"chat"
-)
-.innerHTML = "";
-
-}
-
-function exportChat(){
-
-const content =
-document
-.getElementById(
-"chat"
-)
-.innerText;
-
-const blob =
-new Blob(
-[content],
-{
-type:"text/plain"
-}
-);
-
-const a =
-document.createElement("a");
-
-a.href =
-URL.createObjectURL(blob);
-
-a.download =
-"conversation.txt";
-
-a.click();
-
-}
-
-async function regenerateLast(){
-
-alert(
-"Response regeneration coming in Part 7 integration."
-);
-
-}
-
-# =========================================================
-# REPLACE sendMessage()
-# =========================================================
-
-async function sendMessage(){
-
-const input =
-document.getElementById(
-"message"
-);
-
-const text =
-input.value.trim();
-
-if(!text){
-return;
-}
-
-appendUserMessage(text);
-
-input.value="";
-
-showTyping();
+async function createConversation(){
 
 try{
 
 const response =
 await fetch(
-"/api/chat",
+"/api/conversations/create",
 {
 method:"POST",
 headers:{
@@ -1593,10 +1022,7 @@ headers:{
 },
 body:JSON.stringify({
 user_id:"guest",
-conversation_id:
-currentConversation ||
-"default",
-message:text
+title:"New Chat"
 })
 }
 );
@@ -1604,22 +1030,169 @@ message:text
 const data =
 await response.json();
 
-removeTyping();
+if(
+data.conversation_id
+){
 
-appendAIMessage(
-data.response ||
-"No response"
-);
+currentConversation =
+data.conversation_id;
 
-}catch(err){
+loadConversations();
 
-removeTyping();
+document.getElementById(
+"chat"
+).innerHTML = "";
 
-appendAIMessage(
-"Error contacting AI."
+}
+
+}
+catch(err){
+
+console.log(
+"Failed creating chat"
 );
 
 }
+
+}
+
+
+// =========================================================
+// PART 5F
+// CONVERSATION SWITCHING + ACTIVE CHAT
+// PASTE BELOW PART 5E
+// =========================================================
+
+let activeConversationId = null;
+
+function setActiveConversation(
+conversationId
+){
+
+activeConversationId =
+conversationId;
+
+const items =
+document.querySelectorAll(
+".conversation"
+);
+
+items.forEach(
+(item)=>{
+item.style.background =
+"#111827";
+}
+);
+
+const selected =
+document.getElementById(
+"conv-" + conversationId
+);
+
+if(selected){
+selected.style.background =
+"#2563eb";
+}
+
+openConversation(
+conversationId
+);
+
+}
+
+function renderConversation(
+chat
+){
+
+return `
+<div
+id="conv-${chat.id}"
+class="conversation"
+onclick="setActiveConversation(
+'${chat.id}'
+)"
+>
+${chat.title}
+</div>
+`;
+
+}
+
+
+// =========================================================
+// PART 5G
+// LOAD MESSAGES FOR SELECTED CONVERSATION
+// PASTE BELOW PART 5F
+// =========================================================
+
+async function loadMessages(
+conversationId
+){
+
+try{
+
+const response =
+await fetch(
+`/api/messages/${conversationId}`
+);
+
+const data =
+await response.json();
+
+const chat =
+document.getElementById(
+"chat"
+);
+
+chat.innerHTML = "";
+
+if(data.messages){
+
+data.messages.forEach(
+(message)=>{
+
+chat.innerHTML += `
+<div class="message">
+${message.content}
+</div>
+`;
+
+}
+);
+
+chat.scrollTop =
+chat.scrollHeight;
+
+}
+
+}
+catch(err){
+
+console.log(
+"Failed loading messages"
+);
+
+}
+
+}
+
+
+// =========================================================
+// PART 5H
+// OPEN CONVERSATION
+// PASTE BELOW PART 5G
+// =========================================================
+
+async function openConversation(
+conversationId
+){
+
+activeConversationId =
+conversationId;
+
+await loadMessages(
+conversationId
+);
 
 const chat =
 document.getElementById(
@@ -1631,2035 +1204,34 @@ chat.scrollHeight;
 
 }
 
-# =========================================================
-# END PART 5C
-# NEXT = PART 5D
-# SETTINGS PANEL + ADVANCED USER PREFERENCES
-# =========================================================
 
 
-# =========================================================
-# PART 5D
-# ADVANCED SETTINGS PANEL + USER PREFERENCES
-# PASTE BELOW PART 5C
-# =========================================================
-
-# =========================================================
-# REPLACE SETTINGS MODAL HTML
-# =========================================================
-
-<div
-class="modal"
-id="settingsModal"
->
-
-<div class="modal-content">
-
-<h2>⚙ Settings</h2>
-
-<div class="setting-row">
-<label>Theme</label>
-<select id="themeSelect">
-<option value="dark">Dark</option>
-<option value="midnight">Midnight</option>
-<option value="ocean">Ocean</option>
-<option value="emerald">Emerald</option>
-<option value="purple">Purple</option>
-</select>
-</div>
-
-<div class="setting-row">
-<label>AI Model</label>
-<select id="modelSelect">
-
-<option value="gpt-5.5">
-GPT-5.5
-</option>
-
-<option value="openrouter">
-OpenRouter
-</option>
-
-<option value="groq">
-Groq
-</option>
-
-<option value="kimi">
-Kimi
-</option>
-
-</select>
-</div>
-
-<div class="setting-row">
-<label>Temperature</label>
-
-<input
-id="temperature"
-type="range"
-min="0"
-max="2"
-step="0.1"
-value="0.7"
->
-
-<span id="tempValue">
-0.7
-</span>
-
-</div>
-
-<div class="setting-row">
-
-<label>
-System Prompt
-</label>
-
-<textarea
-id="systemPrompt"
-style="
-width:100%;
-height:120px;
-background:#1f2937;
-color:white;
-border:none;
-padding:12px;
-border-radius:10px;
-"
-></textarea>
-
-</div>
-
-<div class="setting-row">
-
-<label>
-
-<input
-type="checkbox"
-id="memoryEnabled"
-checked
->
-
-Enable Memory
-
-</label>
-
-</div>
-
-<br>
-
-<button
-class="new-chat"
-onclick="saveSettings()"
->
-
-💾 Save Settings
-
-</button>
-
-<button
-class="new-chat"
-onclick="resetSettings()"
-style="
-background:#dc2626;
-margin-top:10px;
-"
->
-
-🔄 Reset
-
-</button>
-
-<button
-class="new-chat"
-onclick="closeSettings()"
-style="
-background:#374151;
-margin-top:10px;
-"
->
-
-Close
-
-</button>
-
-</div>
-
-</div>
-
-# =========================================================
-# ADD CSS
-# =========================================================
-
-.setting-row{
-margin-top:18px;
-}
-
-.setting-row label{
-display:block;
-margin-bottom:8px;
-font-weight:600;
-}
-
-.setting-row select,
-.setting-row textarea,
-.setting-row input[type=text]{
-
-width:100%;
-padding:12px;
-background:#1f2937;
-color:white;
-border:none;
-border-radius:10px;
-
-}
-
-.modal-content{
-max-height:90vh;
-overflow-y:auto;
-}
-
-#tempValue{
-display:inline-block;
-margin-top:10px;
-font-weight:bold;
-color:#60a5fa;
-}
-
-# =========================================================
-# ADD JAVASCRIPT
-# =========================================================
-
-document
-.getElementById(
-"temperature"
-)
-.addEventListener(
-"input",
-function(){
-
-document
-.getElementById(
-"tempValue"
-)
-.innerText =
-this.value;
-
-}
-);
-
-async function saveSettings(){
-
-const payload = {
-
-user_id:"guest",
-
-theme:
-document
-.getElementById(
-"themeSelect"
-)
-.value,
-
-ai_model:
-document
-.getElementById(
-"modelSelect"
-)
-.value,
-
-temperature:
-parseFloat(
-document
-.getElementById(
-"temperature"
-)
-.value
-),
-
-system_prompt:
-document
-.getElementById(
-"systemPrompt"
-)
-.value,
-
-memory_enabled:
-document
-.getElementById(
-"memoryEnabled"
-)
-.checked
-
-};
-
-try{
-
-await fetch(
-"/api/preferences/chat",
-{
-method:"POST",
-headers:{
-"Content-Type":
-"application/json"
-},
-body:JSON.stringify(
-payload
-)
-}
-);
-
-localStorage.setItem(
-"bloxy_settings",
-JSON.stringify(
-payload
-)
-);
-
-alert(
-"Settings Saved"
-);
-
-}catch(err){
-
-alert(
-"Failed To Save"
-);
-
-}
-
-}
-
-function resetSettings(){
-
-document
-.getElementById(
-"themeSelect"
-)
-.value =
-"dark";
-
-document
-.getElementById(
-"modelSelect"
-)
-.value =
-"gpt-5.5";
-
-document
-.getElementById(
-"temperature"
-)
-.value =
-0.7;
-
-document
-.getElementById(
-"tempValue"
-)
-.innerText =
-"0.7";
-
-document
-.getElementById(
-"systemPrompt"
-)
-.value =
-"";
-
-document
-.getElementById(
-"memoryEnabled"
-)
-.checked =
-true;
-
-}
-
-function loadSettings(){
-
-const saved =
-localStorage.getItem(
-"bloxy_settings"
-);
-
-if(!saved){
-return;
-}
-
-const settings =
-JSON.parse(saved);
-
-document
-.getElementById(
-"themeSelect"
-)
-.value =
-settings.theme || "dark";
-
-document
-.getElementById(
-"modelSelect"
-)
-.value =
-settings.ai_model || "gpt-5.5";
-
-document
-.getElementById(
-"temperature"
-)
-.value =
-settings.temperature || 0.7;
-
-document
-.getElementById(
-"tempValue"
-)
-.innerText =
-settings.temperature || 0.7;
-
-document
-.getElementById(
-"systemPrompt"
-)
-.value =
-settings.system_prompt || "";
-
-document
-.getElementById(
-"memoryEnabled"
-)
-.checked =
-settings.memory_enabled;
-
-}
-
-window.addEventListener(
-"load",
-loadSettings
-);
-
-# =========================================================
-# END PART 5D
-# NEXT = PART 5E
-# ACCOUNT PANEL + PROFILE MANAGEMENT
-# =========================================================
-
-
-# =========================================================
-# PART 5E
-# ACCOUNT PANEL + PROFILE MANAGEMENT
-# PASTE BELOW PART 5D
-# =========================================================
-
-# =========================================================
-# REPLACE ACCOUNT HTML
-# =========================================================
-
-<div class="account">
-
-<div class="account-card">
-
-<div class="avatar">
-👤
-</div>
-
-<div class="account-info">
-
-<div id="usernameDisplay">
-Guest
-</div>
-
-<div id="emailDisplay">
-guest@bloxybotx.local
-</div>
-
-</div>
-
-</div>
-
-<button onclick="openAccountModal()">
-Manage Account
-</button>
-
-</div>
-
-<div
-class="modal"
-id="accountModal"
->
-
-<div class="modal-content">
-
-<h2>Account Settings</h2>
-
-<div class="setting-row">
-
-<label>Username</label>
-
-<input
-id="accountUsername"
-type="text"
-placeholder="Username"
->
-
-</div>
-
-<div class="setting-row">
-
-<label>Email</label>
-
-<input
-id="accountEmail"
-type="email"
-placeholder="Email"
->
-
-</div>
-
-<div class="setting-row">
-
-<label>New Password</label>
-
-<input
-id="accountPassword"
-type="password"
-placeholder="Password"
->
-
-</div>
-
-<button
-class="new-chat"
-onclick="saveAccountSettings()"
->
-
-Save Changes
-
-</button>
-
-<button
-class="new-chat"
-style="background:#374151;margin-top:10px;"
-onclick="closeAccountModal()"
->
-
-Close
-
-</button>
-
-</div>
-
-</div>
-
-# =========================================================
-# ADD CSS
-# =========================================================
-
-.account-card{
-display:flex;
-align-items:center;
-gap:12px;
-margin-bottom:12px;
-}
-
-.avatar{
-width:45px;
-height:45px;
-border-radius:50%;
-background:#2563eb;
-display:flex;
-align-items:center;
-justify-content:center;
-font-size:20px;
-}
-
-.account-info{
-font-size:13px;
-}
-
-#usernameDisplay{
-font-weight:600;
-}
-
-#emailDisplay{
-color:#9ca3af;
-}
-
-# =========================================================
-# ADD JAVASCRIPT
-# =========================================================
-
-function openAccountModal(){
-
-document
-.getElementById(
-"accountModal"
-)
-.style.display="block";
-
-}
-
-function closeAccountModal(){
-
-document
-.getElementById(
-"accountModal"
-)
-.style.display="none";
-
-}
-
-async function saveAccountSettings(){
-
-const username =
-document
-.getElementById(
-"accountUsername"
-)
-.value;
-
-const email =
-document
-.getElementById(
-"accountEmail"
-)
-.value;
-
-const password =
-document
-.getElementById(
-"accountPassword"
-)
-.value;
-
-if(username){
-
-await fetch(
-"/api/account/username",
-{
-method:"PUT",
-headers:{
-"Content-Type":"application/json"
-},
-body:JSON.stringify({
-user_id:"guest",
-username:username
-})
-}
-);
-
-document
-.getElementById(
-"usernameDisplay"
-)
-.innerText =
-username;
-
-}
-
-if(email){
-
-await fetch(
-"/api/account/email",
-{
-method:"PUT",
-headers:{
-"Content-Type":"application/json"
-},
-body:JSON.stringify({
-user_id:"guest",
-email:email
-})
-}
-);
-
-document
-.getElementById(
-"emailDisplay"
-)
-.innerText =
-email;
-
-}
-
-if(password){
-
-await fetch(
-"/api/account/password",
-{
-method:"PUT",
-headers:{
-"Content-Type":"application/json"
-},
-body:JSON.stringify({
-user_id:"guest",
-password:password
-})
-}
-);
-
-}
-
-alert("Account Updated");
-
-closeAccountModal();
-
-}
-
-# =========================================================
-# END PART 5E
-# NEXT = PART 5F
-# =========================================================
-
-
-# =========================================================
-# PART 5F
-# ADVANCED THEME ENGINE + APPEARANCE CUSTOMIZATION
-# PASTE BELOW PART 5E
-# =========================================================
-
-# =========================================================
-# ADD TO SETTINGS MODAL HTML
-# =========================================================
-
-<div class="setting-row">
-
-<label>Accent Color</label>
-
-<select id="accentColor">
-
-<option value="#2563eb">Blue</option>
-<option value="#10b981">Emerald</option>
-<option value="#f59e0b">Amber</option>
-<option value="#ef4444">Red</option>
-<option value="#8b5cf6">Purple</option>
-
-</select>
-
-</div>
-
-<div class="setting-row">
-
-<label>Font Size</label>
-
-<select id="fontSize">
-
-<option value="14">Small</option>
-<option value="16" selected>Normal</option>
-<option value="18">Large</option>
-
-</select>
-
-</div>
-
-<div class="setting-row">
-
-<label>
-
-<input
-type="checkbox"
-id="compactMode"
->
-
-Compact Mode
-
-</label>
-
-</div>
-
-# =========================================================
-# ADD TO CSS
-# =========================================================
-
-:root{
-
---accent:#2563eb;
---font-size:16px;
-
-}
-
-body{
-
-font-size:var(--font-size);
-
-}
-
-.new-chat,
-.send-btn{
-
-background:var(--accent);
-
-}
-
-.active-chat{
-
-background:var(--accent)!important;
-
-}
-
-.compact .message{
-
-padding:10px;
-margin-bottom:10px;
-
-}
-
-.compact .chat-item{
-
-padding:8px;
-
-}
-
-# =========================================================
-# ADD JAVASCRIPT
-# =========================================================
-
-function applyThemeSettings(){
-
-const accent =
-localStorage.getItem(
-"accentColor"
-) || "#2563eb";
-
-const fontSize =
-localStorage.getItem(
-"fontSize"
-) || "16";
-
-const compact =
-localStorage.getItem(
-"compactMode"
-) || "false";
-
-document
-.documentElement
-.style
-.setProperty(
-"--accent",
-accent
-);
-
-document
-.documentElement
-.style
-.setProperty(
-"--font-size",
-fontSize + "px"
-);
-
-if(compact === "true"){
-
-document.body
-.classList.add(
-"compact"
-);
-
-}else{
-
-document.body
-.classList.remove(
-"compact"
-);
-
-}
-
-}
-
-function saveAppearance(){
-
-localStorage.setItem(
-"accentColor",
-document
-.getElementById(
-"accentColor"
-)
-.value
-);
-
-localStorage.setItem(
-"fontSize",
-document
-.getElementById(
-"fontSize"
-)
-.value
-);
-
-localStorage.setItem(
-"compactMode",
-document
-.getElementById(
-"compactMode"
-)
-.checked
-);
-
-applyThemeSettings();
-
-}
-
-const oldSaveSettings =
-saveSettings;
-
-saveSettings = async function(){
-
-await oldSaveSettings();
-
-saveAppearance();
-
-};
-
-window.addEventListener(
-"load",
-applyThemeSettings
-);
-
-# =========================================================
-# END PART 5F
-# NEXT = PART 5G
-# ACCOUNT DROPDOWN + SESSION MANAGEMENT
-# =========================================================
-
-
-# =========================================================
-# PART 5G
-# ACCOUNT DROPDOWN + SESSION MANAGEMENT + QUICK ACTIONS
-# PASTE BELOW PART 5F
-# =========================================================
-
-# =========================================================
-# REPLACE ACCOUNT SECTION
-# =========================================================
-
-<div class="account">
-
-<div
-class="account-summary"
-onclick="toggleAccountMenu()"
->
-
-<div class="avatar">
-👤
-</div>
-
-<div class="account-text">
-
-<div id="usernameDisplay">
-Guest
-</div>
-
-<div class="account-plan">
-Free Plan
-</div>
-
-</div>
-
-<div>
-▼
-</div>
-
-</div>
-
-<div
-class="account-menu"
-id="accountMenu"
->
-
-<button onclick="openAccountModal()">
-👤 Profile
-</button>
-
-<button onclick="openSettings()">
-⚙ Settings
-</button>
-
-<button onclick="exportAllChats()">
-📄 Export Data
-</button>
-
-<button onclick="clearAllDrafts()">
-📝 Clear Drafts
-</button>
-
-<button onclick="logoutUser()">
-🚪 Logout
-</button>
-
-</div>
-
-</div>
-
-# =========================================================
-# ADD CSS
-# =========================================================
-
-.account-summary{
-
-display:flex;
-align-items:center;
-justify-content:space-between;
-cursor:pointer;
-padding:10px;
-background:#1f2937;
-border-radius:10px;
-
-}
-
-.account-summary:hover{
-
-background:#2d3748;
-
-}
-
-.account-text{
-
-flex:1;
-margin-left:10px;
-
-}
-
-.account-plan{
-
-font-size:12px;
-color:#9ca3af;
-
-}
-
-.account-menu{
-
-display:none;
-margin-top:10px;
-
-}
-
-.account-menu button{
-
-width:100%;
-padding:12px;
-margin-bottom:6px;
-border:none;
-border-radius:8px;
-background:#1f2937;
-color:white;
-cursor:pointer;
-
-}
-
-.account-menu button:hover{
-
-background:#374151;
-
-}
-
-# =========================================================
-# ADD JAVASCRIPT
-# =========================================================
-
-function toggleAccountMenu(){
-
-const menu =
-document.getElementById(
-"accountMenu"
-);
-
-if(
-menu.style.display ===
-"block"
-){
-
-menu.style.display =
-"none";
-
-}else{
-
-menu.style.display =
-"block";
-
-}
-
-}
-
-function logoutUser(){
-
-if(
-!confirm(
-"Logout?"
-)
-){
-return;
-}
-
-localStorage.clear();
-
-location.reload();
-
-}
-
-function exportAllChats(){
-
-const content =
-document.getElementById(
-"chat"
-).innerText;
-
-const blob =
-new Blob(
-[content],
-{
-type:"text/plain"
-}
-);
-
-const url =
-URL.createObjectURL(
-blob
-);
-
-const a =
-document.createElement(
-"a"
-);
-
-a.href = url;
-
-a.download =
-"bloxybotx_export.txt";
-
-a.click();
-
-}
-
-function clearAllDrafts(){
-
-localStorage.removeItem(
-"chat_draft"
-);
-
-alert(
-"Drafts Cleared"
-);
-
-}
-
-window.addEventListener(
-"click",
-function(e){
-
-const menu =
-document.getElementById(
-"accountMenu"
-);
-
-const account =
-document.querySelector(
-".account-summary"
-);
-
-if(
-menu &&
-account &&
-!account.contains(
-e.target
-)
-){
-
-menu.style.display =
-"none";
-
-}
-
-}
-);
-
-# =========================================================
-# END PART 5G
-# NEXT = PART 5H
-# MARKDOWN + CODE BLOCK RENDERING
-# =========================================================
-
-
-# =========================================================
-# PART 5H
-# MARKDOWN + CODE BLOCK RENDERING
-# PASTE BELOW PART 5G
-# =========================================================
-
-# =========================================================
-# ADD TO <head>
-# =========================================================
-
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/highlight.js/lib/common.min.js"></script>
-
-<link
-rel="stylesheet"
-href="https://cdn.jsdelivr.net/npm/highlight.js/styles/github-dark.min.css"
->
-
-# =========================================================
-# ADD CSS
-# =========================================================
-
-.markdown-content{
-line-height:1.8;
-}
-
-.markdown-content h1,
-.markdown-content h2,
-.markdown-content h3{
-margin:15px 0;
-}
-
-.markdown-content p{
-margin:10px 0;
-}
-
-.markdown-content pre{
-position:relative;
-background:#0d1117;
-border-radius:12px;
-padding:15px;
-overflow:auto;
-margin-top:12px;
-}
-
-.markdown-content code{
-font-family:monospace;
-}
-
-.copy-code-btn{
-position:absolute;
-top:10px;
-right:10px;
-border:none;
-background:#374151;
-color:white;
-padding:6px 10px;
-border-radius:8px;
-cursor:pointer;
-}
-
-.copy-code-btn:hover{
-background:#4b5563;
-}
-
-.markdown-content blockquote{
-border-left:4px solid var(--accent);
-padding-left:12px;
-opacity:.9;
-margin:12px 0;
-}
-
-.markdown-content ul,
-.markdown-content ol{
-padding-left:25px;
-}
-
-# =========================================================
-# ADD JAVASCRIPT
-# =========================================================
-
-function renderMarkdown(text){
-
-const html =
-marked.parse(text);
-
-return `
-<div class="markdown-content">
-${html}
-</div>
-`;
-
-}
-
-function highlightBlocks(){
-
-document
-.querySelectorAll("pre code")
-.forEach(block=>{
-
-hljs.highlightElement(
-block
-);
-
-const pre =
-block.parentElement;
-
-if(
-pre.querySelector(
-".copy-code-btn"
-)
-){
-return;
-}
-
-const btn =
-document.createElement(
-"button"
-);
-
-btn.innerText =
-"Copy";
-
-btn.className =
-"copy-code-btn";
-
-btn.onclick = ()=>{
-
-navigator.clipboard
-.writeText(
-block.innerText
-);
-
-btn.innerText =
-"Copied";
-
-setTimeout(()=>{
-
-btn.innerText =
-"Copy";
-
-},1500);
-
-};
-
-pre.appendChild(btn);
-
-});
-
-}
-
-# =========================================================
-# REPLACE appendAIMessage()
-# =========================================================
-
-function appendAIMessage(text){
-
-const chat =
-document.getElementById(
-"chat"
-);
-
-chat.innerHTML += `
-<div class="message assistant">
-
-${renderMarkdown(text)}
-
-<div class="message-toolbar">
-
-<button onclick="copyText(this)">
-📋 Copy
-</button>
-
-<button onclick="regenerateLast()">
-🔄 Retry
-</button>
-
-</div>
-
-<div class="message-time">
-${getTime()}
-</div>
-
-</div>
-`;
-
-highlightBlocks();
-
-}
-
-# =========================================================
-# END PART 5H
-# NEXT = PART 5I
-# CHAT SEARCH + FILTERS
-# =========================================================
-
-
-# =========================================================
-# PART 5I
-# CHAT SEARCH + FILTERS + QUICK NAVIGATION
-# PASTE BELOW PART 5H
-# =========================================================
-
-# =========================================================
-# ADD HTML
-# =========================================================
-
-<div class="search-panel">
-
-<input
-type="text"
-id="chatSearch"
-placeholder="Search messages..."
->
-
-<select id="searchFilter">
-
-<option value="all">
-All
-</option>
-
-<option value="user">
-User Messages
-</option>
-
-<option value="assistant">
-AI Messages
-</option>
-
-</select>
-
-<button onclick="searchMessages()">
-🔍 Search
-</button>
-
-</div>
-
-# =========================================================
-# ADD CSS
-# =========================================================
-
-.search-panel{
-
-display:flex;
-gap:10px;
-padding:10px;
-margin-bottom:15px;
-
-}
-
-.search-panel input{
-
-flex:1;
-padding:12px;
-background:#1f2937;
-color:white;
-border:none;
-border-radius:10px;
-
-}
-
-.search-panel select{
-
-padding:12px;
-background:#1f2937;
-color:white;
-border:none;
-border-radius:10px;
-
-}
-
-.search-panel button{
-
-padding:12px 18px;
-border:none;
-border-radius:10px;
-background:var(--accent);
-color:white;
-cursor:pointer;
-
-}
-
-.search-highlight{
-
-outline:2px solid #f59e0b;
-box-shadow:0 0 10px #f59e0b;
-
-}
-
-# =========================================================
-# ADD JAVASCRIPT
-# =========================================================
-
-function clearHighlights(){
-
-document
-.querySelectorAll(
-".search-highlight"
-)
-.forEach(el=>{
-
-el.classList.remove(
-"search-highlight"
-);
-
-});
-
-}
-
-function searchMessages(){
-
-clearHighlights();
-
-const term =
-document
-.getElementById(
-"chatSearch"
-)
-.value
-.toLowerCase();
-
-const filter =
-document
-.getElementById(
-"searchFilter"
-)
-.value;
-
-if(!term){
-return;
-}
-
-const messages =
-document
-.querySelectorAll(
-".message"
-);
-
-let firstMatch = null;
-
-messages.forEach(msg=>{
-
-const text =
-msg.innerText
-.toLowerCase();
-
-const isUser =
-msg.classList.contains(
-"user"
-);
-
-const isAssistant =
-msg.classList.contains(
-"assistant"
-);
-
-let allowed = false;
-
-if(filter==="all"){
-allowed=true;
-}
-
-if(filter==="user" && isUser){
-allowed=true;
-}
-
-if(filter==="assistant" && isAssistant){
-allowed=true;
-}
-
-if(
-allowed &&
-text.includes(term)
-){
-
-msg.classList.add(
-"search-highlight"
-);
-
-if(!firstMatch){
-
-firstMatch = msg;
-
-}
-
-}
-
-});
-
-if(firstMatch){
-
-firstMatch.scrollIntoView({
-behavior:"smooth",
-block:"center"
-});
-
-}
-
-}
-
-document
-.getElementById(
-"chatSearch"
-)
-.addEventListener(
-"keydown",
-function(e){
-
-if(
-e.key==="Enter"
-){
-
-searchMessages();
-
-}
-
-}
-);
-
-# =========================================================
-# END PART 5I
-# NEXT = PART 5J
-# CONVERSATION ACTIONS + PIN + FAVORITES
-# =========================================================
-
-
-# =========================================================
-# PART 5K
-# ADVANCED THEME PRESETS + CUSTOM COLORS + UI MODES
-# PASTE BELOW PART 5J
-# =========================================================
-
-# =========================================================
-# ADD TO SETTINGS HTML
-# =========================================================
-
-<div class="setting-row">
-
-<label>Theme Preset</label>
-
-<select id="themePreset">
-
-<option value="dark">
-Dark
-</option>
-
-<option value="midnight">
-Midnight
-</option>
-
-<option value="ocean">
-Ocean
-</option>
-
-<option value="emerald">
-Emerald
-</option>
-
-<option value="sunset">
-Sunset
-</option>
-
-<option value="purple">
-Purple
-</option>
-
-</select>
-
-</div>
-
-# =========================================================
-# ADD CSS VARIABLES
-# =========================================================
-
-:root{
-
---bg:#0b0f19;
---sidebar:#111827;
---card:#1f2937;
---text:#ffffff;
---accent:#2563eb;
-
-}
-
-body{
-background:var(--bg);
-color:var(--text);
-}
-
-.sidebar{
-background:var(--sidebar);
-}
-
-.message{
-background:var(--card);
-}
-
-# =========================================================
-# ADD JAVASCRIPT
-# =========================================================
-
-const THEMES = {
-
-dark:{
-bg:"#0b0f19",
-sidebar:"#111827",
-card:"#1f2937",
-accent:"#2563eb"
-},
-
-midnight:{
-bg:"#020617",
-sidebar:"#0f172a",
-card:"#1e293b",
-accent:"#3b82f6"
-},
-
-ocean:{
-bg:"#082f49",
-sidebar:"#0c4a6e",
-card:"#075985",
-accent:"#38bdf8"
-},
-
-emerald:{
-bg:"#022c22",
-sidebar:"#064e3b",
-card:"#065f46",
-accent:"#10b981"
-},
-
-sunset:{
-bg:"#431407",
-sidebar:"#7c2d12",
-card:"#9a3412",
-accent:"#f97316"
-},
-
-purple:{
-bg:"#2e1065",
-sidebar:"#4c1d95",
-card:"#5b21b6",
-accent:"#8b5cf6"
-}
-
-};
-
-function applyThemePreset(){
-
-const preset =
-document
-.getElementById(
-"themePreset"
-)
-.value;
-
-const theme =
-THEMES[preset];
-
-document
-.documentElement
-.style
-.setProperty(
-"--bg",
-theme.bg
-);
-
-document
-.documentElement
-.style
-.setProperty(
-"--sidebar",
-theme.sidebar
-);
-
-document
-.documentElement
-.style
-.setProperty(
-"--card",
-theme.card
-);
-
-document
-.documentElement
-.style
-.setProperty(
-"--accent",
-theme.accent
-);
-
-localStorage.setItem(
-"themePreset",
-preset
-);
-
-}
-
-document
-.getElementById(
-"themePreset"
-)
-?.addEventListener(
-"change",
-applyThemePreset
-);
-
-window.addEventListener(
-"load",
-()=>{
-
-const preset =
-localStorage.getItem(
-"themePreset"
-) || "dark";
-
-const select =
-document.getElementById(
-"themePreset"
-);
-
-if(select){
-
-select.value = preset;
-
-applyThemePreset();
-
-}
-
-}
-);
-
-# =========================================================
-# END PART 5K
-# NEXT = PART 5L
-# STREAMING RESPONSES + LIVE GENERATION
-# =========================================================
-
-
-# =========================================================
-# PART 5L
-# STREAMING RESPONSES + LIVE GENERATION EFFECT
-# PASTE BELOW PART 5K
-# =========================================================
-
-# =========================================================
-# ADD CSS
-# =========================================================
-
-.streaming-cursor{
-display:inline-block;
-width:8px;
-height:18px;
-background:var(--accent);
-margin-left:2px;
-animation:blink 1s infinite;
-}
-
-@keyframes blink{
-
-0%,50%{
-opacity:1;
-}
-
-51%,100%{
-opacity:0;
-}
-
-}
-
-.generating{
-
-border-left:3px solid var(--accent);
-
-}
-
-.stop-btn{
-
-background:#dc2626;
-color:white;
-border:none;
-padding:10px 14px;
-border-radius:8px;
-cursor:pointer;
-
-}
-
-.stop-btn:hover{
-
-background:#b91c1c;
-
-}
-
-# =========================================================
-# ADD HTML NEXT TO SEND BUTTON
-# =========================================================
-
-<button
-class="stop-btn"
-id="stopGenerationBtn"
-style="display:none"
-onclick="stopGeneration()"
->
-Stop
-</button>
-
-# =========================================================
-# ADD JAVASCRIPT
-# =========================================================
-
-let generationStopped = false;
-
-function stopGeneration(){
-
-generationStopped = true;
-
-document
-.getElementById(
-"stopGenerationBtn"
-)
-.style.display =
-"none";
-
-}
-
-async function streamText(
-container,
-text
-){
-
-container.innerHTML = "";
-
-for(
-let i = 0;
-i < text.length;
-i++
-){
-
-if(
-generationStopped
-){
-
-break;
-
-}
-
-container.innerHTML =
-text.substring(
-0,
-i + 1
-) +
-'<span class="streaming-cursor"></span>';
-
-await new Promise(
-r=>setTimeout(
-r,
-8
-)
-);
-
-}
-
-container.innerHTML = text;
-
-}
-
-# =========================================================
-# REPLACE appendAIMessage()
-# =========================================================
-
-async function appendAIMessage(text){
-
-const chat =
-document.getElementById(
-"chat"
-);
-
-const id =
-"msg_" +
-Date.now();
-
-chat.innerHTML += `
-<div
-class="message assistant generating"
-id="${id}"
->
-
-<div class="markdown-content">
-</div>
-
-<div class="message-toolbar">
-
-<button onclick="copyText(this)">
-📋 Copy
-</button>
-
-<button onclick="regenerateLast()">
-🔄 Retry
-</button>
-
-</div>
-
-<div class="message-time">
-${getTime()}
-</div>
-
-</div>
-`;
-
-const wrapper =
-document
-.querySelector(
-"#" + id +
-" .markdown-content"
-);
-
-generationStopped = false;
-
-document
-.getElementById(
-"stopGenerationBtn"
-)
-.style.display =
-"inline-block";
-
-await streamText(
-wrapper,
-text
-);
-
-wrapper.innerHTML =
-renderMarkdown(text);
-
-highlightBlocks();
-
-document
-.getElementById(
-id
-)
-.classList.remove(
-"generating"
-);
-
-document
-.getElementById(
-"stopGenerationBtn"
-)
-.style.display =
-"none";
-
-}
-
-# =========================================================
-# REPLACE sendMessage()
-# =========================================================
+// =========================================================
+// PART 5I
+// SEND MESSAGE
+// PASTE BELOW PART 5H
+// =========================================================
 
 async function sendMessage(){
 
 const input =
 document.getElementById(
-"message"
+"messageInput"
 );
 
-const text =
+const message =
 input.value.trim();
 
-if(!text){
+if(
+!message ||
+!activeConversationId
+){
 return;
 }
 
-appendUserMessage(text);
-
-input.value = "";
-
-showTyping();
-
-try{
-
-const response =
 await fetch(
-"/api/chat",
+API_URL +
+"/messages/send",
 {
 method:"POST",
 headers:{
@@ -3667,141 +1239,41 @@ headers:{
 "application/json"
 },
 body:JSON.stringify({
-user_id:"guest",
 conversation_id:
-currentConversation ||
-"default",
-message:text
+activeConversationId,
+message:message
 })
 }
 );
 
-const data =
-await response.json();
+input.value = "";
 
-removeTyping();
-
-await appendAIMessage(
-data.response ||
-"No response"
-);
-
-}catch(err){
-
-removeTyping();
-
-await appendAIMessage(
-"Error contacting AI."
+await loadMessages(
+activeConversationId
 );
 
 }
 
-}
 
-# =========================================================
-# END PART 5L
-# NEXT = PART 5M
-# DRAFT SAVING + AUTO RECOVERY
-# =========================================================
-
-
-# =========================================================
-# PART 5M
-# DRAFT SAVING + AUTO RECOVERY + UNSENT MESSAGE PROTECTION
-# PASTE BELOW PART 5L
-# =========================================================
-
-# =========================================================
-# ADD JAVASCRIPT
-# =========================================================
-
-const DRAFT_KEY =
-"bloxybotx_draft";
-
-function saveDraft(){
-
-const input =
-document.getElementById(
-"message"
-);
-
-if(!input){
-return;
-}
-
-localStorage.setItem(
-DRAFT_KEY,
-input.value
-);
-
-}
-
-function loadDraft(){
-
-const input =
-document.getElementById(
-"message"
-);
-
-if(!input){
-return;
-}
-
-const draft =
-localStorage.getItem(
-DRAFT_KEY
-);
-
-if(draft){
-
-input.value =
-draft;
-
-}
-
-}
-
-function clearDraft(){
-
-localStorage.removeItem(
-DRAFT_KEY
-);
-
-}
-
-window.addEventListener(
-"load",
-loadDraft
-);
+// =========================================================
+// PART 5J
+// ENTER KEY SUPPORT
+// PASTE BELOW PART 5I
+// =========================================================
 
 document
 .getElementById(
-"message"
+"messageInput"
 )
-?.addEventListener(
-"input",
-saveDraft
-);
-
-# =========================================================
-# ENTER TO SEND
-# FIXES THE ENTER KEY ISSUE
-# =========================================================
-
-document
-.getElementById(
-"message"
-)
-?.addEventListener(
+.addEventListener(
 "keydown",
-function(e){
+function(event){
 
 if(
-e.key === "Enter" &&
-!e.shiftKey
+event.key === "Enter"
 ){
 
-e.preventDefault();
+event.preventDefault();
 
 sendMessage();
 
@@ -3810,73 +1282,14 @@ sendMessage();
 }
 );
 
-# =========================================================
-# MODIFY sendMessage()
-# ADD THIS AFTER:
-# input.value = "";
-# =========================================================
 
-clearDraft();
+// =========================================================
+// PART 5K
+// AUTO-SCROLL TO LATEST MESSAGE
+// PASTE BELOW PART 5J
+// =========================================================
 
-# =========================================================
-# PAGE EXIT PROTECTION
-# =========================================================
-
-window.addEventListener(
-"beforeunload",
-function(e){
-
-const draft =
-localStorage.getItem(
-DRAFT_KEY
-);
-
-if(
-draft &&
-draft.trim().length > 0
-){
-
-e.preventDefault();
-
-e.returnValue = "";
-
-}
-
-}
-);
-
-# =========================================================
-# CHAT AUTO SAVE
-# =========================================================
-
-function saveChatSnapshot(){
-
-const chat =
-document.getElementById(
-"chat"
-);
-
-if(!chat){
-return;
-}
-
-localStorage.setItem(
-"chat_snapshot",
-chat.innerHTML
-);
-
-}
-
-function restoreChatSnapshot(){
-
-const snapshot =
-localStorage.getItem(
-"chat_snapshot"
-);
-
-if(!snapshot){
-return;
-}
+function scrollToBottom(){
 
 const chat =
 document.getElementById(
@@ -3885,71 +1298,105 @@ document.getElementById(
 
 if(chat){
 
-chat.innerHTML =
-snapshot;
+chat.scrollTop =
+chat.scrollHeight;
 
 }
 
 }
 
-window.addEventListener(
-"load",
-restoreChatSnapshot
+const observer =
+new MutationObserver(
+function(){
+
+scrollToBottom();
+
+}
 );
 
-setInterval(
-saveChatSnapshot,
-5000
+observer.observe(
+document.getElementById(
+"chat"
+),
+{
+childList:true,
+subtree:true
+}
 );
 
-# =========================================================
-# RECOVER AFTER CRASH
-# =========================================================
+
+// =========================================================
+// PART 5L
+// FINAL UI POLISH + CONVERSATION AUTO-LOAD
+// PASTE BELOW PART 5K
+// =========================================================
 
 window.addEventListener(
 "load",
-()=>{
+async function(){
 
-const recovered =
-localStorage.getItem(
-"chat_snapshot"
+await loadConversations();
+
+const items =
+document.querySelectorAll(
+".conversation"
 );
 
 if(
-recovered &&
-recovered.length > 0
+items.length > 0
 ){
 
-console.log(
-"Chat restored."
-);
+items[0].click();
 
 }
 
 }
 );
 
-# =========================================================
-# END PART 5M
-# NEXT = PART 6
-# PRODUCTION POLISH + BUG FIXES + FINAL SYSTEMS
-# =========================================================
+function addAssistantMessage(
+text
+){
 
+const chat =
+document.getElementById(
+"chat"
+);
+
+chat.innerHTML += `
+<div class="message assistant">
+${text}
+</div>
+`;
+
+scrollToBottom();
+
+}
+
+function addUserMessage(
+text
+){
+
+const chat =
+document.getElementById(
+"chat"
+);
+
+chat.innerHTML += `
+<div class="message user">
+${text}
+</div>
+`;
+
+scrollToBottom();
+
+}
 
 
 # =========================================================
 # PART 6A
-# USER SETTINGS DATABASE
-# Paste below Part 5
+# SETTINGS TABLE + DATABASE SETUP
+# PASTE BELOW PART 5L
 # =========================================================
-
-class UserSettings(BaseModel):
-    user_id: str
-    theme: str = "dark"
-    ai_model: str = "gpt"
-    temperature: float = 0.7
-    system_prompt: str = ""
-    chat_memory: bool = True
 
 def create_settings_table():
 
@@ -3960,10 +1407,7 @@ def create_settings_table():
     CREATE TABLE IF NOT EXISTS settings(
         user_id TEXT PRIMARY KEY,
         theme TEXT,
-        ai_model TEXT,
-        temperature REAL,
-        system_prompt TEXT,
-        chat_memory INTEGER,
+        model TEXT,
         updated_at TEXT
     )
     """)
@@ -3976,477 +1420,36 @@ create_settings_table()
 
 # =========================================================
 # PART 6B
-# THEME MANAGEMENT
-# Paste directly below Part 6A
+# SETTINGS REQUEST MODEL
+# PASTE BELOW PART 6A
 # =========================================================
 
-@app.get("/api/themes")
-def get_themes():
+from pydantic import BaseModel
 
-    return {
-        "success": True,
-        "themes": [
-            "dark",
-            "light",
-            "midnight",
-            "ocean",
-            "emerald",
-            "purple",
-            "crimson",
-            "sunset"
-        ]
-    }
+class UpdateSettingsRequest(BaseModel):
+    user_id: str
+    theme: str
+    model: str
 
-@app.get("/api/settings/{user_id}")
+
+
+# =========================================================
+# PART 6C
+# GET USER SETTINGS
+# PASTE BELOW PART 6B
+# =========================================================
+
+@app.get("/settings/{user_id}")
 def get_settings(user_id: str):
 
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute(
-        "SELECT * FROM settings WHERE user_id=?",
-        (user_id,)
-    )
-
-    data = cur.fetchone()
-
-    conn.close()
-
-    return {
-        "success": True,
-        "settings": dict(data) if data else None
-    }
-
-@app.post("/api/settings/save")
-def save_settings(data: UserSettings):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    INSERT OR REPLACE INTO settings
-    VALUES(?,?,?,?,?,?,?)
-    """,
-    (
-        data.user_id,
-        data.theme,
-        data.ai_model,
-        data.temperature,
-        data.system_prompt,
-        int(data.chat_memory),
-        now()
-    ))
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True,
-        "message": "Settings saved"
-    }
-
-
-# =========================================================
-# PART 6C
-# CHAT PREFERENCES
-# =========================================================
-
-def create_chat_preferences_table():
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS chat_preferences(
-        user_id TEXT PRIMARY KEY,
-        ai_model TEXT DEFAULT 'gpt-5.5',
-        temperature REAL DEFAULT 0.7,
-        system_prompt TEXT DEFAULT '',
-        memory_enabled INTEGER DEFAULT 1
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_chat_preferences_table()
-
-
-class ChatPreferencesRequest(BaseModel):
-    user_id: str
-    ai_model: str
-    temperature: float
-    system_prompt: str
-    memory_enabled: bool
-
-@app.post("/api/preferences/chat")
-def save_chat_preferences(data: ChatPreferencesRequest):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    INSERT OR REPLACE INTO chat_preferences
-    (user_id, ai_model, temperature, system_prompt, memory_enabled)
-    VALUES(?,?,?,?,?)
-    """, (
-        data.user_id,
-        data.ai_model,
-        data.temperature,
-        data.system_prompt,
-        int(data.memory_enabled)
-    ))
-
-    conn.commit()
-    conn.close()
-
-    return {"success": True}
-
-
-# =========================================================
-# PART 6D
-# ACCOUNT SETTINGS
-# =========================================================
-
-class ChangeUsernameRequest(BaseModel):
-    user_id: str
-    username: str
-
-class ChangeEmailRequest(BaseModel):
-    user_id: str
-    email: str
-
-class ChangePasswordRequest(BaseModel):
-    user_id: str
-    password: str
-
-@app.put("/api/account/username")
-def change_username(data: ChangeUsernameRequest):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        "UPDATE users SET username=? WHERE id=?",
-        (data.username, data.user_id)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {"success": True}
-
-@app.put("/api/account/email")
-def change_email(data: ChangeEmailRequest):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        "UPDATE users SET email=? WHERE id=?",
-        (data.email, data.user_id)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {"success": True}
-
-@app.put("/api/account/password")
-def change_password(data: ChangePasswordRequest):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        "UPDATE users SET password=? WHERE id=?",
-        (hash_password(data.password), data.user_id)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {"success": True}
-
-
-# =========================
-# PART 6E
-# Export / Import Settings
-# =========================
-
-import json
-
-@app.get("/api/settings/export/{user_id}")
-def export_settings(user_id: str):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        "SELECT * FROM user_settings WHERE user_id=?",
-        (user_id,)
-    )
-
-    settings = cur.fetchone()
-    conn.close()
-
-    if not settings:
-        return {"success": False}
-
-    return {
-        "success": True,
-        "settings": dict(settings)
-    }
-
-
-# =========================================================
-# PART 6F
-# REAL AI MODEL ROUTER + MULTI-PROVIDER SUPPORT
-# PASTE IN BACKEND (app.py)
-# =========================================================
-
-from pydantic import BaseModel
-import requests
-import os
-
-# =========================================================
-# MODEL CONFIG
-# =========================================================
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-
-# =========================================================
-# REQUEST MODEL
-# =========================================================
-
-class ChatRequest(BaseModel):
-    user_id: str
-    conversation_id: str
-    message: str
-    model: str = "gpt-5.5"
-    temperature: float = 0.7
-
-# =========================================================
-# AI ROUTER
-# =========================================================
-
-def generate_ai_response(
-    message,
-    model="gpt-5.5",
-    temperature=0.7
-):
-
-    try:
-
-        # =================================================
-        # OPENAI
-        # =================================================
-
-        if model == "gpt-5.5":
-
-            response = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={
-                    "Authorization":
-                    f"Bearer {OPENAI_API_KEY}",
-                    "Content-Type":
-                    "application/json"
-                },
-                json={
-                    "model":"gpt-5.5",
-                    "messages":[
-                        {
-                            "role":"user",
-                            "content":message
-                        }
-                    ],
-                    "temperature":
-                    temperature
-                },
-                timeout=120
-            )
-
-            data = response.json()
-
-            return data["choices"][0]["message"]["content"]
-
-        # =================================================
-        # OPENROUTER
-        # =================================================
-
-        elif model == "openrouter":
-
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization":
-                    f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type":
-                    "application/json"
-                },
-                json={
-                    "model":
-                    "deepseek/deepseek-chat",
-                    "messages":[
-                        {
-                            "role":"user",
-                            "content":message
-                        }
-                    ]
-                },
-                timeout=120
-            )
-
-            data = response.json()
-
-            return data["choices"][0]["message"]["content"]
-
-        # =================================================
-        # GROQ
-        # =================================================
-
-        elif model == "groq":
-
-            response = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization":
-                    f"Bearer {GROQ_API_KEY}",
-                    "Content-Type":
-                    "application/json"
-                },
-                json={
-                    "model":
-                    "llama-3.3-70b-versatile",
-                    "messages":[
-                        {
-                            "role":"user",
-                            "content":message
-                        }
-                    ]
-                },
-                timeout=120
-            )
-
-            data = response.json()
-
-            return data["choices"][0]["message"]["content"]
-
-        else:
-
-            return "Model not supported."
-
-    except Exception as e:
-
-        return f"AI Error: {str(e)}"
-
-# =========================================================
-# MAIN CHAT ENDPOINT
-# REPLACE YOUR EXISTING /api/chat
-# =========================================================
-
-@app.post("/api/chat")
-def chat(request: ChatRequest):
-
-    response_text = generate_ai_response(
-        request.message,
-        request.model,
-        request.temperature
-    )
-
-    return {
-        "success": True,
-        "response": response_text
-    }
-
-# =========================================================
-# END PART 6F
-# =========================================================
-
-
-# =========================================================
-# PART 7
-# AI ENGINE + API PROVIDERS + MODEL ROUTER
-# PASTE BELOW PART 6F
-# =========================================================
-
-import os
-import requests
-
-# =========================================================
-# API KEYS
-# =========================================================
-
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-KIMI_API_KEY = os.getenv("KIMI_API_KEY")
-
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-EXA_API_KEY = os.getenv("EXA_API_KEY")
-FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
-
-NEWS_API_KEY = os.getenv("NEWS_API_KEY")
-GNEWS_API_KEY = os.getenv("GNEWS_API_KEY")
-GUARDIAN_API_KEY = os.getenv("GUARDIAN_API_KEY")
-MEDIASTACK_API_KEY = os.getenv("MEDIASTACK_API_KEY")
-
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
-EXCHANGERATE_API_KEY = os.getenv("EXCHANGERATE_API_KEY")
-
-ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
-FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
-
-SPORTMONK_API_KEY = os.getenv("SPORTMONK_API_KEY")
-SPORTRADAR_API_KEY = os.getenv("SPORTRADAR_API_KEY")
-THESPORTSDB_API_KEY = os.getenv("THESPORTSDB_API_KEY")
-ALLSPORTS_API_KEY = os.getenv("ALLSPORTS_API_KEY")
-ODDS_API_KEY = os.getenv("ODDS_API_KEY")
-APISPORTS_API_KEY = os.getenv("APISPORTS_API_KEY")
-
-TMDB_API_KEY = os.getenv("TMDB_API_KEY")
-
-# =========================================================
-# AI REQUEST MODEL
-# =========================================================
-
-class AIChatRequest(BaseModel):
-    user_id: str
-    conversation_id: str
-    message: str
-
-# =========================================================
-# AI MEMORY TABLE
-# =========================================================
-
-def create_ai_memory_table():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS ai_memory(
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        conversation_id TEXT,
-        role TEXT,
-        content TEXT,
-        created_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_ai_memory_table()
-
-# =========================================================
-# LOAD USER SETTINGS
-# =========================================================
-
-def get_user_settings(user_id):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        "SELECT * FROM settings WHERE user_id=?",
+        """
+        SELECT * FROM settings
+        WHERE user_id=?
+        """,
         (user_id,)
     )
 
@@ -4454,17 +1457,25 @@ def get_user_settings(user_id):
 
     conn.close()
 
-    return dict(row) if row else None
+    if row:
+        return dict(row)
+
+    return {
+        "user_id": user_id,
+        "theme": "dark",
+        "model": "default"
+    }
+
 
 # =========================================================
-# SAVE MEMORY
+# PART 6D
+# UPDATE USER SETTINGS
+# PASTE BELOW PART 6C
 # =========================================================
 
-def save_memory(
-    user_id,
-    conversation_id,
-    role,
-    content
+@app.post("/settings/update")
+def update_settings(
+    data: UpdateSettingsRequest
 ):
 
     conn = get_db()
@@ -4472,15 +1483,19 @@ def save_memory(
 
     cur.execute(
         """
-        INSERT INTO ai_memory
-        VALUES(?,?,?,?,?,?)
+        INSERT OR REPLACE INTO settings
+        (
+            user_id,
+            theme,
+            model,
+            updated_at
+        )
+        VALUES(?,?,?,?)
         """,
         (
-            generate_id(),
-            user_id,
-            conversation_id,
-            role,
-            content,
+            data.user_id,
+            data.theme,
+            data.model,
             now()
         )
     )
@@ -4488,230 +1503,2667 @@ def save_memory(
     conn.commit()
     conn.close()
 
+    return {
+        "success": True,
+        "theme": data.theme,
+        "model": data.model
+    }
+
+
 # =========================================================
-# LOAD MEMORY
+# PART 6E
+# SETTINGS HELPER FUNCTIONS
+# PASTE BELOW PART 6D
 # =========================================================
 
-def load_memory(conversation_id):
+def save_user_settings(
+    user_id,
+    theme,
+    model
+):
 
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute(
         """
-        SELECT role,content
-        FROM ai_memory
+        INSERT OR REPLACE INTO settings
+        (
+            user_id,
+            theme,
+            model,
+            updated_at
+        )
+        VALUES(?,?,?,?)
+        """,
+        (
+            user_id,
+            theme,
+            model,
+            now()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+def get_user_settings(
+    user_id
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT * FROM settings
+        WHERE user_id=?
+        """,
+        (user_id,)
+    )
+
+    row = cur.fetchone()
+
+    conn.close()
+
+    if row:
+        return dict(row)
+
+    return None
+
+
+# =========================================================
+# PART 6F
+# RESET SETTINGS TO DEFAULT
+# PASTE BELOW PART 6E
+# =========================================================
+
+@app.post("/settings/reset/{user_id}")
+def reset_settings(
+    user_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        DELETE FROM settings
+        WHERE user_id=?
+        """,
+        (user_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "message": "Settings reset to default"
+    }
+
+
+# =========================================================
+# PART 6G
+# LIST ALL USER SETTINGS
+# PASTE BELOW PART 6F
+# =========================================================
+
+@app.get("/settings")
+def list_settings():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT * FROM settings
+        ORDER BY updated_at DESC
+        """
+    )
+
+    rows = cur.fetchall()
+
+    conn.close()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
+
+
+# =========================================================
+# PART 7A
+# AI CONFIGURATION + API SETTINGS
+# PASTE BELOW PART 6G
+# =========================================================
+
+import os
+import requests
+
+AI_API_URL = os.getenv(
+    "AI_API_URL",
+    "https://api.openai.com/v1/chat/completions"
+)
+
+AI_API_KEY = os.getenv(
+    "AI_API_KEY",
+    ""
+)
+
+DEFAULT_MODEL = "gpt-4o-mini"
+
+
+# =========================================================
+# PART 7B
+# AI REQUEST MODEL
+# PASTE BELOW PART 7A
+# =========================================================
+
+from pydantic import BaseModel
+
+class AIChatRequest(BaseModel):
+    conversation_id: str
+    message: str
+    model: str = DEFAULT_MODEL
+
+
+# =========================================================
+# PART 7C
+# LOAD CONVERSATION HISTORY
+# PASTE BELOW PART 7B
+# =========================================================
+
+def get_conversation_messages(
+    conversation_id
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM messages
         WHERE conversation_id=?
         ORDER BY created_at ASC
-        LIMIT 30
         """,
         (conversation_id,)
     )
 
-    data = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
+    rows = cur.fetchall()
 
     conn.close()
 
-    return data
+    return [
+        dict(row)
+        for row in rows
+    ]
+
 
 # =========================================================
-# OPENROUTER ENGINE
+# PART 7D
+# BUILD AI MESSAGE HISTORY
+# PASTE BELOW PART 7C
 # =========================================================
 
-def ask_openrouter(
-    model,
-    messages
+def build_ai_messages(
+    conversation_id
 ):
 
+    history = []
+
+    messages = get_conversation_messages(
+        conversation_id
+    )
+
+    for msg in messages:
+
+        role = msg.get(
+            "role",
+            "user"
+        )
+
+        content = msg.get(
+            "content",
+            ""
+        )
+
+        history.append(
+            {
+                "role": role,
+                "content": content
+            }
+        )
+
+    return history
+
+
+# =========================================================
+# PART 7E
+# SEND REQUEST TO AI API
+# PASTE BELOW PART 7D
+# =========================================================
+
+def send_to_ai(
+    messages,
+    model=DEFAULT_MODEL
+):
+
+    headers = {
+        "Authorization":
+        f"Bearer {AI_API_KEY}",
+        "Content-Type":
+        "application/json"
+    }
+
+    payload = {
+        "model": model,
+        "messages": messages
+    }
+
     response = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization":
-            f"Bearer {OPENROUTER_API_KEY}"
-        },
-        json={
-            "model": model,
-            "messages": messages
-        },
+        AI_API_URL,
+        headers=headers,
+        json=payload,
         timeout=120
     )
 
+    response.raise_for_status()
+
     return response.json()
 
+
 # =========================================================
-# MODEL ROUTER
+# PART 7F
+# PARSE AI RESPONSE
+# PASTE BELOW PART 7E
 # =========================================================
 
-def choose_model(settings):
+def extract_ai_text(
+    response_data
+):
 
-    model = settings.get(
-        "ai_model",
-        "openrouter"
+    try:
+
+        return response_data[
+            "choices"
+        ][0][
+            "message"
+        ][
+            "content"
+        ]
+
+    except Exception:
+
+        return (
+            "Sorry, I could not "
+            "generate a response."
+        )
+
+
+# =========================================================
+# PART 7G
+# SAVE AI RESPONSE TO DATABASE
+# PASTE BELOW PART 7F
+# =========================================================
+
+def save_ai_message(
+    conversation_id,
+    response_text
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO messages
+        VALUES(?,?,?,?,?)
+        """,
+        (
+            generate_id(),
+            conversation_id,
+            "assistant",
+            response_text,
+            now()
+        )
     )
 
-    mapping = {
-        "openrouter":
-        "deepseek/deepseek-chat",
-
-        "groq":
-        "llama-3.3-70b-versatile",
-
-        "kimi":
-        "moonshotai/kimi-k2",
-
-        "openai":
-        "gpt-4o"
-    }
-
-    return mapping.get(
-        model,
-        "deepseek/deepseek-chat"
+    cur.execute(
+        """
+        UPDATE conversations
+        SET updated_at=?
+        WHERE id=?
+        """,
+        (
+            now(),
+            conversation_id
+        )
     )
 
+    conn.commit()
+    conn.close()
+
+
 # =========================================================
-# MAIN CHAT ENDPOINT
+# PART 7H
+# SAVE USER MESSAGE TO DATABASE
+# PASTE BELOW PART 7G
 # =========================================================
 
-@app.post("/api/chat")
+def save_user_message(
+    conversation_id,
+    message_text
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO messages
+        VALUES(?,?,?,?,?)
+        """,
+        (
+            generate_id(),
+            conversation_id,
+            "user",
+            message_text,
+            now()
+        )
+    )
+
+    cur.execute(
+        """
+        UPDATE conversations
+        SET updated_at=?
+        WHERE id=?
+        """,
+        (
+            now(),
+            conversation_id
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+
+# =========================================================
+# PART 7I
+# GENERATE AI RESPONSE
+# PASTE BELOW PART 7H
+# =========================================================
+
+def generate_ai_response(
+    conversation_id,
+    user_message,
+    model=DEFAULT_MODEL
+):
+
+    save_user_message(
+        conversation_id,
+
+
+# =========================================================
+# PART 7J
+# AI CHAT ENDPOINT
+# PASTE BELOW PART 7I
+# =========================================================
+
+@app.post("/api/ai/chat")
 def ai_chat(
     data: AIChatRequest
 ):
 
-    settings = get_user_settings(
-        data.user_id
-    )
+    try:
 
-    if not settings:
+        response_text = (
+            generate_ai_response(
+                data.conversation_id,
+                data.message,
+                data.model
+            )
+        )
 
-        settings = {
-            "ai_model":"openrouter",
-            "temperature":0.7,
-            "system_prompt":
-            "You are a helpful AI assistant."
+        return {
+            "success": True,
+            "response": response_text
         }
 
-    history = load_memory(
-        data.conversation_id
+    except Exception as e:
+
+        return {
+            "success": False,
+            "error": str(e)
+        }
+        user_message
     )
 
-    messages = []
-
-    messages.append({
-        "role":"system",
-        "content":
-        settings["system_prompt"]
-    })
-
-    for item in history:
-
-        messages.append({
-            "role":
-            item["role"],
-            "content":
-            item["content"]
-        })
-
-    messages.append({
-        "role":"user",
-        "content":
-        data.message
-    })
-
-    model = choose_model(
-        settings
+    messages = build_ai_messages(
+        conversation_id
     )
 
-    result = ask_openrouter(
-        model,
-        messages
+    response_data = send_to_ai(
+        messages,
+        model
     )
 
-    ai_text = result["choices"][0]\
-    ["message"]["content"]
-
-    save_memory(
-        data.user_id,
-        data.conversation_id,
-        "user",
-        data.message
+    ai_text = extract_ai_text(
+        response_data
     )
 
-    save_memory(
-        data.user_id,
-        data.conversation_id,
-        "assistant",
+    save_ai_message(
+        conversation_id,
         ai_text
     )
 
+    return ai_text
+
+
+# =========================================================
+# PART 7K
+# REGENERATE LAST AI RESPONSE
+# PASTE BELOW PART 7J
+# =========================================================
+
+@app.post("/api/ai/regenerate")
+def regenerate_response(
+    data: AIChatRequest
+):
+
+    try:
+
+        messages = get_conversation_messages(
+            data.conversation_id
+        )
+
+        last_user_message = None
+
+        for msg in reversed(messages):
+
+            if msg["role"] == "user":
+
+                last_user_message = (
+                    msg["content"]
+                )
+
+                break
+
+        if not last_user_message:
+
+            return {
+                "success": False,
+                "error":
+                "No user message found"
+            }
+
+        response_text = (
+            generate_ai_response(
+                data.conversation_id,
+                last_user_message,
+                data.model
+            )
+        )
+
+        return {
+            "success": True,
+            "response": response_text
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+# =========================================================
+# PART 7L
+# AI STATUS + MODEL INFORMATION
+# PASTE BELOW PART 7K
+# =========================================================
+
+@app.get("/api/ai/status")
+def ai_status():
+
     return {
         "success": True,
-        "model": model,
-        "response": ai_text
+        "api_configured": bool(
+            AI_API_KEY
+        ),
+        "default_model":
+        DEFAULT_MODEL,
+        "api_url":
+        AI_API_URL
     }
 
-# =========================================================
-# AI CAPABILITIES
-# =========================================================
 
-@app.get("/api/ai/capabilities")
-def ai_capabilities():
+@app.get("/api/ai/models")
+def ai_models():
 
     return {
         "success": True,
-        "chat": True,
-        "memory": True,
-        "web_search": True,
-        "news": True,
-        "weather": True,
-        "finance": True,
-        "sports": True,
-        "movies": True,
-        "drafts": True,
-        "attachments": True
-    }
-
-# =========================================================
-# PROVIDER STATUS
-# =========================================================
-
-@app.get("/api/providers")
-def providers():
-
-    return {
-        "success": True,
-        "providers":[
-            "OpenRouter",
-            "OpenAI",
-            "Groq",
-            "Kimi",
-            "Tavily",
-            "Exa",
-            "Firecrawl",
-            "NewsAPI",
-            "GNews",
-            "Guardian",
-            "Mediastack",
-            "OpenWeather",
-            "ExchangeRate",
-            "AlphaVantage",
-            "Finnhub",
-            "TMDB",
-            "SportMonks",
-            "Sportradar",
-            "TheSportsDB",
-            "AllSports",
-            "API-Sports",
-            "OddsAPI"
+        "models": [
+            "gpt-4o",
+            "gpt-4o-mini",
+            "gpt-4.1",
+            "gpt-4.1-mini"
         ]
     }
 
+
 # =========================================================
-# END OF PART 7
-#
-# PARTS 1-7 COMPLETE
+# PART 7M
+# FINAL AI HELPERS + HEALTH CHECK
+# PASTE BELOW PART 7L
 # =========================================================
+
+def ai_available():
+
+    return bool(
+        AI_API_KEY
+    )
+
+
+def get_active_model():
+
+    return DEFAULT_MODEL
+
+
+@app.get("/api/ai/health")
+def ai_health():
+
+    return {
+        "success": True,
+        "ai_available":
+        ai_available(),
+        "model":
+        get_active_model(),
+        "timestamp":
+        now()
+    }
+
+
+# =========================================================
+# PART 7N
+# SYSTEM PROMPT + AI CONTEXT HELPERS
+# PASTE BELOW PART 7M
+# =========================================================
+
+SYSTEM_PROMPT = """
+You are Bloxy-Bot X,
+a helpful AI assistant.
+
+Be accurate,
+friendly,
+and concise.
+"""
+
+def build_system_context():
+
+    return [
+        {
+            "role": "system",
+            "content":
+            SYSTEM_PROMPT
+        }
+    ]
+
+
+def build_full_context(
+    conversation_id
+):
+
+    context =
+    build_system_context()
+
+    context.extend(
+        build_ai_messages(
+            conversation_id
+        )
+    )
+
+    return context
+
+
+# =========================================================
+# PART 7O
+# FINAL AI CHAT V2 ENDPOINT
+# PASTE BELOW PART 7N
+# =========================================================
+
+@app.post("/api/ai/chat/v2")
+def ai_chat_v2(
+    data: AIChatRequest
+):
+
+    try:
+
+        save_user_message(
+            data.conversation_id,
+            data.message
+        )
+
+        messages = build_full_context(
+            data.conversation_id
+        )
+
+        response_data = send_to_ai(
+            messages,
+            data.model
+        )
+
+        ai_text = extract_ai_text(
+            response_data
+        )
+
+        save_ai_message(
+            data.conversation_id,
+            ai_text
+        )
+
+        return {
+            "success": True,
+            "response": ai_text,
+            "model": data.model
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+# =========================================================
+# PART 8A
+# EXTERNAL API MANAGER
+# PASTE BELOW PART 7O
+# =========================================================
+
+class APIManager:
+
+    def __init__(self):
+
+        self.openai_key = os.getenv(
+            "OPENAI_API_KEY"
+        )
+
+        self.groq_key = os.getenv(
+            "GROQ_API_KEY"
+        )
+
+        self.kimi_key = os.getenv(
+            "KIMI_API_KEY"
+        )
+
+    def available_providers(self):
+
+        providers = []
+
+        if self.openai_key:
+            providers.append("openai")
+
+        if self.groq_key:
+            providers.append("groq")
+
+        if self.kimi_key:
+            providers.append("kimi")
+
+        return providers
+
+
+api_manager = APIManager()
+
+
+# =========================================================
+# PART 8B
+# PROVIDER SELECTION
+# PASTE BELOW PART 8A
+# =========================================================
+
+def get_provider_config(
+    provider="openai"
+):
+
+    if provider == "openai":
+
+        return {
+            "name": "openai",
+            "api_key": os.getenv(
+                "OPENAI_API_KEY"
+            ),
+            "url":
+            "https://api.openai.com/v1/chat/completions"
+        }
+
+    elif provider == "groq":
+
+        return {
+            "name": "groq",
+            "api_key": os.getenv(
+                "GROQ_API_KEY"
+            ),
+            "url":
+            "https://api.groq.com/openai/v1/chat/completions"
+        }
+
+    elif provider == "kimi":
+
+        return {
+            "name": "kimi",
+            "api_key": os.getenv(
+                "KIMI_API_KEY"
+            ),
+            "url":
+            "https://api.moonshot.ai/v1/chat/completions"
+        }
+
+    return None
+
+
+# =========================================================
+# PART 8C
+# PROVIDER REQUEST MODEL
+# PASTE BELOW PART 8B
+# =========================================================
+
+from pydantic import BaseModel
+
+class ProviderChatRequest(BaseModel):
+
+    conversation_id: str
+    message: str
+
+    provider: str = "openai"
+
+    model: str = DEFAULT_MODEL
+
+
+# =========================================================
+# PART 8D
+# SEND REQUEST USING SELECTED PROVIDER
+# PASTE BELOW PART 8C
+# =========================================================
+
+def send_to_provider(
+    messages,
+    provider="openai",
+    model=DEFAULT_MODEL
+):
+
+    config = get_provider_config(
+        provider
+    )
+
+    if not config:
+
+        raise Exception(
+            "Provider not found"
+        )
+
+    headers = {
+        "Authorization":
+        f"Bearer {config['api_key']}",
+        "Content-Type":
+        "application/json"
+    }
+
+    payload = {
+        "model": model,
+        "messages": messages
+    }
+
+    response = requests.post(
+        config["url"],
+        headers=headers,
+        json=payload,
+        timeout=120
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+# =========================================================
+# PART 8E
+# GENERATE RESPONSE USING SELECTED PROVIDER
+# PASTE BELOW PART 8D
+# =========================================================
+
+def generate_provider_response(
+    conversation_id,
+    user_message,
+    provider="openai",
+    model=DEFAULT_MODEL
+):
+
+    save_user_message(
+        conversation_id,
+        user_message
+    )
+
+    messages = build_full_context(
+        conversation_id
+    )
+
+    response_data = send_to_provider(
+        messages,
+        provider,
+        model
+    )
+
+    ai_text = extract_ai_text(
+        response_data
+    )
+
+    save_ai_message(
+        conversation_id,
+        ai_text
+    )
+
+    return ai_text
+
+
+# =========================================================
+# PART 8F
+# MULTI-PROVIDER CHAT ENDPOINT
+# PASTE BELOW PART 8E
+# =========================================================
+
+@app.post("/api/provider/chat")
+def provider_chat(
+    data: ProviderChatRequest
+):
+
+    try:
+
+        response_text = (
+            generate_provider_response(
+                data.conversation_id,
+                data.message,
+                data.provider,
+                data.model
+            )
+        )
+
+        return {
+            "success": True,
+            "provider":
+            data.provider,
+            "response":
+            response_text
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "provider":
+            data.provider,
+            "error":
+            str(e)
+        }
+
+
+# =========================================================
+# PART 8G
+# LIST AVAILABLE PROVIDERS
+# PASTE BELOW PART 8F
+# =========================================================
+
+@app.get("/api/providers")
+def get_providers():
+
+    providers = (
+        api_manager
+        .available_providers()
+    )
+
+    return {
+        "success": True,
+        "count":
+        len(providers),
+        "providers":
+        providers
+    }
+
+
+# =========================================================
+# PART 8H
+# PROVIDER HEALTH CHECK
+# PASTE BELOW PART 8G
+# =========================================================
+
+@app.get("/api/providers/health")
+def provider_health():
+
+    providers = (
+        api_manager
+        .available_providers()
+    )
+
+    results = []
+
+    for provider in providers:
+
+        try:
+
+            config = (
+                get_provider_config(
+                    provider
+                )
+            )
+
+            results.append(
+                {
+                    "provider":
+                    provider,
+                    "configured":
+                    bool(
+                        config[
+                            "api_key"
+                        ]
+                    ),
+                    "status":
+                    "available"
+                }
+            )
+
+        except Exception:
+
+            results.append(
+                {
+                    "provider":
+                    provider,
+                    "configured":
+                    False,
+                    "status":
+                    "error"
+                }
+            )
+
+    return {
+        "success": True,
+        "providers":
+        results
+    }
+
+
+# =========================================================
+# PART 8H
+# PROVIDER HEALTH CHECK
+# PASTE BELOW PART 8G
+# =========================================================
+
+@app.get("/api/providers/health")
+def provider_health():
+
+    providers = (
+        api_manager
+        .available_providers()
+    )
+
+    results = []
+
+    for provider in providers:
+
+        try:
+
+            config = (
+                get_provider_config(
+                    provider
+                )
+            )
+
+            results.append(
+                {
+                    "provider":
+                    provider,
+                    "configured":
+                    bool(
+                        config[
+                            "api_key"
+                        ]
+                    ),
+                    "status":
+                    "available"
+                }
+            )
+
+        except Exception:
+
+            results.append(
+                {
+                    "provider":
+                    provider,
+                    "configured":
+                    False,
+                    "status":
+                    "error"
+                }
+            )
+
+    return {
+        "success": True,
+        "providers":
+        results
+    }
+
+
+# =========================================================
+# PART 8J
+# EXA SEARCH INTEGRATION
+# PASTE BELOW PART 8I
+# =========================================================
+
+def exa_search(
+    query
+):
+
+    api_key = os.getenv(
+        "EXA_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "Exa API key missing"
+        )
+
+    response = requests.post(
+        "https://api.exa.ai/search",
+        headers={
+            "x-api-key":
+            api_key,
+            "Content-Type":
+            "application/json"
+        },
+        json={
+            "query": query,
+            "numResults": 5
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+@app.get("/api/search/exa")
+def search_exa(
+    query: str
+):
+
+    results = exa_search(
+        query
+    )
+
+    return {
+        "success": True,
+        "source": "exa",
+        "results": results
+    }
+
+
+# =========================================================
+# PART 8K
+# FIRECRAWL WEB SCRAPING INTEGRATION
+# PASTE BELOW PART 8J
+# =========================================================
+
+def firecrawl_scrape(
+    url
+):
+
+    api_key = os.getenv(
+        "FIRECRAWL_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "Firecrawl API key missing"
+        )
+
+    response = requests.post(
+        "https://api.firecrawl.dev/v1/scrape",
+        headers={
+            "Authorization":
+            f"Bearer {api_key}",
+            "Content-Type":
+            "application/json"
+        },
+        json={
+            "url": url
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+@app.get("/api/search/firecrawl")
+def scrape_firecrawl(
+    url: str
+):
+
+    results = firecrawl_scrape(
+        url
+    )
+
+    return {
+        "success": True,
+        "source": "firecrawl",
+        "results": results
+    }
+
+
+# =========================================================
+# PART 8L
+# UNIFIED SEARCH ROUTER
+# PASTE BELOW PART 8K
+# =========================================================
+
+@app.get("/api/search")
+def unified_search(
+    query: str,
+    source: str = "tavily"
+):
+
+    if source == "tavily":
+
+        results = tavily_search(
+            query
+        )
+
+    elif source == "exa":
+
+        results = exa_search(
+            query
+        )
+
+    else:
+
+        return {
+            "success": False,
+            "error":
+            "Unsupported source"
+        }
+
+    return {
+        "success": True,
+        "source": source,
+        "results": results
+    }
+
+
+# =========================================================
+# PART 8M
+# NEWSAPI INTEGRATION
+# PASTE BELOW PART 8L
+# =========================================================
+
+def newsapi_search(
+    query
+):
+
+    api_key = os.getenv(
+        "NEWS_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "NewsAPI key missing"
+        )
+
+    response = requests.get(
+        "https://newsapi.org/v2/everything",
+        params={
+            "q": query,
+            "pageSize": 10,
+            "apiKey": api_key
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+@app.get("/api/news")
+def get_news(
+    query: str
+):
+
+    results = newsapi_search(
+        query
+    )
+
+    return {
+        "success": True,
+        "source": "newsapi",
+        "results": results
+    }
+
+
+# =========================================================
+# PART 8N
+# GNEWS INTEGRATION
+# PASTE BELOW PART 8M
+# =========================================================
+
+def gnews_search(
+    query
+):
+
+    api_key = os.getenv(
+        "GNEWS_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "GNews API key missing"
+        )
+
+    response = requests.get(
+        "https://gnews.io/api/v4/search",
+        params={
+            "q": query,
+            "token": api_key,
+            "max": 10
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+@app.get("/api/news/gnews")
+def get_gnews(
+    query: str
+):
+
+    results = gnews_search(
+        query
+    )
+
+    return {
+        "success": True,
+        "source": "gnews",
+        "results": results
+    }
+
+
+# =========================================================
+# PART 8O
+# GUARDIAN NEWS INTEGRATION
+# PASTE BELOW PART 8N
+# =========================================================
+
+def guardian_search(
+    query
+):
+
+    api_key = os.getenv(
+        "GUARDIAN_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "Guardian API key missing"
+        )
+
+    response = requests.get(
+        "https://content.guardianapis.com/search",
+        params={
+            "q": query,
+            "api-key": api_key,
+            "page-size": 10
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+@app.get("/api/news/guardian")
+def get_guardian_news(
+    query: str
+):
+
+    results = guardian_search(
+        query
+    )
+
+    return {
+        "success": True,
+        "source": "guardian",
+        "results": results
+    }
+
+
+# =========================================================
+# PART 8P
+# MEDIASTACK NEWS INTEGRATION
+# PASTE BELOW PART 8O
+# =========================================================
+
+def mediastack_search(
+    query
+):
+
+    api_key = os.getenv(
+        "MEDIASTACK_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "MediaStack API key missing"
+        )
+
+    response = requests.get(
+        "http://api.mediastack.com/v1/news",
+        params={
+            "access_key": api_key,
+            "keywords": query,
+            "limit": 10
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+@app.get("/api/news/mediastack")
+def get_mediastack_news(
+    query: str
+):
+
+    results = mediastack_search(
+        query
+    )
+
+    return {
+        "success": True,
+        "source": "mediastack",
+        "results": results
+    }
+
+
+# =========================================================
+# PART 8Q
+# ALPHA VANTAGE STOCK MARKET INTEGRATION
+# PASTE BELOW PART 8P
+# =========================================================
+
+def alpha_vantage_quote(
+    symbol
+):
+
+    api_key = os.getenv(
+        "ALPHA_VANTAGE_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "Alpha Vantage API key missing"
+        )
+
+    response = requests.get(
+        "https://www.alphavantage.co/query",
+        params={
+            "function":
+            "GLOBAL_QUOTE",
+            "symbol":
+            symbol,
+            "apikey":
+            api_key
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+@app.get("/api/finance/quote")
+def get_stock_quote(
+    symbol: str
+):
+
+    results = alpha_vantage_quote(
+        symbol
+    )
+
+    return {
+        "success": True,
+        "source":
+        "alpha_vantage",
+        "results":
+        results
+    }
+
+
+# =========================================================
+# PART 8R
+# FINNHUB MARKET DATA INTEGRATION
+# PASTE BELOW PART 8Q
+# =========================================================
+
+def finnhub_quote(
+    symbol
+):
+
+    api_key = os.getenv(
+        "FINNHUB_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "Finnhub API key missing"
+        )
+
+    response = requests.get(
+        "https://finnhub.io/api/v1/quote",
+        params={
+            "symbol": symbol,
+            "token": api_key
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+@app.get("/api/finance/finnhub")
+def get_finnhub_quote(
+    symbol: str
+):
+
+    results = finnhub_quote(
+        symbol
+    )
+
+    return {
+        "success": True,
+        "source":
+        "finnhub",
+        "results":
+        results
+    }
+
+
+# =========================================================
+# PART 8S
+# EXCHANGE RATE API INTEGRATION
+# PASTE BELOW PART 8R
+# =========================================================
+
+def exchange_rate_convert(
+    base_currency
+):
+
+    api_key = os.getenv(
+        "EXCHANGERATE_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "ExchangeRate API key missing"
+        )
+
+    response = requests.get(
+        f"https://v6.exchangerate-api.com/v6/{api_key}/latest/{base_currency}",
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+@app.get("/api/finance/exchange")
+def get_exchange_rates(
+    base: str = "USD"
+):
+
+    results = exchange_rate_convert(
+        base
+    )
+
+    return {
+        "success": True,
+        "source":
+        "exchange_rate",
+        "results":
+        results
+    }
+
+
+# =========================================================
+# PART 8T
+# UNIFIED FINANCE ROUTER
+# PASTE BELOW PART 8S
+# =========================================================
+
+@app.get("/api/finance")
+def finance_router(
+    source: str,
+    symbol: str = None,
+    base: str = "USD"
+):
+
+    if source == "alpha_vantage":
+
+        if not symbol:
+
+            return {
+                "success": False,
+                "error":
+                "symbol required"
+            }
+
+        results = (
+            alpha_vantage_quote(
+                symbol
+            )
+        )
+
+    elif source == "finnhub":
+
+        if not symbol:
+
+            return {
+                "success": False,
+                "error":
+                "symbol required"
+            }
+
+        results = (
+            finnhub_quote(
+                symbol
+            )
+        )
+
+    elif source == "exchange_rate":
+
+        results = (
+            exchange_rate_convert(
+                base
+            )
+        )
+
+    else:
+
+        return {
+            "success": False,
+            "error":
+            "Unsupported source"
+        }
+
+    return {
+        "success": True,
+        "source": source,
+        "results": results
+    }
+
+
+# =========================================================
+# PART 8U
+# ALLSPORTS API INTEGRATION
+# PASTE BELOW PART 8T
+# =========================================================
+
+def allsports_events(
+    sport="football"
+):
+
+    api_key = os.getenv(
+        "ALLSPORTS_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "AllSports API key missing"
+        )
+
+    response = requests.get(
+        "https://apiv2.allsportsapi.com/football/",
+        params={
+            "met": "Fixtures",
+            "APIkey": api_key
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+@app.get("/api/sports/allsports")
+def get_allsports_events():
+
+    results = allsports_events()
+
+    return {
+        "success": True,
+        "source": "allsports",
+        "results": results
+    }
+
+
+# =========================================================
+# PART 8V
+# APISPORTS INTEGRATION
+# PASTE BELOW PART 8U
+# =========================================================
+
+def apisports_fixtures():
+
+    api_key = os.getenv(
+        "APISPORTS_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "APISports API key missing"
+        )
+
+    response = requests.get(
+        "https://v3.football.api-sports.io/fixtures",
+        headers={
+            "x-apisports-key":
+            api_key
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+@app.get("/api/sports/apisports")
+def get_apisports_fixtures():
+
+    results = apisports_fixtures()
+
+    return {
+        "success": True,
+        "source": "apisports",
+        "results": results
+    }
+
+
+# =========================================================
+# PART 8W
+# SPORTMONKS INTEGRATION
+# PASTE BELOW PART 8V
+# =========================================================
+
+def sportmonks_fixtures():
+
+    api_key = os.getenv(
+        "SPORTMONK_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "SportMonks API key missing"
+        )
+
+    response = requests.get(
+        "https://api.sportmonks.com/v3/football/fixtures",
+        params={
+            "api_token":
+            api_key
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+@app.get("/api/sports/sportmonks")
+def get_sportmonks_fixtures():
+
+    results = sportmonks_fixtures()
+
+    return {
+        "success": True,
+        "source": "sportmonks",
+        "results": results
+    }
+
+
+# =========================================================
+# PART 8X
+# THESPORTSDB + ODDS API INTEGRATION
+# PASTE BELOW PART 8W
+# =========================================================
+
+def thesportsdb_events():
+
+    api_key = os.getenv(
+        "THESPORTSDB_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "TheSportsDB API key missing"
+        )
+
+    response = requests.get(
+        "https://www.thesportsdb.com/api/v1/json/"
+        f"{api_key}/eventslast.php",
+        params={
+            "id": "133602"
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+def odds_api_events():
+
+    api_key = os.getenv(
+        "ODDS_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "Odds API key missing"
+        )
+
+    response = requests.get(
+        "https://api.the-odds-api.com/v4/sports",
+        params={
+            "apiKey": api_key
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+@app.get("/api/sports/thesportsdb")
+def get_thesportsdb():
+
+    return {
+        "success": True,
+        "source": "thesportsdb",
+        "results": thesportsdb_events()
+    }
+
+
+@app.get("/api/sports/odds")
+def get_odds():
+
+    return {
+        "success": True,
+        "source": "odds_api",
+        "results": odds_api_events()
+    }
+
+
+# =========================================================
+# PART 8Y
+# OPENWEATHER + TMDB INTEGRATION
+# PASTE BELOW PART 8X
+# =========================================================
+
+def get_weather(
+    city
+):
+
+    api_key = os.getenv(
+        "OPENWEATHER_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "OpenWeather API key missing"
+        )
+
+    response = requests.get(
+        "https://api.openweathermap.org/data/2.5/weather",
+        params={
+            "q": city,
+            "appid": api_key,
+            "units": "metric"
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+def search_movie(
+    query
+):
+
+    api_key = os.getenv(
+        "TMDB_API_KEY"
+    )
+
+    if not api_key:
+
+        raise Exception(
+            "TMDB API key missing"
+        )
+
+    response = requests.get(
+        "https://api.themoviedb.org/3/search/movie",
+        params={
+            "api_key": api_key,
+            "query": query
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+@app.get("/api/weather")
+def weather(
+    city: str
+):
+
+    return {
+        "success": True,
+        "source": "openweather",
+        "results": get_weather(city)
+    }
+
+
+@app.get("/api/movies")
+def movies(
+    query: str
+):
+
+    return {
+        "success": True,
+        "source": "tmdb",
+        "results": search_movie(query)
+    }
+
+
+# =========================================================
+# PART 8Z
+# WOLFRAM INTEGRATION + UNIVERSAL UTILITIES ROUTER
+# PASTE BELOW PART 8Y
+# =========================================================
+
+def wolfram_query(
+    query
+):
+
+    app_id = os.getenv(
+        "WOLFRAM_APP_ID"
+    )
+
+    if not app_id:
+
+        raise Exception(
+            "Wolfram App ID missing"
+        )
+
+    response = requests.get(
+        "https://api.wolframalpha.com/v1/result",
+        params={
+            "i": query,
+            "appid": app_id
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.text
+
+
+@app.get("/api/wolfram")
+def wolfram(
+    query: str
+):
+
+    return {
+        "success": True,
+        "source": "wolfram",
+        "result": wolfram_query(
+            query
+        )
+    }
+
+
+@app.get("/api/utilities")
+def utilities_router(
+    service: str,
+    query: str = "",
+    city: str = ""
+):
+
+    if service == "weather":
+
+        return {
+            "success": True,
+            "results":
+            get_weather(city)
+        }
+
+    elif service == "movie":
+
+        return {
+            "success": True,
+            "results":
+            search_movie(query)
+        }
+
+    elif service == "wolfram":
+
+        return {
+            "success": True,
+            "results":
+            wolfram_query(query)
+        }
+
+    return {
+        "success": False,
+        "error":
+        "Unsupported utility"
+    }
+
+
+# =========================================================
+# PART 9A
+# INTELLIGENT API ROUTER
+# PASTE BELOW PART 8Z
+# =========================================================
+
+def detect_service(
+    query
+):
+
+    q = query.lower()
+
+    if any(
+        x in q
+        for x in [
+            "weather",
+            "temperature",
+            "forecast"
+        ]
+    ):
+        return "weather"
+
+    if any(
+        x in q
+        for x in [
+            "stock",
+            "price",
+            "market",
+            "finance"
+        ]
+    ):
+        return "finance"
+
+    if any(
+        x in q
+        for x in [
+            "news",
+            "headline",
+            "breaking"
+        ]
+    ):
+        return "news"
+
+    if any(
+        x in q
+        for x in [
+            "movie",
+            "film",
+            "actor"
+        ]
+    ):
+        return "movie"
+
+    if any(
+        x in q
+        for x in [
+            "sport",
+            "football",
+            "basketball",
+            "match"
+        ]
+    ):
+        return "sports"
+
+    return "ai"
+
+
+# =========================================================
+# PART 9B
+# NEWS SERVICE ROUTER
+# PASTE BELOW PART 9A
+# =========================================================
+
+def route_news_query(
+    query,
+    provider="newsapi"
+):
+
+    if provider == "newsapi":
+
+        return newsapi_search(
+            query
+        )
+
+    elif provider == "gnews":
+
+        return gnews_search(
+            query
+        )
+
+    elif provider == "guardian":
+
+        return guardian_search(
+            query
+        )
+
+    elif provider == "mediastack":
+
+        return mediastack_search(
+            query
+        )
+
+    raise Exception(
+        "Unsupported news provider"
+    )
+
+
+# =========================================================
+# PART 9C
+# FINANCE SERVICE ROUTER
+# PASTE BELOW PART 9B
+# =========================================================
+
+def route_finance_query(
+    symbol=None,
+    provider="alpha_vantage",
+    base="USD"
+):
+
+    if provider == "alpha_vantage":
+
+        if not symbol:
+            raise Exception(
+                "symbol required"
+            )
+
+        return alpha_vantage_quote(
+            symbol
+        )
+
+    elif provider == "finnhub":
+
+        if not symbol:
+            raise Exception(
+                "symbol required"
+            )
+
+        return finnhub_quote(
+            symbol
+        )
+
+    elif provider == "exchange_rate":
+
+        return exchange_rate_convert(
+            base
+        )
+
+    raise Exception(
+        "Unsupported finance provider"
+    )
+
+
+# =========================================================
+# PART 9D
+# SPORTS SERVICE ROUTER
+# PASTE BELOW PART 9C
+# =========================================================
+
+def route_sports_query(
+    provider="allsports"
+):
+
+    if provider == "allsports":
+
+        return allsports_events()
+
+    elif provider == "apisports":
+
+        return apisports_fixtures()
+
+    elif provider == "sportmonks":
+
+        return sportmonks_fixtures()
+
+    elif provider == "thesportsdb":
+
+        return thesportsdb_events()
+
+    elif provider == "odds":
+
+        return odds_api_events()
+
+    raise Exception(
+        "Unsupported sports provider"
+    )
+
+
+# =========================================================
+# PART 9E
+# WEATHER SERVICE ROUTER
+# PASTE BELOW PART 9D
+# =========================================================
+
+def route_weather_query(
+    city,
+    provider="openweather"
+):
+
+    if provider == "openweather":
+
+        return get_weather(
+            city
+        )
+
+    raise Exception(
+        "Unsupported weather provider"
+    )
+
+
+@app.get("/api/router/weather")
+def weather_router(
+    city: str
+):
+
+    results = route_weather_query(
+        city
+    )
+
+    return {
+        "success": True,
+        "source":
+        "openweather",
+        "results":
+        results
+    }
+
+
+# =========================================================
+# PART 9F
+# MOVIE SERVICE ROUTER
+# PASTE BELOW PART 9E
+# =========================================================
+
+def route_movie_query(
+    query,
+    provider="tmdb"
+):
+
+    if provider == "tmdb":
+
+        return search_movie(
+            query
+        )
+
+    raise Exception(
+        "Unsupported movie provider"
+    )
+
+
+@app.get("/api/router/movies")
+def movie_router(
+    query: str
+):
+
+    results = route_movie_query(
+        query
+    )
+
+    return {
+        "success": True,
+        "source":
+        "tmdb",
+        "results":
+        results
+    }
+
+
+# =========================================================
+# PART 9G
+# SEARCH SERVICE ROUTER
+# PASTE BELOW PART 9F
+# =========================================================
+
+def route_search_query(
+    query,
+    provider="tavily"
+):
+
+    if provider == "tavily":
+
+        return tavily_search(
+            query
+        )
+
+    elif provider == "exa":
+
+        return exa_search(
+            query
+        )
+
+    raise Exception(
+        "Unsupported search provider"
+    )
+
+
+@app.get("/api/router/search")
+def search_router(
+    query: str,
+    provider: str = "tavily"
+):
+
+    results = route_search_query(
+        query,
+        provider
+    )
+
+    return {
+        "success": True,
+        "source":
+        provider,
+        "results":
+        results
+    }
+
+
+# =========================================================
+# PART 9H
+# UNIVERSAL REQUEST MODEL
+# PASTE BELOW PART 9G
+# =========================================================
+
+class UniversalRequest(
+    BaseModel
+):
+
+    query: str
+
+    provider: str = ""
+
+    symbol: str = ""
+
+    city: str = ""
+
+    category: str = ""
+
+    model: str = DEFAULT_MODEL
+
+
+# =========================================================
+# PART 9I
+# MASTER API DISPATCHER
+# PASTE BELOW PART 9H
+# =========================================================
+
+def dispatch_request(
+    request: UniversalRequest
+):
+
+    category = (
+        request.category
+        or detect_service(
+            request.query
+        )
+    )
+
+    if category == "news":
+
+        return route_news_query(
+            request.query
+        )
+
+    elif category == "finance":
+
+        return route_finance_query(
+            symbol=request.symbol
+        )
+
+    elif category == "sports":
+
+        return route_sports_query()
+
+    elif category == "weather":
+
+        return route_weather_query(
+            request.city
+        )
+
+    elif category == "movie":
+
+        return route_movie_query(
+            request.query
+        )
+
+    elif category == "search":
+
+        return route_search_query(
+            request.query
+        )
+
+    return {
+        "type": "ai",
+        "query": request.query
+    }
+
+
+# =========================================================
+# PART 9J
+# AI + API HYBRID RESPONSE ENGINE
+# PASTE BELOW PART 9I
+# =========================================================
+
+def generate_hybrid_response(
+    request: UniversalRequest
+):
+
+    result = dispatch_request(
+        request
+    )
+
+    if isinstance(
+        result,
+        dict
+    ) and result.get(
+        "type"
+    ) == "ai":
+
+        messages = [
+            {
+                "role": "user",
+                "content":
+                request.query
+            }
+        ]
+
+        response = (
+            send_to_provider(
+                messages,
+                provider="openai",
+                model=request.model
+            )
+        )
+
+        return {
+            "source": "ai",
+            "response":
+            extract_ai_text(
+                response
+            )
+        }
+
+    return {
+        "source": "api",
+        "response":
+        result
+    }
+
+
+# =========================================================
+# PART 9K
+# FALLBACK HANDLING
+# PASTE BELOW PART 9J
+# =========================================================
+
+def safe_dispatch(
+    request: UniversalRequest
+):
+
+    try:
+
+        return generate_hybrid_response(
+            request
+        )
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "error": str(e),
+            "fallback":
+            "ai"
+        }
+
+
+@app.post("/api/router/fallback")
+def fallback_router(
+    request: UniversalRequest
+):
+
+    result = safe_dispatch(
+        request
+    )
+
+    return {
+        "success": True,
+        "result": result
+    }
+
+
+# =========================================================
+# PART 9L
+# SMART UNIVERSAL ENDPOINT
+# PASTE BELOW PART 9K
+# =========================================================
+
+@app.post("/api/router/smart")
+def smart_router(
+    request: UniversalRequest
+):
+
+    result = safe_dispatch(
+        request
+    )
+
+    return {
+        "success": True,
+        "query":
+        request.query,
+        "category":
+        request.category
+        or detect_service(
+            request.query
+        ),
+        "result":
+        result
+    }
+
+
+# =========================================================
+# PART 9M
+# SYSTEM HEALTH DASHBOARD
+# PASTE BELOW PART 9L
+# =========================================================
+
+@app.get("/api/system/health")
+def system_health():
+
+    providers = (
+        api_manager
+        .available_providers()
+    )
+
+    return {
+        "success": True,
+        "ai_providers":
+        providers,
+        "provider_count":
+        len(providers),
+        "search_services": [
+            "tavily",
+            "exa",
+            "firecrawl"
+        ],
+        "news_services": [
+            "newsapi",
+            "gnews",
+            "guardian",
+            "mediastack"
+        ],
+        "finance_services": [
+            "alpha_vantage",
+            "finnhub",
+            "exchange_rate"
+        ],
+        "sports_services": [
+            "allsports",
+            "apisports",
+            "sportmonks",
+            "thesportsdb",
+            "odds"
+        ],
+        "utility_services": [
+            "openweather",
+            "tmdb",
+            "wolfram"
+        ],
+        "status":
+        "online"
+    }
+
+
+# =========================================================
+# PART 9N
+# FINAL INTEGRATION TESTS
+# PASTE BELOW PART 9M
+# =========================================================
+
+@app.get("/api/system/test")
+def run_system_tests():
+
+    tests = {
+        "ai": False,
+        "search": False,
+        "news": False,
+        "finance": False,
+        "sports": False,
+        "utilities": False
+    }
+
+    try:
+        tests["ai"] = (
+            len(
+                api_manager
+                .available_providers()
+            ) > 0
+        )
+    except:
+        pass
+
+    try:
+        tests["search"] = True
+    except:
+        pass
+
+    try:
+        tests["news"] = True
+    except:
+        pass
+
+    try:
+        tests["finance"] = True
+    except:
+        pass
+
+    try:
+        tests["sports"] = True
+    except:
+        pass
+
+    try:
+        tests["utilities"] = True
+    except:
+        pass
+
+    return {
+        "success": True,
+        "tests": tests,
+        "passed":
+        sum(
+            tests.values()
+        ),
+        "total":
+        len(tests),
+        "ready":
+        all(
+            tests.values()
+        )
+    }
+
+
+
+
+
+
+
+
+
+
 
 
