@@ -963,11 +963,7 @@ id="conversationList"
 # ADD TO CSS
 # =========================================================
 
-.sidebar-tools{
-padding:10px;
-display:flex;
-gap:8px;
-}
+
 
 
 
