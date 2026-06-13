@@ -866,13 +866,12 @@ def get_messages(
 # PASTE INSIDE THE HTML FROM PART 5A
 # =========================================================
 
+HTML_PAGE = """
 <style>
-
 .layout{
 display:flex;
 height:calc(100vh - 60px);
 }
-
 .sidebar{
 width:260px;
 background:#0b1220;
@@ -880,13 +879,11 @@ border-right:1px solid #1f2937;
 padding:15px;
 overflow-y:auto;
 }
-
 .sidebar-title{
 font-size:16px;
 margin-bottom:15px;
 font-weight:bold;
 }
-
 .new-chat-btn{
 width:100%;
 padding:10px;
@@ -897,7 +894,6 @@ color:white;
 cursor:pointer;
 margin-bottom:15px;
 }
-
 .conversation{
 padding:10px;
 border-radius:10px;
@@ -905,19 +901,16 @@ background:#111827;
 margin-bottom:8px;
 cursor:pointer;
 }
-
 .conversation:hover{
 background:#1e293b;
 }
-
 .main-chat{
 flex:1;
 display:flex;
 flex-direction:column;
 }
-
 </style>
-
+"""
 
 # =========================================================
 # PART 5D
