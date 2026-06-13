@@ -979,15 +979,7 @@ color:#9ca3af;
 text-transform:uppercase;
 }
 
-.chat-item{
-position:relative;
-padding:12px;
-border-radius:10px;
-background:#1f2937;
-margin-bottom:6px;
-cursor:pointer;
-transition:.2s;
-}
+
 
 .chat-item:hover{
 background:#2d3748;
