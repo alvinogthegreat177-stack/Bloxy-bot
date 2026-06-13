@@ -912,478 +912,588 @@ flex-direction:column;
 </style>
 """
 
-# =========================================================
-# PART 5D
-# LOAD CONVERSATIONS FROM API
-# PASTE BELOW THE createConversation() FUNCTION
-# =========================================================
+<!-- ===================================================== -->
+<!-- PART 5D -->
+<!-- LOAD CONVERSATIONS FROM API -->
+<!-- START OF MAIN JAVASCRIPT BLOCK -->
+<!-- ===================================================== -->
 
-async function loadConversations(){
+<script>
 
-try{
+async function loadConversations() {
 
-const response =
-await fetch(
-"/api/conversations/guest"
-);
+    try {
 
-const data =
-await response.json();
+        const response =
+            await fetch(
+                "/api/conversations/guest"
+            );
 
-const list =
-document.getElementById(
-"conversation-list"
-);
+        const data =
+            await response.json();
 
-list.innerHTML = "";
+        const list =
+            document.getElementById(
+                "conversation-list"
+            );
 
-if(
-data.conversations
-){
+        if (!list) {
+            return;
+        }
 
-data.conversations.forEach(
-(chat)=>{
+        list.innerHTML = "";
 
-list.innerHTML += `
-<div
-class="conversation"
-onclick="openConversation(
-'${chat.id}'
-)"
->
-${chat.title}
-</div>
-`;
+        if (
+            data &&
+            data.conversations &&
+            Array.isArray(
+                data.conversations
+            )
+        ) {
 
-}
-);
+            data.conversations.forEach(
+                function(chat) {
 
-}
+                    const item =
+                        document.createElement(
+                            "div"
+                        );
 
-}
-catch(err){
+                    item.className =
+                        "conversation";
 
-console.log(
-"Failed loading chats"
-);
+                    item.id =
+                        "conv-" + chat.id;
 
-}
+                    item.textContent =
+                        chat.title ||
+                        "New Chat";
+
+                    item.onclick =
+                        function() {
+                            openConversation(
+                                chat.id
+                            );
+                        };
+
+                    list.appendChild(
+                        item
+                    );
+
+                }
+            );
+
+        }
+
+    }
+    catch (err) {
+
+        console.error(
+            "Failed loading chats",
+            err
+        );
+
+    }
 
 }
 
 let currentConversation =
-"default";
+    "default";
 
 function openConversation(
-conversationId
-){
+    conversationId
+) {
 
-currentConversation =
-conversationId;
+    currentConversation =
+        conversationId;
 
-loadMessages(
-conversationId
-);
+    loadMessages(
+        conversationId
+    );
 
 }
 
-window.onload = function(){
-
-loadConversations();
-
-};
-
-
-// =========================================================
+// =====================================================
 // PART 5E
 // CREATE NEW CONVERSATIONS USING API
 // PASTE BELOW PART 5D
-// =========================================================
+// =====================================================
 
-async function createConversation(){
+async function createConversation() {
 
-try{
+    try {
 
-const response =
-await fetch(
-"/api/conversations/create",
-{
-method:"POST",
-headers:{
-"Content-Type":
-"application/json"
-},
-body:JSON.stringify({
-user_id:"guest",
-title:"New Chat"
-})
+        const response =
+            await fetch(
+                "/api/conversations/create",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+                    body: JSON.stringify({
+                        user_id: "guest",
+                        title: "New Chat"
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (
+            data &&
+            data.conversation_id
+        ) {
+
+            currentConversation =
+                data.conversation_id;
+
+            await loadConversations();
+
+            const chat =
+                document.getElementById(
+                    "chat"
+                );
+
+            if (chat) {
+                chat.innerHTML = "";
+            }
+
+        }
+
+    }
+    catch (err) {
+
+        console.error(
+            "Failed creating chat",
+            err
+        );
+
+    }
+
 }
-);
-
-const data =
-await response.json();
-
-if(
-data.conversation_id
-){
-
-currentConversation =
-data.conversation_id;
-
-loadConversations();
-
-document.getElementById(
-"chat"
-).innerHTML = "";
-
-}
-
-}
-catch(err){
-
-console.log(
-"Failed creating chat"
-);
-
-}
-
-}
-
-
-// =========================================================
+// =====================================================
 // PART 5F
 // CONVERSATION SWITCHING + ACTIVE CHAT
 // PASTE BELOW PART 5E
-// =========================================================
+// =====================================================
 
-let activeConversationId = null;
+let activeConversationId =
+    null;
 
 function setActiveConversation(
-conversationId
-){
+    conversationId
+) {
 
-activeConversationId =
-conversationId;
+    activeConversationId =
+        conversationId;
 
-const items =
-document.querySelectorAll(
-".conversation"
-);
+    const items =
+        document.querySelectorAll(
+            ".conversation"
+        );
 
-items.forEach(
-(item)=>{
-item.style.background =
-"#111827";
-}
-);
+    items.forEach(
+        function(item) {
 
-const selected =
-document.getElementById(
-"conv-" + conversationId
-);
+            item.style.background =
+                "#111827";
 
-if(selected){
-selected.style.background =
-"#2563eb";
-}
+        }
+    );
 
-openConversation(
-conversationId
-);
+    const selected =
+        document.getElementById(
+            "conv-" + conversationId
+        );
+
+    if (selected) {
+
+        selected.style.background =
+            "#2563eb";
+
+    }
+
+    openConversation(
+        conversationId
+    );
 
 }
 
 function renderConversation(
-chat
-){
+    chat
+) {
 
-return `
-<div
-id="conv-${chat.id}"
-class="conversation"
-onclick="setActiveConversation(
-'${chat.id}'
-)"
->
-${chat.title}
-</div>
-`;
+    const div =
+        document.createElement(
+            "div"
+        );
+
+    div.id =
+        "conv-" + chat.id;
+
+    div.className =
+        "conversation";
+
+    div.textContent =
+        chat.title ||
+        "New Chat";
+
+    div.onclick =
+        function() {
+
+            setActiveConversation(
+                chat.id
+            );
+
+        };
+
+    return div;
 
 }
-
-
-// =========================================================
+// =====================================================
 // PART 5G
 // LOAD MESSAGES FOR SELECTED CONVERSATION
 // PASTE BELOW PART 5F
-// =========================================================
+// =====================================================
 
 async function loadMessages(
-conversationId
-){
+    conversationId
+) {
 
-try{
+    try {
 
-const response =
-await fetch(
-`/api/messages/${conversationId}`
-);
+        const response =
+            await fetch(
+                "/api/messages/" +
+                conversationId
+            );
 
-const data =
-await response.json();
+        const data =
+            await response.json();
 
-const chat =
-document.getElementById(
-"chat"
-);
+        const chat =
+            document.getElementById(
+                "chat"
+            );
 
-chat.innerHTML = "";
+        if (!chat) {
+            return;
+        }
 
-if(data.messages){
+        chat.innerHTML = "";
 
-data.messages.forEach(
-(message)=>{
+        if (
+            data &&
+            data.messages &&
+            Array.isArray(
+                data.messages
+            )
+        ) {
 
-chat.innerHTML += `
-<div class="message">
-${message.content}
-</div>
-`;
+            data.messages.forEach(
+                function(message) {
+
+                    const div =
+                        document.createElement(
+                            "div"
+                        );
+
+                    div.className =
+                        "message";
+
+                    div.textContent =
+                        message.content ||
+                        "";
+
+                    chat.appendChild(
+                        div
+                    );
+
+                }
+            );
+
+            chat.scrollTop =
+                chat.scrollHeight;
+
+        }
+
+    }
+    catch (err) {
+
+        console.error(
+            "Failed loading messages",
+            err
+        );
+
+    }
 
 }
-);
-
-chat.scrollTop =
-chat.scrollHeight;
-
-}
-
-}
-catch(err){
-
-console.log(
-"Failed loading messages"
-);
-
-}
-
-}
-
-
-// =========================================================
+// =====================================================
 // PART 5H
 // OPEN CONVERSATION
 // PASTE BELOW PART 5G
-// =========================================================
+// =====================================================
 
 async function openConversation(
-conversationId
-){
+    conversationId
+) {
 
-activeConversationId =
-conversationId;
+    activeConversationId =
+        conversationId;
 
-await loadMessages(
-conversationId
-);
+    await loadMessages(
+        conversationId
+    );
 
-const chat =
-document.getElementById(
-"chat"
-);
+    const chat =
+        document.getElementById(
+            "chat"
+        );
 
-chat.scrollTop =
-chat.scrollHeight;
+    if (chat) {
+
+        chat.scrollTop =
+            chat.scrollHeight;
+
+    }
 
 }
-
-
-
-// =========================================================
+// =====================================================
 // PART 5I
 // SEND MESSAGE
 // PASTE BELOW PART 5H
-// =========================================================
+// =====================================================
 
-async function sendMessage(){
+async function sendMessage() {
 
-const input =
-document.getElementById(
-"messageInput"
-);
+    const input =
+        document.getElementById(
+            "messageInput"
+        );
 
-const message =
-input.value.trim();
+    if (!input) {
+        return;
+    }
 
-if(
-!message ||
-!activeConversationId
-){
-return;
+    const message =
+        input.value.trim();
+
+    if (
+        !message ||
+        !activeConversationId
+    ) {
+        return;
+    }
+
+    try {
+
+        await fetch(
+            "/api/messages/send",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+                body: JSON.stringify({
+                    conversation_id:
+                        activeConversationId,
+                    message:
+                        message
+                })
+            }
+        );
+
+        input.value = "";
+
+        await loadMessages(
+            activeConversationId
+        );
+
+    }
+    catch (err) {
+
+        console.error(
+            "Failed sending message",
+            err
+        );
+
+    }
+
 }
-
-await fetch(
-API_URL +
-"/messages/send",
-{
-method:"POST",
-headers:{
-"Content-Type":
-"application/json"
-},
-body:JSON.stringify({
-conversation_id:
-activeConversationId,
-message:message
-})
-}
-);
-
-input.value = "";
-
-await loadMessages(
-activeConversationId
-);
-
-}
-
-
-// =========================================================
+// =====================================================
 // PART 5J
 // ENTER KEY SUPPORT
 // PASTE BELOW PART 5I
-// =========================================================
+// =====================================================
 
-document
-.getElementById(
-"messageInput"
-)
-.addEventListener(
-"keydown",
-function(event){
+const messageInput =
+    document.getElementById(
+        "messageInput"
+    );
 
-if(
-event.key === "Enter"
-){
+if (messageInput) {
 
-event.preventDefault();
+    messageInput.addEventListener(
+        "keydown",
+        function(event) {
 
-sendMessage();
+            if (
+                event.key ===
+                "Enter"
+            ) {
+
+                event.preventDefault();
+
+                sendMessage();
+
+            }
+
+        }
+    );
 
 }
-
-}
-);
-
-
-// =========================================================
+// =====================================================
 // PART 5K
 // AUTO-SCROLL TO LATEST MESSAGE
 // PASTE BELOW PART 5J
-// =========================================================
+// =====================================================
 
-function scrollToBottom(){
+function scrollToBottom() {
 
-const chat =
-document.getElementById(
-"chat"
-);
+    const chat =
+        document.getElementById(
+            "chat"
+        );
 
-if(chat){
+    if (chat) {
 
-chat.scrollTop =
-chat.scrollHeight;
+        chat.scrollTop =
+            chat.scrollHeight;
 
-}
-
-}
-
-const observer =
-new MutationObserver(
-function(){
-
-scrollToBottom();
+    }
 
 }
-);
 
-observer.observe(
-document.getElementById(
-"chat"
-),
-{
-childList:true,
-subtree:true
+const chatContainer =
+    document.getElementById(
+        "chat"
+    );
+
+if (chatContainer) {
+
+    const observer =
+        new MutationObserver(
+            function() {
+
+                scrollToBottom();
+
+            }
+        );
+
+    observer.observe(
+        chatContainer,
+        {
+            childList: true,
+            subtree: true
+        }
+    );
+
 }
-);
-
-
-// =========================================================
+// =====================================================
 // PART 5L
-// FINAL UI POLISH + CONVERSATION AUTO-LOAD
+// FINAL UI POLISH + AUTO LOAD
 // PASTE BELOW PART 5K
-// =========================================================
+// =====================================================
 
 window.addEventListener(
-"load",
-async function(){
+    "load",
+    async function() {
 
-await loadConversations();
+        await loadConversations();
 
-const items =
-document.querySelectorAll(
-".conversation"
-);
+        const firstConversation =
+            document.querySelector(
+                ".conversation"
+            );
 
-if(
-items.length > 0
-){
+        if (firstConversation) {
 
-items[0].click();
+            firstConversation.click();
 
-}
+        }
 
-}
+    }
 );
 
 function addAssistantMessage(
-text
-){
+    text
+) {
 
-const chat =
-document.getElementById(
-"chat"
-);
+    const chat =
+        document.getElementById(
+            "chat"
+        );
 
-chat.innerHTML += `
-<div class="message assistant">
-${text}
-</div>
-`;
+    if (!chat) {
+        return;
+    }
 
-scrollToBottom();
+    const div =
+        document.createElement(
+            "div"
+        );
+
+    div.className =
+        "message assistant";
+
+    div.textContent =
+        text;
+
+    chat.appendChild(
+        div
+    );
+
+    scrollToBottom();
 
 }
 
 function addUserMessage(
-text
-){
+    text
+) {
 
-const chat =
-document.getElementById(
-"chat"
-);
+    const chat =
+        document.getElementById(
+            "chat"
+        );
 
-chat.innerHTML += `
-<div class="message user">
-${text}
-</div>
-`;
+    if (!chat) {
+        return;
+    }
 
-scrollToBottom();
+    const div =
+        document.createElement(
+            "div"
+        );
+
+    div.className =
+        "message user";
+
+    div.textContent =
+        text;
+
+    chat.appendChild(
+        div
+    );
+
+    scrollToBottom();
 
 }
 
+</script>
 
 # =========================================================
 # PART 6A
