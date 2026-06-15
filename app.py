@@ -733,6 +733,13 @@ e.key === "Enter" &&
 ){
 e.preventDefault();
 sendMessage();
+
+
+<!-- ===================================================== -->
+<!-- PART 5D -->
+<!-- LOAD CONVERSATIONS FROM API -->
+<!-- START OF MAIN JAVASCRIPT BLOCK -->
+<!-- ===================================================== -->
 }
 
 }
@@ -912,11 +919,7 @@ flex-direction:column;
 </style>
 """
 
-<!-- ===================================================== -->
-<!-- PART 5D -->
-<!-- LOAD CONVERSATIONS FROM API -->
-<!-- START OF MAIN JAVASCRIPT BLOCK -->
-<!-- ===================================================== -->
+
 
 <script>
 
