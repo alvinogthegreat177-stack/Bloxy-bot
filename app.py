@@ -867,63 +867,46 @@ def get_messages(
     }
 
 
-# =========================================================
-# PART 5C
-# CONVERSATION SIDEBAR UI
-# PASTE INSIDE THE HTML FROM PART 5A
-# =========================================================
-
 HTML_PAGE = """
 <style>
 .layout{
-display:flex;
-height:calc(100vh - 60px);
+    display:flex;
+    height:calc(100vh - 60px);
 }
+
 .sidebar{
-width:260px;
-background:#0b1220;
-border-right:1px solid #1f2937;
-padding:15px;
-overflow-y:auto;
+    width:260px;
+    background:#0b1220;
+    border-right:1px solid #1f2937;
+    padding:15px;
+    overflow-y:auto;
 }
-.sidebar-title{
-font-size:16px;
-margin-bottom:15px;
-font-weight:bold;
-}
-.new-chat-btn{
-width:100%;
-padding:10px;
-border:none;
-border-radius:10px;
-background:#2563eb;
-color:white;
-cursor:pointer;
-margin-bottom:15px;
-}
+
 .conversation{
-padding:10px;
-border-radius:10px;
-background:#111827;
-margin-bottom:8px;
-cursor:pointer;
+    padding:10px;
+    border-radius:10px;
+    background:#111827;
+    margin-bottom:8px;
+    cursor:pointer;
 }
-.conversation:hover{
-background:#1e293b;
-}
+
 .main-chat{
-flex:1;
-display:flex;
-flex-direction:column;
+    flex:1;
 }
 </style>
-"""
-
-
 
 <script>
 
+let activeConversationId = null;
+
 async function loadConversations() {
+
+    const list =
+        document.getElementById(
+            "conversation-list"
+        );
+
+    if (!list) return;
 
     try {
 
@@ -935,236 +918,68 @@ async function loadConversations() {
         const data =
             await response.json();
 
-        const list =
-            document.getElementById(
-                "conversation-list"
-            );
-
-        if (!list) {
-            return;
-        }
-
         list.innerHTML = "";
 
-        if (
-            data &&
-            data.conversations &&
-            Array.isArray(
-                data.conversations
-            )
-        ) {
+        (data.conversations || [])
+        .forEach(chat => {
 
-            data.conversations.forEach(
-                function(chat) {
+            const item =
+                document.createElement(
+                    "div"
+                );
 
-                    const item =
-                        document.createElement(
-                            "div"
-                        );
+            item.className =
+                "conversation";
 
-                    item.className =
-                        "conversation";
+            item.innerText =
+                chat.title || "Chat";
 
-                    item.id =
-                        "conv-" + chat.id;
+            item.onclick =
+                () => openConversation(
+                    chat.id
+                );
 
-                    item.textContent =
-                        chat.title ||
-                        "New Chat";
-
-                    item.onclick =
-                        function() {
-                            openConversation(
-                                chat.id
-                            );
-                        };
-
-                    list.appendChild(
-                        item
-                    );
-
-                }
+            list.appendChild(
+                item
             );
 
-        }
+        });
 
-    }
-    catch (err) {
+    } catch(err) {
 
-        console.error(
-            "Failed loading chats",
-            err
-        );
+        console.error(err);
 
     }
 
 }
-
-let currentConversation =
-    "default";
-
-function openConversation(
-    conversationId
-) {
-
-    currentConversation =
-        conversationId;
-
-    loadMessages(
-        conversationId
-    );
-
-}
-
-// =====================================================
-// PART 5E
-// CREATE NEW CONVERSATIONS USING API
-// PASTE BELOW PART 5D
-// =====================================================
 
 async function createConversation() {
 
     try {
 
-        const response =
-            await fetch(
-                "/api/conversations/create",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
-                    body: JSON.stringify({
-                        user_id: "guest",
-                        title: "New Chat"
-                    })
-                }
-            );
-
-        const data =
-            await response.json();
-
-        if (
-            data &&
-            data.conversation_id
-        ) {
-
-            currentConversation =
-                data.conversation_id;
-
-            await loadConversations();
-
-            const chat =
-                document.getElementById(
-                    "chat"
-                );
-
-            if (chat) {
-                chat.innerHTML = "";
+        await fetch(
+            "/api/conversations/create",
+            {
+                method:"POST"
             }
-
-        }
-
-    }
-    catch (err) {
-
-        console.error(
-            "Failed creating chat",
-            err
         );
+
+        loadConversations();
+
+    } catch(err) {
+
+        console.error(err);
 
     }
 
 }
-// =====================================================
-// PART 5F
-// CONVERSATION SWITCHING + ACTIVE CHAT
-// PASTE BELOW PART 5E
-// =====================================================
 
-let activeConversationId =
-    null;
-
-function setActiveConversation(
+async function loadMessages(
     conversationId
 ) {
 
     activeConversationId =
         conversationId;
-
-    const items =
-        document.querySelectorAll(
-            ".conversation"
-        );
-
-    items.forEach(
-        function(item) {
-
-            item.style.background =
-                "#111827";
-
-        }
-    );
-
-    const selected =
-        document.getElementById(
-            "conv-" + conversationId
-        );
-
-    if (selected) {
-
-        selected.style.background =
-            "#2563eb";
-
-    }
-
-    openConversation(
-        conversationId
-    );
-
-}
-
-function renderConversation(
-    chat
-) {
-
-    const div =
-        document.createElement(
-            "div"
-        );
-
-    div.id =
-        "conv-" + chat.id;
-
-    div.className =
-        "conversation";
-
-    div.textContent =
-        chat.title ||
-        "New Chat";
-
-    div.onclick =
-        function() {
-
-            setActiveConversation(
-                chat.id
-            );
-
-        };
-
-    return div;
-
-}
-// =====================================================
-// PART 5G
-// LOAD MESSAGES FOR SELECTED CONVERSATION
-// PASTE BELOW PART 5F
-// =====================================================
-
-async function loadMessages(
-    conversationId
-) {
 
     try {
 
@@ -1182,93 +997,50 @@ async function loadMessages(
                 "chat"
             );
 
-        if (!chat) {
-            return;
-        }
+        if (!chat) return;
 
         chat.innerHTML = "";
 
-        if (
-            data &&
-            data.messages &&
-            Array.isArray(
-                data.messages
-            )
-        ) {
+        (data.messages || [])
+        .forEach(msg => {
 
-            data.messages.forEach(
-                function(message) {
+            const div =
+                document.createElement(
+                    "div"
+                );
 
-                    const div =
-                        document.createElement(
-                            "div"
-                        );
+            div.className =
+                "message";
 
-                    div.className =
-                        "message";
+            div.textContent =
+                msg.content;
 
-                    div.textContent =
-                        message.content ||
-                        "";
-
-                    chat.appendChild(
-                        div
-                    );
-
-                }
+            chat.appendChild(
+                div
             );
 
-            chat.scrollTop =
-                chat.scrollHeight;
-
-        }
-
-    }
-    catch (err) {
-
-        console.error(
-            "Failed loading messages",
-            err
-        );
-
-    }
-
-}
-// =====================================================
-// PART 5H
-// OPEN CONVERSATION
-// PASTE BELOW PART 5G
-// =====================================================
-
-async function openConversation(
-    conversationId
-) {
-
-    activeConversationId =
-        conversationId;
-
-    await loadMessages(
-        conversationId
-    );
-
-    const chat =
-        document.getElementById(
-            "chat"
-        );
-
-    if (chat) {
+        });
 
         chat.scrollTop =
             chat.scrollHeight;
 
+    } catch(err) {
+
+        console.error(err);
+
     }
 
 }
-// =====================================================
-// PART 5I
-// SEND MESSAGE
-// PASTE BELOW PART 5H
-// =====================================================
+
+async function openConversation(
+    id
+) {
+
+    await loadMessages(
+        id
+    );
+
+}
 
 async function sendMessage() {
 
@@ -1277,226 +1049,85 @@ async function sendMessage() {
             "messageInput"
         );
 
-    if (!input) {
-        return;
-    }
+    if (
+        !input ||
+        !activeConversationId
+    ) return;
 
-    const message =
+    const text =
         input.value.trim();
 
-    if (
-        !message ||
-        !activeConversationId
-    ) {
-        return;
-    }
+    if (!text) return;
 
     try {
 
         await fetch(
             "/api/messages/send",
             {
-                method: "POST",
-                headers: {
+                method:"POST",
+                headers:{
                     "Content-Type":
-                        "application/json"
+                    "application/json"
                 },
-                body: JSON.stringify({
+                body:JSON.stringify({
                     conversation_id:
-                        activeConversationId,
-                    message:
-                        message
+                    activeConversationId,
+                    message:text
                 })
             }
         );
 
         input.value = "";
 
-        await loadMessages(
+        loadMessages(
             activeConversationId
         );
 
-    }
-    catch (err) {
+    } catch(err) {
 
-        console.error(
-            "Failed sending message",
-            err
-        );
+        console.error(err);
 
     }
 
 }
-// =====================================================
-// PART 5J
-// ENTER KEY SUPPORT
-// PASTE BELOW PART 5I
-// =====================================================
-
-const messageInput =
-    document.getElementById(
-        "messageInput"
-    );
-
-if (messageInput) {
-
-    messageInput.addEventListener(
-        "keydown",
-        function(event) {
-
-            if (
-                event.key ===
-                "Enter"
-            ) {
-
-                event.preventDefault();
-
-                sendMessage();
-
-            }
-
-        }
-    );
-
-}
-// =====================================================
-// PART 5K
-// AUTO-SCROLL TO LATEST MESSAGE
-// PASTE BELOW PART 5J
-// =====================================================
-
-function scrollToBottom() {
-
-    const chat =
-        document.getElementById(
-            "chat"
-        );
-
-    if (chat) {
-
-        chat.scrollTop =
-            chat.scrollHeight;
-
-    }
-
-}
-
-const chatContainer =
-    document.getElementById(
-        "chat"
-    );
-
-if (chatContainer) {
-
-    const observer =
-        new MutationObserver(
-            function() {
-
-                scrollToBottom();
-
-            }
-        );
-
-    observer.observe(
-        chatContainer,
-        {
-            childList: true,
-            subtree: true
-        }
-    );
-
-}
-// =====================================================
-// PART 5L
-// FINAL UI POLISH + AUTO LOAD
-// PASTE BELOW PART 5K
-// =====================================================
 
 window.addEventListener(
     "load",
-    async function() {
+    function() {
 
-        await loadConversations();
+        loadConversations();
 
-        const firstConversation =
-            document.querySelector(
-                ".conversation"
+        const input =
+            document.getElementById(
+                "messageInput"
             );
 
-        if (firstConversation) {
+        if (input) {
 
-            firstConversation.click();
+            input.addEventListener(
+                "keydown",
+                function(e) {
+
+                    if (
+                        e.key === "Enter"
+                    ) {
+
+                        e.preventDefault();
+
+                        sendMessage();
+
+                    }
+
+                }
+            );
 
         }
 
     }
 );
 
-function addAssistantMessage(
-    text
-) {
-
-    const chat =
-        document.getElementById(
-            "chat"
-        );
-
-    if (!chat) {
-        return;
-    }
-
-    const div =
-        document.createElement(
-            "div"
-        );
-
-    div.className =
-        "message assistant";
-
-    div.textContent =
-        text;
-
-    chat.appendChild(
-        div
-    );
-
-    scrollToBottom();
-
-}
-
-function addUserMessage(
-    text
-) {
-
-    const chat =
-        document.getElementById(
-            "chat"
-        );
-
-    if (!chat) {
-        return;
-    }
-
-    const div =
-        document.createElement(
-            "div"
-        );
-
-    div.className =
-        "message user";
-
-    div.textContent =
-        text;
-
-    chat.appendChild(
-        div
-    );
-
-    scrollToBottom();
-
-}
-
 </script>
+"""
 
 # =========================================================
 # PART 6A
