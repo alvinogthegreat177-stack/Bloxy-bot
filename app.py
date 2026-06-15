@@ -743,10 +743,6 @@ sendMessage();
 
 
 
-}
-
-}
-);
 
 </script>
 
