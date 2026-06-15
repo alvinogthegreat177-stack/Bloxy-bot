@@ -733,6 +733,13 @@ e.key === "Enter" &&
 ){
 e.preventDefault();
 sendMessage();
+        }
+    }
+);
+</script>
+</body>
+</html>
+"""
 
 
 <!-- ===================================================== -->
@@ -954,14 +961,27 @@ async function loadConversations() {
 }
 
 async function createConversation() {
-
     try {
-
         await fetch(
             "/api/conversations/create",
             {
-                method:"POST"
+                method:"POST",
+                headers:{
+                    "Content-Type":"application/json"
+                },
+                body:JSON.stringify({
+                    user_id:"guest",
+                    title:"New Chat"
+                })
             }
+        );
+
+        loadConversations();
+
+    } catch(err) {
+        console.error(err);
+    }
+}
         );
 
         loadConversations();
@@ -1633,48 +1653,18 @@ def save_user_message(
 # PASTE BELOW PART 7H
 # =========================================================
 
+# =========================================================
+# PART 7I
+# GENERATE AI RESPONSE
+# =========================================================
+
 def generate_ai_response(
     conversation_id,
     user_message,
     model=DEFAULT_MODEL
 ):
-
     save_user_message(
         conversation_id,
-
-
-# =========================================================
-# PART 7J
-# AI CHAT ENDPOINT
-# PASTE BELOW PART 7I
-# =========================================================
-
-@app.post("/api/ai/chat")
-def ai_chat(
-    data: AIChatRequest
-):
-
-    try:
-
-        response_text = (
-            generate_ai_response(
-                data.conversation_id,
-                data.message,
-                data.model
-            )
-        )
-
-        return {
-            "success": True,
-            "response": response_text
-        }
-
-    except Exception as e:
-
-        return {
-            "success": False,
-            "error": str(e)
-        }
         user_message
     )
 
@@ -1697,8 +1687,6 @@ def ai_chat(
     )
 
     return ai_text
-
-
 # =========================================================
 # PART 7K
 # REGENERATE LAST AI RESPONSE
@@ -1854,8 +1842,7 @@ def build_full_context(
     conversation_id
 ):
 
-    context =
-    build_system_context()
+   context = build_system_context()
 
     context.extend(
         build_ai_messages(
@@ -2291,6 +2278,29 @@ def provider_health():
         "providers":
         results
     }
+
+
+def tavily_search(query):
+    api_key = os.getenv("TAVILY_API_KEY")
+
+    if not api_key:
+        raise Exception(
+            "Tavily API key missing"
+        )
+
+    response = requests.post(
+        "https://api.tavily.com/search",
+        json={
+            "api_key": api_key,
+            "query": query,
+            "max_results": 5
+        },
+        timeout=60
+    )
+
+    response.raise_for_status()
+
+    return response.json()
 
 
 # =========================================================
