@@ -5222,11 +5222,11 @@ export async function executeRequest(
 
   return result;
 }
-• Model lists
-• Pricing tables
-• Provider health
-• Routing rules
-• Capabilities
+ Model lists
+ Pricing tables
+ Provider health
+ Routing rules
+ Capabilities
 export async function invalidateCache(
   key: string
 ) {
@@ -5625,7 +5625,7 @@ GET /health
  Failover validated
  Monitoring active
  Audit logging enabled
-• Backups configured
+ Backups configured
 ✓ Unit tests
 ✓ Integration tests
 ✓ Failover testing
