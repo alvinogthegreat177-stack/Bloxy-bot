@@ -1,23 +1,27 @@
 # =========================================================
-# PART 1
-# FASTAPI + DATABASE FOUNDATION
+# PART 1A
+# FOUNDATION + CONFIGURATION + DATABASE
+# Bloxy-Bot X
 # =========================================================
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-
 import sqlite3
 import uuid
 import hashlib
 import secrets
-
+import os
 from datetime import datetime
+
+# =========================================================
+# APP SETUP
+# =========================================================
 
 app = FastAPI(
     title="Bloxy-Bot X",
-    version="1.0"
+    version="2.0.0"
 )
 
 app.add_middleware(
@@ -28,19 +32,33 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-DB_NAME = "bloxybotx.db"
+# =========================================================
+# CONFIGURATION
+# =========================================================
 
-# =========================
+DB_NAME = os.getenv(
+    "DATABASE_NAME",
+    "bloxybotx.db"
+)
+
+APP_NAME = "Bloxy-Bot X"
+
+OWNER_USERNAME = "aTg"
+
+OWNER_EMAILS = [
+    "alvinogthegreat177@gmail.com",
+    "alvinogthegreat177@outlook.com"
+]
+
+# =========================================================
 # HELPERS
-# =========================
-
-def get_db():
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
-    return conn
+# =========================================================
 
 def generate_id():
     return str(uuid.uuid4())
+
+def generate_token():
+    return secrets.token_hex(32)
 
 def now():
     return datetime.utcnow().isoformat()
@@ -50,9 +68,20 @@ def hash_password(password: str):
         password.encode()
     ).hexdigest()
 
-# =========================
+# =========================================================
+# DATABASE
+# =========================================================
+
+def get_db():
+    conn = sqlite3.connect(
+        DB_NAME
+    )
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# =========================================================
 # DATABASE TABLES
-# =========================
+# =========================================================
 
 def create_tables():
     conn = get_db()
@@ -64,6 +93,8 @@ def create_tables():
         username TEXT UNIQUE,
         email TEXT UNIQUE,
         password TEXT,
+        verified INTEGER DEFAULT 0,
+        role TEXT DEFAULT 'user',
         created_at TEXT
     )
     """)
@@ -76,45 +107,233 @@ def create_tables():
     )
     """)
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS user_badges(
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        badge_type TEXT,
+        badge_color TEXT,
+        granted_by TEXT,
+        granted_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS settings(
+        user_id TEXT PRIMARY KEY,
+        theme TEXT DEFAULT 'dark',
+        model TEXT DEFAULT 'gpt-4o-mini',
+        updated_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS audit_logs(
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        action TEXT,
+        created_at TEXT
+    )
+    """)
+
     conn.commit()
     conn.close()
 
-create_tables()
+# =========================================================
+# AUDIT LOGGING
+# =========================================================
 
-# =========================
+def create_audit_log(
+    user_id,
+    action
+):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO audit_logs
+        VALUES(?,?,?,?)
+        """,
+        (
+            generate_id(),
+            user_id,
+            action,
+            now()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+# =========================================================
+# OWNER BOOTSTRAP
+# =========================================================
+
+def owner_exists():
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM users
+        WHERE role='super_admin'
+        LIMIT 1
+        """
+    )
+
+    row = cur.fetchone()
+
+    conn.close()
+    return row
+
+def create_owner():
+
+    if owner_exists():
+        return
+
+    owner_id = generate_id()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO users
+        VALUES(?,?,?,?,?,?,?)
+        """,
+        (
+            owner_id,
+            OWNER_USERNAME,
+            OWNER_EMAILS[0],
+            hash_password("CHANGE_ME"),
+            1,
+            "super_admin",
+            now()
+        )
+    )
+
+    cur.execute(
+        """
+        INSERT INTO user_badges
+        VALUES(?,?,?,?,?,?)
+        """,
+        (
+            generate_id(),
+            owner_id,
+            "owner",
+            "#ff8c00",
+            owner_id,
+            now()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+# =========================================================
+# SYSTEM STARTUP
+# =========================================================
+
+create_tables()
+create_owner()
+
+# =========================================================
 # HEALTH CHECK
-# =========================
+# =========================================================
 
 @app.get("/health")
 def health():
     return {
-        "status": "healthy"
+        "success": True,
+        "app": APP_NAME,
+        "status": "online",
+        "timestamp": now()
     }
 
-
 # =========================================================
-# PART 2
-# USER AUTHENTICATION
+# SYSTEM INFO
 # =========================================================
 
-# =========================
+@app.get("/api/system/info")
+def system_info():
+    return {
+        "success": True,
+        "app": APP_NAME,
+        "version": "2.0.0",
+        "database": DB_NAME
+    }
+
+# =========================================================
+# PART 1A COMPLETE
+# NEXT:
+# PART 1B = AUTHENTICATION + VERIFICATION
+# =========================================================
+# =========================================================
+# PART 1B
+# AUTHENTICATION + EMAIL VERIFICATION
+# PASTE BELOW PART 1A
+# =========================================================
+
+from pydantic import EmailStr
+
+# =========================================================
 # REQUEST MODELS
-# =========================
+# =========================================================
 
 class RegisterRequest(BaseModel):
     username: str
-    email: str
+    email: EmailStr
     password: str
-
 
 class LoginRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str
 
+class VerifyEmailRequest(BaseModel):
+    token: str
 
-# =========================
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+# =========================================================
+# AUTH TABLES
+# =========================================================
+
+def create_auth_tables():
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS email_verifications(
+        token TEXT PRIMARY KEY,
+        user_id TEXT,
+        email TEXT,
+        created_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS password_resets(
+        token TEXT PRIMARY KEY,
+        user_id TEXT,
+        created_at TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+create_auth_tables()
+
+# =========================================================
 # USER HELPERS
-# =========================
+# =========================================================
 
 def get_user_by_email(email):
     conn = get_db()
@@ -125,11 +344,9 @@ def get_user_by_email(email):
         (email,)
     )
 
-    user = cur.fetchone()
-
+    row = cur.fetchone()
     conn.close()
-    return user
-
+    return row
 
 def get_user_by_id(user_id):
     conn = get_db()
@@ -140,14 +357,16 @@ def get_user_by_id(user_id):
         (user_id,)
     )
 
-    user = cur.fetchone()
-
+    row = cur.fetchone()
     conn.close()
-    return user
+    return row
 
+# =========================================================
+# SESSION HELPERS
+# =========================================================
 
 def create_session(user_id):
-    token = secrets.token_hex(32)
+    token = generate_token()
 
     conn = get_db()
     cur = conn.cursor()
@@ -166,10 +385,79 @@ def create_session(user_id):
 
     return token
 
+def get_session(token):
+    conn = get_db()
+    cur = conn.cursor()
 
-# =========================
-# AUTH ROUTES
-# =========================
+    cur.execute(
+        "SELECT * FROM sessions WHERE token=?",
+        (token,)
+    )
+
+    row = cur.fetchone()
+    conn.close()
+
+    return row
+
+# =========================================================
+# TOKEN HELPERS
+# =========================================================
+
+def create_verification_token(
+    user_id,
+    email
+):
+    token = generate_token()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO email_verifications
+        VALUES(?,?,?,?)
+        """,
+        (
+            token,
+            user_id,
+            email,
+            now()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return token
+
+def create_password_reset_token(
+    user_id
+):
+    token = generate_token()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO password_resets
+        VALUES(?,?,?)
+        """,
+        (
+            token,
+            user_id,
+            now()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return token
+
+# =========================================================
+# REGISTER
+# =========================================================
 
 @app.post("/api/register")
 def register(data: RegisterRequest):
@@ -189,12 +477,17 @@ def register(data: RegisterRequest):
     cur = conn.cursor()
 
     cur.execute(
-        "INSERT INTO users VALUES(?,?,?,?,?)",
+        """
+        INSERT INTO users
+        VALUES(?,?,?,?,?,?,?)
+        """,
         (
             user_id,
             data.username,
             data.email,
             hash_password(data.password),
+            0,
+            "user",
             now()
         )
     )
@@ -202,54 +495,68 @@ def register(data: RegisterRequest):
     conn.commit()
     conn.close()
 
+    verification_token = (
+        create_verification_token(
+            user_id,
+            data.email
+        )
+    )
+
+    create_audit_log(
+        user_id,
+        "user_registered"
+    )
+
     return {
         "success": True,
-        "user_id": user_id
+        "user_id": user_id,
+        "verification_token":
+            verification_token
     }
 
+# =========================================================
+# LOGIN
+# =========================================================
 
 @app.post("/api/login")
 def login(data: LoginRequest):
 
-    user = get_user_by_email(data.email)
+    user = get_user_by_email(
+        data.email
+    )
 
-    if not user:
+    if (
+        not user or
+        user["password"] !=
+        hash_password(data.password)
+    ):
         return JSONResponse(
             status_code=401,
             content={
                 "success": False,
-                "message": "Invalid credentials"
+                "message":
+                "Invalid credentials"
             }
         )
 
-    if user["password"] != hash_password(data.password):
-        return JSONResponse(
-            status_code=401,
-            content={
-                "success": False,
-                "message": "Invalid credentials"
-            }
-        )
+    token = create_session(
+        user["id"]
+    )
 
-    token = create_session(user["id"])
+    create_audit_log(
+        user["id"],
+        "user_login"
+    )
 
     return {
         "success": True,
         "token": token,
-        "user_id": user["id"],
-        "username": user["username"]
+        "user_id": user["id"]
     }
 
-
-@app.post("/api/guest")
-def guest_login():
-    return {
-        "success": True,
-        "guest": True,
-        "user_id": generate_id(),
-        "username": "Guest"
-    }
-
+# =========================================================
+# LOGOUT
+# =========================================================
 
 @app.delete("/api/logout/{token}")
 def logout(token: str):
@@ -265,53 +572,594 @@ def logout(token: str):
     conn.commit()
     conn.close()
 
+    return {"success": True}
+
+# =========================================================
+# VERIFY EMAIL
+# =========================================================
+
+@app.post("/api/verify-email")
+def verify_email(
+    data: VerifyEmailRequest
+):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM email_verifications
+        WHERE token=?
+        """,
+        (data.token,)
+    )
+
+    row = cur.fetchone()
+
+    if not row:
+        conn.close()
+        return {
+            "success": False,
+            "message": "Invalid token"
+        }
+
+    cur.execute(
+        """
+        UPDATE users
+        SET verified=1
+        WHERE id=?
+        """,
+        (row["user_id"],)
+    )
+
+    cur.execute(
+        """
+        DELETE FROM email_verifications
+        WHERE token=?
+        """,
+        (data.token,)
+    )
+
+    conn.commit()
+    conn.close()
+
     return {
-        "success": True
+        "success": True,
+        "message": "Email verified"
     }
 
-
 # =========================================================
-# PART 3
-# USER PROFILE ROUTES
+# FORGOT PASSWORD
 # =========================================================
 
-@app.get("/api/user/{user_id}")
-def get_user(user_id: str):
+@app.post("/api/forgot-password")
+def forgot_password(
+    data: ForgotPasswordRequest
+):
+    user = get_user_by_email(
+        data.email
+    )
 
-    user = get_user_by_id(user_id)
+    if not user:
+        return {"success": True}
+
+    token = create_password_reset_token(
+        user["id"]
+    )
+
+    return {
+        "success": True,
+        "reset_token": token
+    }
+
+# =========================================================
+# RESET PASSWORD
+# =========================================================
+
+@app.post("/api/reset-password")
+def reset_password(
+    data: ResetPasswordRequest
+):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM password_resets
+        WHERE token=?
+        """,
+        (data.token,)
+    )
+
+    row = cur.fetchone()
+
+    if not row:
+        conn.close()
+        return {
+            "success": False,
+            "message": "Invalid token"
+        }
+
+    cur.execute(
+        """
+        UPDATE users
+        SET password=?
+        WHERE id=?
+        """,
+        (
+            hash_password(
+                data.new_password
+            ),
+            row["user_id"]
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "message": "Password updated"
+    }
+
+# =========================================================
+# PART 1B COMPLETE
+# NEXT:
+# PART 1C = PROFILES + ROLES + VERIFICATION
+# =========================================================
+# =========================================================
+# PART 1C
+# PROFILES + ROLES + VERIFICATION SYSTEM
+# PASTE BELOW PART 1B
+# =========================================================
+
+from enum import Enum
+
+# =========================================================
+# USER ROLES
+# =========================================================
+
+class UserRole(str, Enum):
+    USER = "user"
+    MODERATOR = "moderator"
+    ADMIN = "admin"
+    OWNER = "owner"
+    SUPER_ADMIN = "super_admin"
+
+# =========================================================
+# VERIFICATION TYPES
+# =========================================================
+
+class VerificationType(str, Enum):
+    NONE = "none"
+    ORANGE = "orange"
+
+# =========================================================
+# DATABASE UPGRADE
+# =========================================================
+
+def upgrade_user_table():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN display_name TEXT
+            """
+        )
+    except:
+        pass
+
+    try:
+        cur.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN bio TEXT
+            """
+        )
+    except:
+        pass
+
+    try:
+        cur.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN verification_type TEXT
+            DEFAULT 'none'
+            """
+        )
+    except:
+        pass
+
+    conn.commit()
+    conn.close()
+
+upgrade_user_table()
+
+# =========================================================
+# PROFILE REQUEST MODELS
+# =========================================================
+
+class UpdateProfileRequest(BaseModel):
+    user_id: str
+    display_name: str = ""
+    bio: str = ""
+
+# =========================================================
+# VERIFICATION HELPERS
+# =========================================================
+
+OWNER_EMAILS = {
+    "alvinogthegreat177@gmail.com",
+    "alvinogthegreat177@outlook.com"
+}
+
+def assign_special_badge(user):
+
+    if user["email"] in OWNER_EMAILS:
+        return {
+            "role":
+                UserRole.OWNER,
+            "verified":
+                1,
+            "verification_type":
+                VerificationType.ORANGE
+        }
+
+    return {
+        "role":
+            UserRole.USER,
+        "verified":
+            0,
+        "verification_type":
+            VerificationType.NONE
+    }
+
+def verification_tooltip(role):
+
+    if role in [
+        UserRole.OWNER,
+        UserRole.SUPER_ADMIN
+    ]:
+        return (
+            "This badge belongs to the "
+            "rightful owner of the platform."
+        )
+
+    if role in [
+        UserRole.ADMIN,
+        UserRole.MODERATOR
+    ]:
+        return (
+            "This badge belongs to an "
+            "administrator or contributor."
+        )
+
+    return ""
+
+# =========================================================
+# PUBLIC USER FORMATTER
+# =========================================================
+
+def public_user(user):
+
+    return {
+        "id":
+            user["id"],
+        "username":
+            user["username"],
+        "display_name":
+            user["display_name"],
+        "bio":
+            user["bio"],
+        "role":
+            user["role"],
+        "verified":
+            bool(user["verified"]),
+        "verification_type":
+            user["verification_type"],
+        "verification_tooltip":
+            verification_tooltip(
+                user["role"]
+            )
+    }
+
+# =========================================================
+# PROFILE ENDPOINTS
+# =========================================================
+
+@app.get("/api/profile/{user_id}")
+def get_profile(
+    user_id: str
+):
+    user = get_user_by_id(
+        user_id
+    )
 
     if not user:
         return {
             "success": False,
-            "message": "User not found"
+            "message":
+            "User not found"
         }
 
     return {
         "success": True,
-        "user": {
-            "id": user["id"],
-            "username": user["username"],
-            "email": user["email"],
-            "created_at": user["created_at"]
-        }
+        "user":
+        public_user(user)
     }
 
+@app.post("/api/profile/update")
+def update_profile(
+    data: UpdateProfileRequest
+):
+    conn = get_db()
+    cur = conn.cursor()
 
-@app.get("/api/users")
-def get_all_users():
+    cur.execute(
+        """
+        UPDATE users
+        SET display_name=?,
+            bio=?
+        WHERE id=?
+        """,
+        (
+            data.display_name,
+            data.bio,
+            data.user_id
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    create_audit_log(
+        data.user_id,
+        "profile_updated"
+    )
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# STAFF BADGE HELPER
+# =========================================================
+
+def grant_staff_badge(
+    user_id,
+    role="admin"
+):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE users
+        SET role=?,
+            verified=1,
+            verification_type='orange'
+        WHERE id=?
+        """,
+        (
+            role,
+            user_id
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return True
+
+# =========================================================
+# PART 1C COMPLETE
+# NEXT:
+# PART 1D
+# ADMIN SYSTEM + BADGES + AUDIT LOGS
+# =========================================================
+# =========================================================
+# PART 1D
+# ADMIN SYSTEM + BADGES + AUDIT LOGS
+# PASTE BELOW PART 1C
+# =========================================================
+
+# =========================================================
+# REQUEST MODELS
+# =========================================================
+
+class GrantBadgeRequest(BaseModel):
+    admin_user_id: str
+    target_user_id: str
+    role: str = "admin"
+
+class RevokeBadgeRequest(BaseModel):
+    admin_user_id: str
+    target_user_id: str
+
+# =========================================================
+# PERMISSION HELPERS
+# =========================================================
+
+def is_admin(user_id):
+
+    user = get_user_by_id(
+        user_id
+    )
+
+    if not user:
+        return False
+
+    return user["role"] in [
+        "super_admin",
+        "owner",
+        "admin"
+    ]
+
+def is_owner(user_id):
+
+    user = get_user_by_id(
+        user_id
+    )
+
+    if not user:
+        return False
+
+    return user["role"] in [
+        "super_admin",
+        "owner"
+    ]
+
+# =========================================================
+# GRANT STAFF BADGE
+# =========================================================
+
+@app.post("/api/admin/grant-badge")
+def grant_badge(
+    data: GrantBadgeRequest
+):
+
+    if not is_owner(
+        data.admin_user_id
+    ):
+        return {
+            "success": False,
+            "message":
+            "Owner permission required"
+        }
 
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute(
         """
-        SELECT id, username, email, created_at
+        UPDATE users
+        SET role=?,
+            verified=1,
+            verification_type='orange'
+        WHERE id=?
+        """,
+        (
+            data.role,
+            data.target_user_id
+        )
+    )
+
+    cur.execute(
+        """
+        INSERT INTO user_badges
+        VALUES(?,?,?,?,?,?)
+        """,
+        (
+            generate_id(),
+            data.target_user_id,
+            data.role,
+            "#ff8c00",
+            data.admin_user_id,
+            now()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    create_audit_log(
+        data.admin_user_id,
+        f"grant_{data.role}"
+    )
+
+    return {
+        "success": True,
+        "role": data.role,
+        "badge": "orange_checkmark"
+    }
+
+# =========================================================
+# REVOKE STAFF BADGE
+# =========================================================
+
+@app.post("/api/admin/revoke-badge")
+def revoke_badge(
+    data: RevokeBadgeRequest
+):
+
+    if not is_owner(
+        data.admin_user_id
+    ):
+        return {
+            "success": False,
+            "message":
+            "Owner permission required"
+        }
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE users
+        SET role='user',
+            verified=0,
+            verification_type='none'
+        WHERE id=?
+        """,
+        (
+            data.target_user_id,
+        )
+    )
+
+    cur.execute(
+        """
+        DELETE FROM user_badges
+        WHERE user_id=?
+        """,
+        (
+            data.target_user_id,
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    create_audit_log(
+        data.admin_user_id,
+        "revoke_badge"
+    )
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# LIST STAFF
+# =========================================================
+
+@app.get("/api/admin/staff")
+def list_staff():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT
+            id,
+            username,
+            display_name,
+            email,
+            role,
+            verified
         FROM users
-        ORDER BY created_at DESC
+        WHERE role != 'user'
+        ORDER BY role
         """
     )
 
-    users = [
+    staff = [
         dict(row)
         for row in cur.fetchall()
     ]
@@ -320,28 +1168,148 @@ def get_all_users():
 
     return {
         "success": True,
-        "users": users
+        "staff": staff
     }
 
+# =========================================================
+# AUDIT LOGS
+# =========================================================
+
+@app.get("/api/admin/audit")
+def audit_logs():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM audit_logs
+        ORDER BY created_at DESC
+        LIMIT 500
+        """
+    )
+
+    logs = [
+        dict(row)
+        for row in cur.fetchall()
+    ]
+
+    conn.close()
+
+    return {
+        "success": True,
+        "logs": logs
+    }
 
 # =========================================================
-# PART 4
-# CONVERSATIONS + MESSAGES
+# BADGE TOOLTIP
+# =========================================================
+
+@app.get("/api/badge-tooltip/{user_id}")
+def badge_tooltip(
+    user_id: str
+):
+
+    user = get_user_by_id(
+        user_id
+    )
+
+    if not user:
+        return {
+            "success": False
+        }
+
+    return {
+        "success": True,
+        "tooltip":
+            verification_tooltip(
+                user["role"]
+            ),
+        "verification_type":
+            user["verification_type"]
+    }
+
+# =========================================================
+# PLATFORM HEALTH
+# =========================================================
+
+@app.get("/api/system/health")
+def system_health():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        "SELECT COUNT(*) FROM users"
+    )
+    total_users = (
+        cur.fetchone()[0]
+    )
+
+    cur.execute(
+        "SELECT COUNT(*) FROM sessions"
+    )
+    active_sessions = (
+        cur.fetchone()[0]
+    )
+
+    cur.execute(
+        "SELECT COUNT(*) FROM audit_logs"
+    )
+    audit_entries = (
+        cur.fetchone()[0]
+    )
+
+    conn.close()
+
+    return {
+        "success": True,
+        "app": APP_NAME,
+        "status": "online",
+        "users": total_users,
+        "active_sessions":
+            active_sessions,
+        "audit_entries":
+            audit_entries,
+        "timestamp": now()
+    }
+
+# =========================================================
+# PART 1 COMPLETE
+# NEXT:
+# PART 2A
+# CONVERSATIONS + CHAT FOUNDATION
+# =========================================================
+# =========================================================
+# PART 2A
+# CONVERSATIONS + CHAT FOUNDATION
+# PASTE BELOW PART 1D
+# =========================================================
+
+# =========================================================
+# REQUEST MODELS
 # =========================================================
 
 class CreateConversationRequest(BaseModel):
     user_id: str
+    title: str = "New Chat"
+
+class RenameConversationRequest(BaseModel):
+    conversation_id: str
     title: str
 
-
-class SendMessageRequest(BaseModel):
+class DeleteConversationRequest(BaseModel):
     conversation_id: str
+
+class MessageRequest(BaseModel):
+    conversation_id: str
+    user_id: str
     message: str
 
-
-# =========================
-# DATABASE TABLES
-# =========================
+# =========================================================
+# CONVERSATION TABLES
+# =========================================================
 
 def create_conversation_tables():
 
@@ -353,6 +1321,8 @@ def create_conversation_tables():
         id TEXT PRIMARY KEY,
         user_id TEXT,
         title TEXT,
+        pinned INTEGER DEFAULT 0,
+        archived INTEGER DEFAULT 0,
         created_at TEXT,
         updated_at TEXT
     )
@@ -362,6 +1332,7 @@ def create_conversation_tables():
     CREATE TABLE IF NOT EXISTS messages(
         id TEXT PRIMARY KEY,
         conversation_id TEXT,
+        user_id TEXT,
         role TEXT,
         content TEXT,
         created_at TEXT
@@ -371,15 +1342,48 @@ def create_conversation_tables():
     conn.commit()
     conn.close()
 
-
 create_conversation_tables()
 
+# =========================================================
+# HELPERS
+# =========================================================
 
-# =========================
+def get_conversation(
+    conversation_id
+):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM conversations
+        WHERE id=?
+        """,
+        (conversation_id,)
+    )
+
+    row = cur.fetchone()
+
+    conn.close()
+    return row
+
+def conversation_exists(
+    conversation_id
+):
+    return bool(
+        get_conversation(
+            conversation_id
+        )
+    )
+
+# =========================================================
 # CREATE CONVERSATION
-# =========================
+# =========================================================
 
-@app.post("/api/conversations/create")
+@app.post(
+    "/api/conversations/create"
+)
 def create_conversation(
     data: CreateConversationRequest
 ):
@@ -392,12 +1396,14 @@ def create_conversation(
     cur.execute(
         """
         INSERT INTO conversations
-        VALUES(?,?,?,?,?)
+        VALUES(?,?,?,?,?,?,?)
         """,
         (
             conversation_id,
             data.user_id,
             data.title,
+            0,
+            0,
             now(),
             now()
         )
@@ -406,17 +1412,24 @@ def create_conversation(
     conn.commit()
     conn.close()
 
+    create_audit_log(
+        data.user_id,
+        "conversation_created"
+    )
+
     return {
         "success": True,
-        "conversation_id": conversation_id
+        "conversation_id":
+            conversation_id
     }
 
+# =========================================================
+# LIST CONVERSATIONS
+# =========================================================
 
-# =========================
-# GET CONVERSATIONS
-# =========================
-
-@app.get("/api/conversations/{user_id}")
+@app.get(
+    "/api/conversations/{user_id}"
+)
 def get_conversations(
     user_id: str
 ):
@@ -443,16 +1456,111 @@ def get_conversations(
 
     return {
         "success": True,
-        "conversations": conversations
+        "conversations":
+            conversations
     }
 
+# =========================================================
+# RENAME CONVERSATION
+# =========================================================
 
-# =========================
+@app.post(
+    "/api/conversations/rename"
+)
+def rename_conversation(
+    data: RenameConversationRequest
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE conversations
+        SET title=?,
+            updated_at=?
+        WHERE id=?
+        """,
+        (
+            data.title,
+            now(),
+            data.conversation_id
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# PIN CONVERSATION
+# =========================================================
+
+@app.post(
+    "/api/conversations/pin/{conversation_id}"
+)
+def pin_conversation(
+    conversation_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE conversations
+        SET pinned=1
+        WHERE id=?
+        """,
+        (conversation_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# ARCHIVE CONVERSATION
+# =========================================================
+
+@app.post(
+    "/api/conversations/archive/{conversation_id}"
+)
+def archive_conversation(
+    conversation_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE conversations
+        SET archived=1
+        WHERE id=?
+        """,
+        (conversation_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
 # DELETE CONVERSATION
-# =========================
+# =========================================================
 
 @app.delete(
-    "/api/conversations/{conversation_id}"
+    "/api/conversations/delete/{conversation_id}"
 )
 def delete_conversation(
     conversation_id: str
@@ -484,291 +1592,16 @@ def delete_conversation(
         "success": True
     }
 
-
 # =========================================================
-# PART 5A
-# FRONTEND HOME PAGE
-# PASTE BELOW PART 4
+# SAVE MESSAGE
 # =========================================================
 
-from fastapi.responses import HTMLResponse
-
-
-@app.get("/", response_class=HTMLResponse)
-def home():
-
-    return """
-<!DOCTYPE html>
-<html>
-
-<head>
-<meta charset="utf-8">
-
-<meta
-name="viewport"
-content="width=device-width,initial-scale=1"
->
-
-<title>Bloxy-Bot X</title>
-
-<style>
-
-*{
-margin:0;
-padding:0;
-box-sizing:border-box;
-font-family:Arial,sans-serif;
-}
-
-body{
-background:#0f172a;
-color:white;
-height:100vh;
-display:flex;
-flex-direction:column;
-}
-
-.header{
-height:60px;
-display:flex;
-align-items:center;
-padding:0 20px;
-background:#111827;
-border-bottom:1px solid #1f2937;
-}
-
-.header h2{
-font-size:20px;
-}
-
-.chat{
-flex:1;
-overflow-y:auto;
-padding:20px;
-}
-
-.message{
-max-width:800px;
-margin:auto;
-margin-bottom:15px;
-padding:15px;
-border-radius:12px;
-line-height:1.6;
-}
-
-.user{
-background:#1e293b;
-}
-
-.assistant{
-background:#111827;
-}
-
-.input-area{
-padding:20px;
-border-top:1px solid #1f2937;
-}
-
-.input-row{
-display:flex;
-gap:10px;
-max-width:900px;
-margin:auto;
-}
-
-textarea{
-flex:1;
-height:60px;
-resize:none;
-border:none;
-outline:none;
-background:#111827;
-color:white;
-padding:15px;
-border-radius:12px;
-}
-
-button{
-width:70px;
-border:none;
-background:#2563eb;
-color:white;
-border-radius:12px;
-cursor:pointer;
-}
-
-button:hover{
-background:#1d4ed8;
-}
-
-</style>
-</head>
-
-<body>
-
-<div class="header">
-<h2>🤖 Bloxy-Bot X</h2>
-</div>
-
-<div
-class="chat"
-id="chat"
->
-
-<div class="message assistant">
-Welcome to Bloxy-Bot X
-</div>
-
-</div>
-
-<div class="input-area">
-
-<div class="input-row">
-
-<textarea
-id="message"
-placeholder="Message Bloxy-Bot X..."
-></textarea>
-
-<button
-onclick="sendMessage()"
->
-Send
-</button>
-
-</div>
-
-</div>
-
-<script>
-
-async function sendMessage(){
-
-const input =
-document.getElementById(
-"message"
-);
-
-const text =
-input.value.trim();
-
-if(!text){
-return;
-}
-
-const chat =
-document.getElementById(
-"chat"
-);
-
-chat.innerHTML +=
-`
-<div class="message user">
-${text}
-</div>
-`;
-
-input.value = "";
-
-chat.scrollTop =
-chat.scrollHeight;
-
-try{
-
-const response =
-await fetch(
-"/api/chat",
-{
-method:"POST",
-headers:{
-"Content-Type":
-"application/json"
-},
-body:JSON.stringify({
-user_id:"guest",
-conversation_id:"default",
-message:text
-})
-}
-);
-
-const data =
-await response.json();
-
-chat.innerHTML +=
-`
-<div class="message assistant">
-${data.response || "No response"}
-</div>
-`;
-
-chat.scrollTop =
-chat.scrollHeight;
-
-}
-catch(err){
-
-chat.innerHTML +=
-`
-<div class="message assistant">
-Error contacting AI.
-</div>
-`;
-
-}
-
-}
-
-document
-.getElementById(
-"message"
-)
-.addEventListener(
-"keydown",
-function(e){
-
-if(
-e.key === "Enter" &&
-!e.shiftKey
-){
-e.preventDefault();
-sendMessage();
-        }
-    }
-);
-</script>
-</body>
-</html>
-"""
-
-
-
-
-</script>
-
-</body>
-</html>
-"""
-
-
-# =========================================================
-# PART 5B
-# CHAT API ENDPOINT
-# PASTE BELOW PART 5A
-# =========================================================
-
-class ChatRequest(BaseModel):
-    user_id: str
-    conversation_id: str
-    message: str
-
-
-@app.post("/api/chat")
-def chat(
-    data: ChatRequest
+def save_message(
+    conversation_id,
+    user_id,
+    role,
+    content
 ):
-
-    user_message_id = generate_id()
 
     conn = get_db()
     cur = conn.cursor()
@@ -776,34 +1609,14 @@ def chat(
     cur.execute(
         """
         INSERT INTO messages
-        VALUES(?,?,?,?,?)
+        VALUES(?,?,?,?,?,?)
         """,
         (
-            user_message_id,
-            data.conversation_id,
-            "user",
-            data.message,
-            now()
-        )
-    )
-
-    ai_response = (
-        "You said: " +
-        data.message
-    )
-
-    ai_message_id = generate_id()
-
-    cur.execute(
-        """
-        INSERT INTO messages
-        VALUES(?,?,?,?,?)
-        """,
-        (
-            ai_message_id,
-            data.conversation_id,
-            "assistant",
-            ai_response,
+            generate_id(),
+            conversation_id,
+            user_id,
+            role,
+            content,
             now()
         )
     )
@@ -816,22 +1629,47 @@ def chat(
         """,
         (
             now(),
-            data.conversation_id
+            conversation_id
         )
     )
 
     conn.commit()
     conn.close()
 
+# =========================================================
+# SEND MESSAGE
+# =========================================================
+
+@app.post(
+    "/api/messages/send"
+)
+def send_message(
+    data: MessageRequest
+):
+
+    if not conversation_exists(
+        data.conversation_id
+    ):
+        return {
+            "success": False,
+            "message":
+            "Conversation not found"
+        }
+
+    save_message(
+        data.conversation_id,
+        data.user_id,
+        "user",
+        data.message
+    )
+
     return {
-        "success": True,
-        "response": ai_response
+        "success": True
     }
 
-
-# =========================
+# =========================================================
 # GET MESSAGES
-# =========================
+# =========================================================
 
 @app.get(
     "/api/messages/{conversation_id}"
@@ -862,369 +1700,19 @@ def get_messages(
 
     return {
         "success": True,
-        "messages": messages
+        "messages":
+            messages
     }
 
-
-HTML_PAGE = """
-<style>
-.layout{
-    display:flex;
-    height:calc(100vh - 60px);
-}
-
-.sidebar{
-    width:260px;
-    background:#0b1220;
-    border-right:1px solid #1f2937;
-    padding:15px;
-    overflow-y:auto;
-}
-
-.conversation{
-    padding:10px;
-    border-radius:10px;
-    background:#111827;
-    margin-bottom:8px;
-    cursor:pointer;
-}
-
-.main-chat{
-    flex:1;
-}
-</style>
-
-<script>
-
-let activeConversationId = null;
-
-async function loadConversations() {
-
-    const list =
-        document.getElementById(
-            "conversation-list"
-        );
-
-    if (!list) return;
-
-    try {
-
-        const response =
-            await fetch(
-                "/api/conversations/guest"
-            );
-
-        const data =
-            await response.json();
-
-        list.innerHTML = "";
-
-        (data.conversations || [])
-        .forEach(chat => {
-
-            const item =
-                document.createElement(
-                    "div"
-                );
-
-            item.className =
-                "conversation";
-
-            item.innerText =
-                chat.title || "Chat";
-
-            item.onclick =
-                () => openConversation(
-                    chat.id
-                );
-
-            list.appendChild(
-                item
-            );
-
-        });
-
-    } catch(err) {
-
-        console.error(err);
-
-    }
-
-}
-
-async function createConversation() {
-    try {
-        await fetch(
-            "/api/conversations/create",
-            {
-                method:"POST",
-                headers:{
-                    "Content-Type":"application/json"
-                },
-                body:JSON.stringify({
-                    user_id:"guest",
-                    title:"New Chat"
-                })
-            }
-        );
-
-        loadConversations();
-
-    } catch(err) {
-        console.error(err);
-    }
-}
-        );
-
-        loadConversations();
-
-    } catch(err) {
-
-        console.error(err);
-
-    }
-
-}
-
-async function loadMessages(
-    conversationId
-) {
-
-    activeConversationId =
-        conversationId;
-
-    try {
-
-        const response =
-            await fetch(
-                "/api/messages/" +
-                conversationId
-            );
-
-        const data =
-            await response.json();
-
-        const chat =
-            document.getElementById(
-                "chat"
-            );
-
-        if (!chat) return;
-
-        chat.innerHTML = "";
-
-        (data.messages || [])
-        .forEach(msg => {
-
-            const div =
-                document.createElement(
-                    "div"
-                );
-
-            div.className =
-                "message";
-
-            div.textContent =
-                msg.content;
-
-            chat.appendChild(
-                div
-            );
-
-        });
-
-        chat.scrollTop =
-            chat.scrollHeight;
-
-    } catch(err) {
-
-        console.error(err);
-
-    }
-
-}
-
-async function openConversation(
-    id
-) {
-
-    await loadMessages(
-        id
-    );
-
-}
-
-async function sendMessage() {
-
-    const input =
-        document.getElementById(
-            "messageInput"
-        );
-
-    if (
-        !input ||
-        !activeConversationId
-    ) return;
-
-    const text =
-        input.value.trim();
-
-    if (!text) return;
-
-    try {
-
-        await fetch(
-            "/api/messages/send",
-            {
-                method:"POST",
-                headers:{
-                    "Content-Type":
-                    "application/json"
-                },
-                body:JSON.stringify({
-                    conversation_id:
-                    activeConversationId,
-                    message:text
-                })
-            }
-        );
-
-        input.value = "";
-
-        loadMessages(
-            activeConversationId
-        );
-
-    } catch(err) {
-
-        console.error(err);
-
-    }
-
-}
-
-window.addEventListener(
-    "load",
-    function() {
-
-        loadConversations();
-
-        const input =
-            document.getElementById(
-                "messageInput"
-            );
-
-        if (input) {
-
-            input.addEventListener(
-                "keydown",
-                function(e) {
-
-                    if (
-                        e.key === "Enter"
-                    ) {
-
-                        e.preventDefault();
-
-                        sendMessage();
-
-                    }
-
-                }
-            );
-
-        }
-
-    }
-);
-
-</script>
-"""
-
 # =========================================================
-# PART 6A
-# SETTINGS TABLE + DATABASE SETUP
-# PASTE BELOW PART 5L
+# CONVERSATION STATS
 # =========================================================
 
-def create_settings_table():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS settings(
-        user_id TEXT PRIMARY KEY,
-        theme TEXT,
-        model TEXT,
-        updated_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_settings_table()
-
-
-# =========================================================
-# PART 6B
-# SETTINGS REQUEST MODEL
-# PASTE BELOW PART 6A
-# =========================================================
-
-from pydantic import BaseModel
-
-class UpdateSettingsRequest(BaseModel):
-    user_id: str
-    theme: str
-    model: str
-
-
-
-# =========================================================
-# PART 6C
-# GET USER SETTINGS
-# PASTE BELOW PART 6B
-# =========================================================
-
-@app.get("/settings/{user_id}")
-def get_settings(user_id: str):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT * FROM settings
-        WHERE user_id=?
-        """,
-        (user_id,)
-    )
-
-    row = cur.fetchone()
-
-    conn.close()
-
-    if row:
-        return dict(row)
-
-    return {
-        "user_id": user_id,
-        "theme": "dark",
-        "model": "default"
-    }
-
-
-# =========================================================
-# PART 6D
-# UPDATE USER SETTINGS
-# PASTE BELOW PART 6C
-# =========================================================
-
-@app.post("/settings/update")
-def update_settings(
-    data: UpdateSettingsRequest
+@app.get(
+    "/api/conversations/stats/{conversation_id}"
+)
+def conversation_stats(
+    conversation_id: str
 ):
 
     conn = get_db()
@@ -1232,200 +1720,488 @@ def update_settings(
 
     cur.execute(
         """
-        INSERT OR REPLACE INTO settings
-        (
-            user_id,
-            theme,
-            model,
-            updated_at
-        )
-        VALUES(?,?,?,?)
+        SELECT COUNT(*)
+        FROM messages
+        WHERE conversation_id=?
         """,
-        (
-            data.user_id,
-            data.theme,
-            data.model,
-            now()
-        )
+        (conversation_id,)
     )
 
-    conn.commit()
+    count = cur.fetchone()[0]
+
     conn.close()
 
     return {
         "success": True,
-        "theme": data.theme,
-        "model": data.model
+        "message_count":
+            count
     }
 
+# =========================================================
+# PART 2A COMPLETE
+# NEXT:
+# PART 2B
+# MESSAGE HISTORY + SEARCH + EXPORT
+# =========================================================
+# =========================================================
+# PART 2B
+# ADVANCED MESSAGE HISTORY + SEARCH + EXPORT
+# =========================================================
+
+import json
+
+class SearchMessagesRequest(BaseModel):
+    conversation_id: str
+    query: str
 
 # =========================================================
-# PART 6E
-# SETTINGS HELPER FUNCTIONS
-# PASTE BELOW PART 6D
+# SEARCH MESSAGES
 # =========================================================
-
-def save_user_settings(
-    user_id,
-    theme,
-    model
-):
-
+@app.post("/api/messages/search")
+def search_messages(data: SearchMessagesRequest):
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute(
         """
-        INSERT OR REPLACE INTO settings
-        (
-            user_id,
-            theme,
-            model,
-            updated_at
-        )
-        VALUES(?,?,?,?)
+        SELECT *
+        FROM messages
+        WHERE conversation_id=?
+        AND content LIKE ?
+        ORDER BY created_at DESC
         """,
         (
-            user_id,
-            theme,
-            model,
-            now()
+            data.conversation_id,
+            f"%{data.query}%"
         )
     )
 
-    conn.commit()
-    conn.close()
-
-def get_user_settings(
-    user_id
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT * FROM settings
-        WHERE user_id=?
-        """,
-        (user_id,)
-    )
-
-    row = cur.fetchone()
-
-    conn.close()
-
-    if row:
-        return dict(row)
-
-    return None
-
-
-# =========================================================
-# PART 6F
-# RESET SETTINGS TO DEFAULT
-# PASTE BELOW PART 6E
-# =========================================================
-
-@app.post("/settings/reset/{user_id}")
-def reset_settings(
-    user_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        DELETE FROM settings
-        WHERE user_id=?
-        """,
-        (user_id,)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True,
-        "message": "Settings reset to default"
-    }
-
-
-# =========================================================
-# PART 6G
-# LIST ALL USER SETTINGS
-# PASTE BELOW PART 6F
-# =========================================================
-
-@app.get("/settings")
-def list_settings():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT * FROM settings
-        ORDER BY updated_at DESC
-        """
-    )
-
-    rows = cur.fetchall()
-
-    conn.close()
-
-    return [
+    results = [
         dict(row)
-        for row in rows
+        for row in cur.fetchall()
     ]
 
+    conn.close()
+
+    return {
+        "success": True,
+        "count": len(results),
+        "results": results
+    }
 
 # =========================================================
-# PART 7A
-# AI CONFIGURATION + API SETTINGS
-# PASTE BELOW PART 6G
+# DELETE MESSAGE
 # =========================================================
+@app.delete("/api/messages/{message_id}")
+def delete_message(message_id: str):
+    conn = get_db()
+    cur = conn.cursor()
 
-import os
-import requests
+    cur.execute(
+        """
+        DELETE FROM messages
+        WHERE id=?
+        """,
+        (message_id,)
+    )
 
-AI_API_URL = os.getenv(
-    "AI_API_URL",
-    "https://api.openai.com/v1/chat/completions"
+    conn.commit()
+    conn.close()
+
+    return {"success": True}
+
+# =========================================================
+# EXPORT CONVERSATION
+# =========================================================
+@app.get(
+    "/api/conversations/export/{conversation_id}"
 )
-
-AI_API_KEY = os.getenv(
-    "AI_API_KEY",
-    ""
-)
-
-DEFAULT_MODEL = "gpt-4o-mini"
-
-
-# =========================================================
-# PART 7B
-# AI REQUEST MODEL
-# PASTE BELOW PART 7A
-# =========================================================
-
-from pydantic import BaseModel
-
-class AIChatRequest(BaseModel):
+def export_conversation(
     conversation_id: str
-    message: str
-    model: str = DEFAULT_MODEL
-
-
-# =========================================================
-# PART 7C
-# LOAD CONVERSATION HISTORY
-# PASTE BELOW PART 7B
-# =========================================================
-
-def get_conversation_messages(
-    conversation_id
 ):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM conversations
+        WHERE id=?
+        """,
+        (conversation_id,)
+    )
+
+    conversation = cur.fetchone()
+
+    if not conversation:
+        conn.close()
+        return {
+            "success": False,
+            "message":
+            "Conversation not found"
+        }
+
+    cur.execute(
+        """
+        SELECT *
+        FROM messages
+        WHERE conversation_id=?
+        ORDER BY created_at ASC
+        """,
+        (conversation_id,)
+    )
+
+    messages = [
+        dict(row)
+        for row in cur.fetchall()
+    ]
+
+    conn.close()
+
+    return {
+        "success": True,
+        "conversation":
+            dict(conversation),
+        "messages":
+            messages,
+        "exported_at": now()
+    }
+
+# =========================================================
+# CLEAR CONVERSATION
+# =========================================================
+@app.delete(
+    "/api/conversations/clear/{conversation_id}"
+)
+def clear_conversation(
+    conversation_id: str
+):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        DELETE FROM messages
+        WHERE conversation_id=?
+        """,
+        (conversation_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {"success": True}
+
+# =========================================================
+# PART 2B COMPLETE
+# NEXT:
+# PART 2C
+# AI RESPONSES + MODEL MANAGEMENT
+# =========================================================
+# =========================================================
+# PART 2C
+# AI RESPONSES + MODEL MANAGEMENT + CHAT COMPLETIONS
+# =========================================================
+
+# =========================================================
+# REQUEST MODELS
+# =========================================================
+
+class AIMessageRequest(BaseModel):
+    conversation_id: str
+    user_id: str
+    message: str
+    model: str = "gpt-4o-mini"
+
+# =========================================================
+# SUPPORTED MODELS
+# =========================================================
+
+SUPPORTED_MODELS = [
+    "gpt-4o",
+    "gpt-4o-mini",
+    "gpt-4.1",
+    "gpt-4.1-mini"
+]
+
+# =========================================================
+# MODEL VALIDATION
+# =========================================================
+
+def valid_model(model):
+    return model in SUPPORTED_MODELS
+
+# =========================================================
+# AI ENGINE
+# REPLACE WITH OPENAI API
+# =========================================================
+
+def generate_ai_response(
+    user_message,
+    model
+):
+    return (
+        f"[{model}] "
+        f"Response to: {user_message}"
+    )
+
+# =========================================================
+# SAVE ASSISTANT MESSAGE
+# =========================================================
+
+def save_assistant_message(
+    conversation_id,
+    content
+):
+    save_message(
+        conversation_id,
+        "assistant",
+        "assistant",
+        content
+    )
+
+# =========================================================
+# CHAT COMPLETION
+# =========================================================
+
+@app.post("/api/chat/completion")
+def chat_completion(
+    data: AIMessageRequest
+):
+
+    if not conversation_exists(
+        data.conversation_id
+    ):
+        return {
+            "success": False,
+            "message":
+            "Conversation not found"
+        }
+
+    if not valid_model(
+        data.model
+    ):
+        return {
+            "success": False,
+            "message":
+            "Unsupported model"
+        }
+
+    save_message(
+        data.conversation_id,
+        data.user_id,
+        "user",
+        data.message
+    )
+
+    ai_response = (
+        generate_ai_response(
+            data.message,
+            data.model
+        )
+    )
+
+    save_assistant_message(
+        data.conversation_id,
+        ai_response
+    )
+
+    create_audit_log(
+        data.user_id,
+        "ai_completion"
+    )
+
+    return {
+        "success": True,
+        "model": data.model,
+        "response": ai_response
+    }
+
+# =========================================================
+# LIST MODELS
+# =========================================================
+
+@app.get("/api/models")
+def list_models():
+    return {
+        "success": True,
+        "models":
+        SUPPORTED_MODELS
+    }
+
+# =========================================================
+# CONVERSATION CONTEXT
+# =========================================================
+
+@app.get(
+    "/api/chat/context/{conversation_id}"
+)
+def conversation_context(
+    conversation_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT role,content
+        FROM messages
+        WHERE conversation_id=?
+        ORDER BY created_at ASC
+        LIMIT 100
+        """,
+        (conversation_id,)
+    )
+
+    rows = [
+        dict(row)
+        for row in cur.fetchall()
+    ]
+
+    conn.close()
+
+    return {
+        "success": True,
+        "context": rows
+    }
+
+# =========================================================
+# TOKEN ESTIMATION
+# =========================================================
+
+@app.get(
+    "/api/chat/tokens/{conversation_id}"
+)
+def estimate_tokens(
+    conversation_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT content
+        FROM messages
+        WHERE conversation_id=?
+        """,
+        (conversation_id,)
+    )
+
+    total = 0
+
+    for row in cur.fetchall():
+        total += len(
+            row["content"].split()
+        )
+
+    conn.close()
+
+    return {
+        "success": True,
+        "estimated_tokens":
+            total
+    }
+
+# =========================================================
+# REGENERATE RESPONSE
+# =========================================================
+
+@app.post(
+    "/api/chat/regenerate/{conversation_id}"
+)
+def regenerate_response(
+    conversation_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM messages
+        WHERE conversation_id=?
+        AND role='user'
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (conversation_id,)
+    )
+
+    last_user = cur.fetchone()
+
+    conn.close()
+
+    if not last_user:
+        return {
+            "success": False
+        }
+
+    ai_response = (
+        generate_ai_response(
+            last_user["content"],
+            "gpt-4o-mini"
+        )
+    )
+
+    save_assistant_message(
+        conversation_id,
+        ai_response
+    )
+
+    return {
+        "success": True,
+        "response": ai_response
+    }
+
+# =========================================================
+# PART 2C COMPLETE
+# NEXT:
+# PART 2D
+# CHAT EXPORT + IMPORT
+# =========================================================
+# =========================================================
+# PART 2D
+# CHAT EXPORT + IMPORT
+# PASTE BELOW PART 2C
+# =========================================================
+
+import json
+
+# =========================================================
+# IMPORT REQUEST MODEL
+# =========================================================
+
+class ImportConversationRequest(
+    BaseModel
+):
+    user_id: str
+    title: str
+    messages: list
+
+# =========================================================
+# EXPORT CONVERSATION
+# =========================================================
+
+@app.get(
+    "/api/conversations/export/{conversation_id}"
+)
+def export_conversation(
+    conversation_id: str
+):
+
+    conversation = get_conversation(
+        conversation_id
+    )
+
+    if not conversation:
+        return {
+            "success": False,
+            "message":
+            "Conversation not found"
+        }
 
     conn = get_db()
     cur = conn.cursor()
@@ -1440,451 +2216,1755 @@ def get_conversation_messages(
         (conversation_id,)
     )
 
-    rows = cur.fetchall()
-
-    conn.close()
-
-    return [
+    messages = [
         dict(row)
-        for row in rows
+        for row in cur.fetchall()
     ]
 
-
-# =========================================================
-# PART 7D
-# BUILD AI MESSAGE HISTORY
-# PASTE BELOW PART 7C
-# =========================================================
-
-def build_ai_messages(
-    conversation_id
-):
-
-    history = []
-
-    messages = get_conversation_messages(
-        conversation_id
-    )
-
-    for msg in messages:
-
-        role = msg.get(
-            "role",
-            "user"
-        )
-
-        content = msg.get(
-            "content",
-            ""
-        )
-
-        history.append(
-            {
-                "role": role,
-                "content": content
-            }
-        )
-
-    return history
-
-
-# =========================================================
-# PART 7E
-# SEND REQUEST TO AI API
-# PASTE BELOW PART 7D
-# =========================================================
-
-def send_to_ai(
-    messages,
-    model=DEFAULT_MODEL
-):
-
-    headers = {
-        "Authorization":
-        f"Bearer {AI_API_KEY}",
-        "Content-Type":
-        "application/json"
-    }
-
-    payload = {
-        "model": model,
-        "messages": messages
-    }
-
-    response = requests.post(
-        AI_API_URL,
-        headers=headers,
-        json=payload,
-        timeout=120
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-# =========================================================
-# PART 7F
-# PARSE AI RESPONSE
-# PASTE BELOW PART 7E
-# =========================================================
-
-def extract_ai_text(
-    response_data
-):
-
-    try:
-
-        return response_data[
-            "choices"
-        ][0][
-            "message"
-        ][
-            "content"
-        ]
-
-    except Exception:
-
-        return (
-            "Sorry, I could not "
-            "generate a response."
-        )
-
-
-# =========================================================
-# PART 7G
-# SAVE AI RESPONSE TO DATABASE
-# PASTE BELOW PART 7F
-# =========================================================
-
-def save_ai_message(
-    conversation_id,
-    response_text
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO messages
-        VALUES(?,?,?,?,?)
-        """,
-        (
-            generate_id(),
-            conversation_id,
-            "assistant",
-            response_text,
-            now()
-        )
-    )
-
-    cur.execute(
-        """
-        UPDATE conversations
-        SET updated_at=?
-        WHERE id=?
-        """,
-        (
-            now(),
-            conversation_id
-        )
-    )
-
-    conn.commit()
     conn.close()
 
-
-# =========================================================
-# PART 7H
-# SAVE USER MESSAGE TO DATABASE
-# PASTE BELOW PART 7G
-# =========================================================
-
-def save_user_message(
-    conversation_id,
-    message_text
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO messages
-        VALUES(?,?,?,?,?)
-        """,
-        (
-            generate_id(),
-            conversation_id,
-            "user",
-            message_text,
-            now()
-        )
-    )
-
-    cur.execute(
-        """
-        UPDATE conversations
-        SET updated_at=?
-        WHERE id=?
-        """,
-        (
-            now(),
-            conversation_id
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-
-# =========================================================
-# PART 7I
-# GENERATE AI RESPONSE
-# PASTE BELOW PART 7H
-# =========================================================
-
-# =========================================================
-# PART 7I
-# GENERATE AI RESPONSE
-# =========================================================
-
-def generate_ai_response(
-    conversation_id,
-    user_message,
-    model=DEFAULT_MODEL
-):
-    save_user_message(
-        conversation_id,
-        user_message
-    )
-
-    messages = build_ai_messages(
-        conversation_id
-    )
-
-    response_data = send_to_ai(
-        messages,
-        model
-    )
-
-    ai_text = extract_ai_text(
-        response_data
-    )
-
-    save_ai_message(
-        conversation_id,
-        ai_text
-    )
-
-    return ai_text
-# =========================================================
-# PART 7K
-# REGENERATE LAST AI RESPONSE
-# PASTE BELOW PART 7J
-# =========================================================
-
-@app.post("/api/ai/regenerate")
-def regenerate_response(
-    data: AIChatRequest
-):
-
-    try:
-
-        messages = get_conversation_messages(
-            data.conversation_id
-        )
-
-        last_user_message = None
-
-        for msg in reversed(messages):
-
-            if msg["role"] == "user":
-
-                last_user_message = (
-                    msg["content"]
-                )
-
-                break
-
-        if not last_user_message:
-
-            return {
-                "success": False,
-                "error":
-                "No user message found"
-            }
-
-        response_text = (
-            generate_ai_response(
-                data.conversation_id,
-                last_user_message,
-                data.model
-            )
-        )
-
-        return {
-            "success": True,
-            "response": response_text
-        }
-
-    except Exception as e:
-
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-
-# =========================================================
-# PART 7L
-# AI STATUS + MODEL INFORMATION
-# PASTE BELOW PART 7K
-# =========================================================
-
-@app.get("/api/ai/status")
-def ai_status():
-
     return {
         "success": True,
-        "api_configured": bool(
-            AI_API_KEY
-        ),
-        "default_model":
-        DEFAULT_MODEL,
-        "api_url":
-        AI_API_URL
-    }
-
-
-@app.get("/api/ai/models")
-def ai_models():
-
-    return {
-        "success": True,
-        "models": [
-            "gpt-4o",
-            "gpt-4o-mini",
-            "gpt-4.1",
-            "gpt-4.1-mini"
-        ]
-    }
-
-
-# =========================================================
-# PART 7M
-# FINAL AI HELPERS + HEALTH CHECK
-# PASTE BELOW PART 7L
-# =========================================================
-
-def ai_available():
-
-    return bool(
-        AI_API_KEY
-    )
-
-
-def get_active_model():
-
-    return DEFAULT_MODEL
-
-
-@app.get("/api/ai/health")
-def ai_health():
-
-    return {
-        "success": True,
-        "ai_available":
-        ai_available(),
-        "model":
-        get_active_model(),
-        "timestamp":
-        now()
-    }
-
-
-# =========================================================
-# PART 7N
-# SYSTEM PROMPT + AI CONTEXT HELPERS
-# PASTE BELOW PART 7M
-# =========================================================
-
-SYSTEM_PROMPT = """
-You are Bloxy-Bot X,
-a helpful AI assistant.
-
-Be accurate,
-friendly,
-and concise.
-"""
-
-def build_system_context():
-
-    return [
-        {
-            "role": "system",
-            "content":
-            SYSTEM_PROMPT
-        }
-    ]
-
-
-def build_full_context(
-    conversation_id
-):
-
-   context = build_system_context()
-
-    context.extend(
-        build_ai_messages(
-            conversation_id
-        )
-    )
-
-    return context
-
-
-# =========================================================
-# PART 7O
-# FINAL AI CHAT V2 ENDPOINT
-# PASTE BELOW PART 7N
-# =========================================================
-
-@app.post("/api/ai/chat/v2")
-def ai_chat_v2(
-    data: AIChatRequest
-):
-
-    try:
-
-        save_user_message(
-            data.conversation_id,
-            data.message
-        )
-
-        messages = build_full_context(
-            data.conversation_id
-        )
-
-        response_data = send_to_ai(
+        "conversation":
+            dict(conversation),
+        "messages":
             messages,
-            data.model
+        "exported_at":
+            now()
+    }
+
+# =========================================================
+# IMPORT CONVERSATION
+# =========================================================
+
+@app.post(
+    "/api/conversations/import"
+)
+def import_conversation(
+    data: ImportConversationRequest
+):
+
+    conversation_id = generate_id()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO conversations
+        VALUES(?,?,?,?,?,?,?)
+        """,
+        (
+            conversation_id,
+            data.user_id,
+            data.title,
+            0,
+            0,
+            now(),
+            now()
+        )
+    )
+
+    for msg in data.messages:
+
+        cur.execute(
+            """
+            INSERT INTO messages
+            VALUES(?,?,?,?,?,?)
+            """,
+            (
+                generate_id(),
+                conversation_id,
+                msg.get(
+                    "user_id",
+                    data.user_id
+                ),
+                msg.get(
+                    "role",
+                    "user"
+                ),
+                msg.get(
+                    "content",
+                    ""
+                ),
+                msg.get(
+                    "created_at",
+                    now()
+                )
+            )
         )
 
-        ai_text = extract_ai_text(
-            response_data
+    conn.commit()
+    conn.close()
+
+    create_audit_log(
+        data.user_id,
+        "conversation_imported"
+    )
+
+    return {
+        "success": True,
+        "conversation_id":
+            conversation_id
+    }
+
+# =========================================================
+# DUPLICATE CONVERSATION
+# =========================================================
+
+@app.post(
+    "/api/conversations/duplicate/{conversation_id}"
+)
+def duplicate_conversation(
+    conversation_id: str
+):
+
+    original = get_conversation(
+        conversation_id
+    )
+
+    if not original:
+        return {
+            "success": False
+        }
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    new_id = generate_id()
+
+    cur.execute(
+        """
+        INSERT INTO conversations
+        VALUES(?,?,?,?,?,?,?)
+        """,
+        (
+            new_id,
+            original["user_id"],
+            f"{original['title']} Copy",
+            0,
+            0,
+            now(),
+            now()
+        )
+    )
+
+    cur.execute(
+        """
+        SELECT *
+        FROM messages
+        WHERE conversation_id=?
+        ORDER BY created_at ASC
+        """,
+        (conversation_id,)
+    )
+
+    for msg in cur.fetchall():
+
+        cur.execute(
+            """
+            INSERT INTO messages
+            VALUES(?,?,?,?,?,?)
+            """,
+            (
+                generate_id(),
+                new_id,
+                msg["user_id"],
+                msg["role"],
+                msg["content"],
+                msg["created_at"]
+            )
         )
 
-        save_ai_message(
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "conversation_id":
+            new_id
+    }
+
+# =========================================================
+# CLEAR CONVERSATION
+# =========================================================
+
+@app.delete(
+    "/api/conversations/clear/{conversation_id}"
+)
+def clear_conversation(
+    conversation_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        DELETE FROM messages
+        WHERE conversation_id=?
+        """,
+        (conversation_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# PART 2D COMPLETE
+# NEXT:
+# PART 2E
+# CHAT SHARING + FAVORITES + FOLDERS
+# =========================================================
+# =========================================================
+# PART 2E
+# CHAT SHARING + FAVORITES + FOLDERS
+# PASTE BELOW PART 2D
+# =========================================================
+
+# =========================================================
+# TABLES
+# =========================================================
+
+def create_organization_tables():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS folders(
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        name TEXT,
+        created_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS shared_chats(
+        id TEXT PRIMARY KEY,
+        conversation_id TEXT,
+        share_token TEXT,
+        created_at TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+create_organization_tables()
+
+# =========================================================
+# REQUEST MODELS
+# =========================================================
+
+class CreateFolderRequest(BaseModel):
+    user_id: str
+    name: str
+
+class MoveConversationRequest(BaseModel):
+    conversation_id: str
+    folder_id: str
+
+# =========================================================
+# ADD OPTIONAL COLUMNS
+# =========================================================
+
+try:
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        "ALTER TABLE conversations ADD COLUMN folder_id TEXT"
+    )
+
+    cur.execute(
+        "ALTER TABLE conversations ADD COLUMN favorite INTEGER DEFAULT 0"
+    )
+
+    conn.commit()
+    conn.close()
+
+except:
+    pass
+
+# =========================================================
+# FAVORITE CONVERSATION
+# =========================================================
+
+@app.post(
+    "/api/conversations/favorite/{conversation_id}"
+)
+def favorite_conversation(
+    conversation_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE conversations
+        SET favorite=1
+        WHERE id=?
+        """,
+        (conversation_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# CREATE FOLDER
+# =========================================================
+
+@app.post("/api/folders/create")
+def create_folder(
+    data: CreateFolderRequest
+):
+
+    folder_id = generate_id()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO folders
+        VALUES(?,?,?,?)
+        """,
+        (
+            folder_id,
+            data.user_id,
+            data.name,
+            now()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "folder_id": folder_id
+    }
+
+# =========================================================
+# LIST FOLDERS
+# =========================================================
+
+@app.get("/api/folders/{user_id}")
+def list_folders(
+    user_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM folders
+        WHERE user_id=?
+        ORDER BY name ASC
+        """,
+        (user_id,)
+    )
+
+    folders = [
+        dict(row)
+        for row in cur.fetchall()
+    ]
+
+    conn.close()
+
+    return {
+        "success": True,
+        "folders": folders
+    }
+
+# =========================================================
+# MOVE CONVERSATION
+# =========================================================
+
+@app.post("/api/conversations/move")
+def move_conversation(
+    data: MoveConversationRequest
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE conversations
+        SET folder_id=?
+        WHERE id=?
+        """,
+        (
+            data.folder_id,
+            data.conversation_id
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# SHARE CHAT
+# =========================================================
+
+@app.post(
+    "/api/conversations/share/{conversation_id}"
+)
+def share_chat(
+    conversation_id: str
+):
+
+    share_token = generate_token()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO shared_chats
+        VALUES(?,?,?,?)
+        """,
+        (
+            generate_id(),
+            conversation_id,
+            share_token,
+            now()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "share_token": share_token
+    }
+
+# =========================================================
+# VIEW SHARED CHAT
+# =========================================================
+
+@app.get("/api/shared/{share_token}")
+def view_shared_chat(
+    share_token: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM shared_chats
+        WHERE share_token=?
+        """,
+        (share_token,)
+    )
+
+    shared = cur.fetchone()
+
+    if not shared:
+        conn.close()
+        return {
+            "success": False
+        }
+
+    cur.execute(
+        """
+        SELECT *
+        FROM messages
+        WHERE conversation_id=?
+        ORDER BY created_at ASC
+        """,
+        (
+            shared["conversation_id"],
+        )
+    )
+
+    messages = [
+        dict(row)
+        for row in cur.fetchall()
+    ]
+
+    conn.close()
+
+    return {
+        "success": True,
+        "messages": messages
+    }
+
+# =========================================================
+# PART 2E COMPLETE
+# NEXT:
+# PART 2F
+# TAGS + SEARCH INDEXING +
+# CHAT ANALYTICS + SMART FILTERS
+# =========================================================
+# =========================================================
+# PART 2F
+# TAGS + SEARCH INDEXING + ANALYTICS
+# PASTE BELOW PART 2E
+# =========================================================
+
+# =========================================================
+# TABLES
+# =========================================================
+
+def create_tag_tables():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS conversation_tags(
+        id TEXT PRIMARY KEY,
+        conversation_id TEXT,
+        tag TEXT,
+        created_at TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+create_tag_tables()
+
+# =========================================================
+# REQUEST MODELS
+# =========================================================
+
+class AddTagRequest(BaseModel):
+    conversation_id: str
+    tag: str
+
+class RemoveTagRequest(BaseModel):
+    conversation_id: str
+    tag: str
+
+# =========================================================
+# ADD TAG
+# =========================================================
+
+@app.post("/api/tags/add")
+def add_tag(
+    data: AddTagRequest
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO conversation_tags
+        VALUES(?,?,?,?)
+        """,
+        (
+            generate_id(),
             data.conversation_id,
-            ai_text
+            data.tag.lower(),
+            now()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# REMOVE TAG
+# =========================================================
+
+@app.post("/api/tags/remove")
+def remove_tag(
+    data: RemoveTagRequest
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        DELETE FROM conversation_tags
+        WHERE conversation_id=?
+        AND tag=?
+        """,
+        (
+            data.conversation_id,
+            data.tag.lower()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# LIST TAGS
+# =========================================================
+
+@app.get(
+    "/api/tags/{conversation_id}"
+)
+def list_tags(
+    conversation_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT tag
+        FROM conversation_tags
+        WHERE conversation_id=?
+        ORDER BY tag ASC
+        """,
+        (conversation_id,)
+    )
+
+    tags = [
+        row["tag"]
+        for row in cur.fetchall()
+    ]
+
+    conn.close()
+
+    return {
+        "success": True,
+        "tags": tags
+    }
+
+# =========================================================
+# SEARCH BY TAG
+# =========================================================
+
+@app.get(
+    "/api/search/tag/{tag}"
+)
+def search_by_tag(
+    tag: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT c.*
+        FROM conversations c
+        JOIN conversation_tags t
+        ON c.id=t.conversation_id
+        WHERE t.tag=?
+        ORDER BY c.updated_at DESC
+        """,
+        (
+            tag.lower(),
+        )
+    )
+
+    rows = [
+        dict(row)
+        for row in cur.fetchall()
+    ]
+
+    conn.close()
+
+    return {
+        "success": True,
+        "results": rows
+    }
+
+# =========================================================
+# USER ANALYTICS
+# =========================================================
+
+@app.get(
+    "/api/analytics/user/{user_id}"
+)
+def user_analytics(
+    user_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT COUNT(*)
+        FROM conversations
+        WHERE user_id=?
+        """,
+        (user_id,)
+    )
+
+    conversations = (
+        cur.fetchone()[0]
+    )
+
+    cur.execute(
+        """
+        SELECT COUNT(*)
+        FROM messages
+        WHERE user_id=?
+        """,
+        (user_id,)
+    )
+
+    messages = (
+        cur.fetchone()[0]
+    )
+
+    conn.close()
+
+    return {
+        "success": True,
+        "conversations":
+            conversations,
+        "messages":
+            messages
+    }
+
+# =========================================================
+# TOP ACTIVE CHATS
+# =========================================================
+
+@app.get(
+    "/api/analytics/top-chats"
+)
+def top_chats():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT
+            conversation_id,
+            COUNT(*) as total
+        FROM messages
+        GROUP BY conversation_id
+        ORDER BY total DESC
+        LIMIT 20
+        """
+    )
+
+    rows = [
+        dict(row)
+        for row in cur.fetchall()
+    ]
+
+    conn.close()
+
+    return {
+        "success": True,
+        "results": rows
+    }
+
+# =========================================================
+# PART 2F COMPLETE
+# NEXT:
+# PART 2G
+# CHAT MEMORY + PINNED MESSAGES +
+# PROMPTS + SYSTEM INSTRUCTIONS
+# =========================================================
+# =========================================================
+# PART 2G
+# CHAT MEMORY + PINNED MESSAGES +
+# PROMPTS + SYSTEM INSTRUCTIONS
+# PASTE BELOW PART 2F
+# =========================================================
+
+# =========================================================
+# TABLES
+# =========================================================
+
+def create_memory_tables():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS pinned_messages(
+        id TEXT PRIMARY KEY,
+        message_id TEXT,
+        conversation_id TEXT,
+        created_at TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS system_prompts(
+        id TEXT PRIMARY KEY,
+        conversation_id TEXT,
+        prompt TEXT,
+        created_at TEXT,
+        updated_at TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+create_memory_tables()
+
+# =========================================================
+# REQUEST MODELS
+# =========================================================
+
+class PinMessageRequest(BaseModel):
+    message_id: str
+    conversation_id: str
+
+class SystemPromptRequest(BaseModel):
+    conversation_id: str
+    prompt: str
+
+# =========================================================
+# PIN MESSAGE
+# =========================================================
+
+@app.post("/api/messages/pin")
+def pin_message(
+    data: PinMessageRequest
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO pinned_messages
+        VALUES(?,?,?,?)
+        """,
+        (
+            generate_id(),
+            data.message_id,
+            data.conversation_id,
+            now()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# UNPIN MESSAGE
+# =========================================================
+
+@app.delete(
+    "/api/messages/unpin/{message_id}"
+)
+def unpin_message(
+    message_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        DELETE FROM pinned_messages
+        WHERE message_id=?
+        """,
+        (message_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# LIST PINNED MESSAGES
+# =========================================================
+
+@app.get(
+    "/api/messages/pinned/{conversation_id}"
+)
+def pinned_messages(
+    conversation_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT m.*
+        FROM messages m
+        JOIN pinned_messages p
+        ON m.id=p.message_id
+        WHERE p.conversation_id=?
+        ORDER BY p.created_at DESC
+        """,
+        (conversation_id,)
+    )
+
+    rows = [
+        dict(row)
+        for row in cur.fetchall()
+    ]
+
+    conn.close()
+
+    return {
+        "success": True,
+        "messages": rows
+    }
+
+# =========================================================
+# SAVE SYSTEM PROMPT
+# =========================================================
+
+@app.post(
+    "/api/system-prompt/save"
+)
+def save_system_prompt(
+    data: SystemPromptRequest
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM system_prompts
+        WHERE conversation_id=?
+        """,
+        (
+            data.conversation_id,
+        )
+    )
+
+    existing = cur.fetchone()
+
+    if existing:
+
+        cur.execute(
+            """
+            UPDATE system_prompts
+            SET prompt=?,
+                updated_at=?
+            WHERE conversation_id=?
+            """,
+            (
+                data.prompt,
+                now(),
+                data.conversation_id
+            )
+        )
+
+    else:
+
+        cur.execute(
+            """
+            INSERT INTO system_prompts
+            VALUES(?,?,?,?,?)
+            """,
+            (
+                generate_id(),
+                data.conversation_id,
+                data.prompt,
+                now(),
+                now()
+            )
+        )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# GET SYSTEM PROMPT
+# =========================================================
+
+@app.get(
+    "/api/system-prompt/{conversation_id}"
+)
+def get_system_prompt(
+    conversation_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM system_prompts
+        WHERE conversation_id=?
+        """,
+        (conversation_id,)
+    )
+
+    row = cur.fetchone()
+
+    conn.close()
+
+    return {
+        "success": True,
+        "prompt":
+            row["prompt"]
+            if row else ""
+    }
+
+# =========================================================
+# MEMORY SUMMARY
+# =========================================================
+
+@app.get(
+    "/api/chat/memory/{conversation_id}"
+)
+def chat_memory(
+    conversation_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT COUNT(*)
+        FROM messages
+        WHERE conversation_id=?
+        """,
+        (conversation_id,)
+    )
+
+    total_messages = (
+        cur.fetchone()[0]
+    )
+
+    conn.close()
+
+    return {
+        "success": True,
+        "conversation_id":
+            conversation_id,
+        "messages":
+            total_messages
+    }
+
+# =========================================================
+# PART 2G COMPLETE
+# NEXT:
+# PART 3A
+# FILE UPLOADS + ATTACHMENTS +
+# IMAGE STORAGE + MEDIA SYSTEM
+# =========================================================
+# =========================================================
+# PART 3A
+# FILE UPLOADS + ATTACHMENTS + MEDIA SYSTEM
+# PASTE BELOW PART 2G
+# =========================================================
+
+import os
+import shutil
+
+# =========================================================
+# FASTAPI FILES
+# =========================================================
+
+from fastapi import UploadFile, File
+
+# =========================================================
+# UPLOAD DIRECTORY
+# =========================================================
+
+UPLOAD_DIR = "uploads"
+
+os.makedirs(
+    UPLOAD_DIR,
+    exist_ok=True
+)
+
+# =========================================================
+# TABLES
+# =========================================================
+
+def create_media_tables():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS attachments(
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        conversation_id TEXT,
+        filename TEXT,
+        file_type TEXT,
+        file_size INTEGER,
+        file_path TEXT,
+        created_at TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+create_media_tables()
+
+# =========================================================
+# FILE HELPERS
+# =========================================================
+
+def get_attachment(
+    attachment_id
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM attachments
+        WHERE id=?
+        """,
+        (attachment_id,)
+    )
+
+    row = cur.fetchone()
+
+    conn.close()
+
+    return row
+
+# =========================================================
+# UPLOAD FILE
+# =========================================================
+
+@app.post("/api/files/upload")
+async def upload_file(
+    user_id: str,
+    conversation_id: str,
+    file: UploadFile = File(...)
+):
+
+    attachment_id = generate_id()
+
+    filename = (
+        f"{attachment_id}_"
+        f"{file.filename}"
+    )
+
+    filepath = os.path.join(
+        UPLOAD_DIR,
+        filename
+    )
+
+    with open(
+        filepath,
+        "wb"
+    ) as buffer:
+
+        shutil.copyfileobj(
+            file.file,
+            buffer
+        )
+
+    file_size = (
+        os.path.getsize(filepath)
+    )
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO attachments
+        VALUES(?,?,?,?,?,?,?,?)
+        """,
+        (
+            attachment_id,
+            user_id,
+            conversation_id,
+            file.filename,
+            file.content_type,
+            file_size,
+            filepath,
+            now()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    create_audit_log(
+        user_id,
+        "file_uploaded"
+    )
+
+    return {
+        "success": True,
+        "attachment_id":
+            attachment_id,
+        "filename":
+            file.filename,
+        "size":
+            file_size
+    }
+
+# =========================================================
+# LIST ATTACHMENTS
+# =========================================================
+
+@app.get(
+    "/api/files/{conversation_id}"
+)
+def list_attachments(
+    conversation_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM attachments
+        WHERE conversation_id=?
+        ORDER BY created_at DESC
+        """,
+        (conversation_id,)
+    )
+
+    files = [
+        dict(row)
+        for row in cur.fetchall()
+    ]
+
+    conn.close()
+
+    return {
+        "success": True,
+        "files": files
+    }
+
+# =========================================================
+# ATTACHMENT DETAILS
+# =========================================================
+
+@app.get(
+    "/api/file/{attachment_id}"
+)
+def file_details(
+    attachment_id: str
+):
+
+    attachment = get_attachment(
+        attachment_id
+    )
+
+    if not attachment:
+        return {
+            "success": False
+        }
+
+    return {
+        "success": True,
+        "file":
+            dict(attachment)
+    }
+
+# =========================================================
+# DELETE FILE
+# =========================================================
+
+@app.delete(
+    "/api/file/delete/{attachment_id}"
+)
+def delete_file(
+    attachment_id: str
+):
+
+    attachment = get_attachment(
+        attachment_id
+    )
+
+    if not attachment:
+        return {
+            "success": False
+        }
+
+    try:
+
+        if os.path.exists(
+            attachment["file_path"]
+        ):
+            os.remove(
+                attachment["file_path"]
+            )
+
+    except:
+        pass
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        DELETE FROM attachments
+        WHERE id=?
+        """,
+        (attachment_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# STORAGE STATS
+# =========================================================
+
+@app.get(
+    "/api/storage/stats"
+)
+def storage_stats():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT COUNT(*)
+        FROM attachments
+        """
+    )
+
+    total_files = (
+        cur.fetchone()[0]
+    )
+
+    cur.execute(
+        """
+        SELECT SUM(file_size)
+        FROM attachments
+        """
+    )
+
+    total_storage = (
+        cur.fetchone()[0] or 0
+    )
+
+    conn.close()
+
+    return {
+        "success": True,
+        "files":
+            total_files,
+        "storage_bytes":
+            total_storage
+    }
+
+# =========================================================
+# PART 3A COMPLETE
+# NEXT:
+# PART 3B
+# IMAGE PROCESSING +
+# AVATARS + PROFILE MEDIA +
+# IMAGE GENERATION
+# =========================================================
+# =========================================================
+# PART 3B
+# IMAGE PROCESSING + AVATARS + PROFILE MEDIA
+# PASTE BELOW PART 3A
+# =========================================================
+
+from PIL import Image
+
+# =========================================================
+# PROFILE MEDIA TABLE
+# =========================================================
+
+def create_profile_media_tables():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS profile_media(
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        avatar_path TEXT,
+        banner_path TEXT,
+        updated_at TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+create_profile_media_tables()
+
+# =========================================================
+# IMAGE DIRECTORY
+# =========================================================
+
+IMAGE_DIR = "uploads/images"
+
+os.makedirs(
+    IMAGE_DIR,
+    exist_ok=True
+)
+
+# =========================================================
+# RESIZE IMAGE
+# =========================================================
+
+def resize_image(
+    filepath,
+    width=512,
+    height=512
+):
+
+    try:
+
+        image = Image.open(
+            filepath
+        )
+
+        image.thumbnail(
+            (width, height)
+        )
+
+        image.save(
+            filepath
+        )
+
+        return True
+
+    except:
+        return False
+
+# =========================================================
+# UPLOAD AVATAR
+# =========================================================
+
+@app.post(
+    "/api/profile/avatar"
+)
+async def upload_avatar(
+    user_id: str,
+    file: UploadFile = File(...)
+):
+
+    media_id = generate_id()
+
+    filename = (
+        f"avatar_{media_id}.png"
+    )
+
+    filepath = os.path.join(
+        IMAGE_DIR,
+        filename
+    )
+
+    with open(
+        filepath,
+        "wb"
+    ) as buffer:
+
+        shutil.copyfileobj(
+            file.file,
+            buffer
+        )
+
+    resize_image(
+        filepath,
+        512,
+        512
+    )
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT OR REPLACE
+        INTO profile_media
+        VALUES(?,?,?,?,?)
+        """,
+        (
+            media_id,
+            user_id,
+            filepath,
+            "",
+            now()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "avatar": filepath
+    }
+
+# =========================================================
+# UPLOAD BANNER
+# =========================================================
+
+@app.post(
+    "/api/profile/banner"
+)
+async def upload_banner(
+    user_id: str,
+    file: UploadFile = File(...)
+):
+
+    filename = (
+        f"banner_{generate_id()}.png"
+    )
+
+    filepath = os.path.join(
+        IMAGE_DIR,
+        filename
+    )
+
+    with open(
+        filepath,
+        "wb"
+    ) as buffer:
+
+        shutil.copyfileobj(
+            file.file,
+            buffer
+        )
+
+    resize_image(
+        filepath,
+        1600,
+        600
+    )
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE profile_media
+        SET banner_path=?,
+            updated_at=?
+        WHERE user_id=?
+        """,
+        (
+            filepath,
+            now(),
+            user_id
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "banner": filepath
+    }
+
+# =========================================================
+# GET PROFILE MEDIA
+# =========================================================
+
+@app.get(
+    "/api/profile/media/{user_id}"
+)
+def get_profile_media(
+    user_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM profile_media
+        WHERE user_id=?
+        """,
+        (user_id,)
+    )
+
+    row = cur.fetchone()
+
+    conn.close()
+
+    return {
+        "success": True,
+        "media":
+            dict(row)
+            if row else None
+    }
+
+# =========================================================
+# DELETE AVATAR
+# =========================================================
+
+@app.delete(
+    "/api/profile/avatar/{user_id}"
+)
+def delete_avatar(
+    user_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE profile_media
+        SET avatar_path=''
+        WHERE user_id=?
+        """,
+        (user_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# PART 3B COMPLETE
+# NEXT:
+# PART 3C
+# IMAGE GENERATION +
+# OCR + FILE PREVIEWS +
+# MEDIA ANALYTICS
+# =========================================================
+# =========================================================
+# PART 3C
+# IMAGE GENERATION + OCR + FILE PREVIEWS
+# PASTE BELOW PART 3B
+# =========================================================
+
+import base64
+
+# =========================================================
+# OPTIONAL OCR
+# =========================================================
+
+try:
+
+    import pytesseract
+
+    OCR_ENABLED = True
+
+except:
+
+    OCR_ENABLED = False
+
+# =========================================================
+# MEDIA ANALYTICS TABLE
+# =========================================================
+
+def create_media_analytics_tables():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS media_analytics(
+        id TEXT PRIMARY KEY,
+        attachment_id TEXT,
+        views INTEGER DEFAULT 0,
+        downloads INTEGER DEFAULT 0,
+        created_at TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+create_media_analytics_tables()
+
+# =========================================================
+# OCR IMAGE
+# =========================================================
+
+@app.get(
+    "/api/media/ocr/{attachment_id}"
+)
+def image_ocr(
+    attachment_id: str
+):
+
+    if not OCR_ENABLED:
+
+        return {
+            "success": False,
+            "message":
+            "OCR not installed"
+        }
+
+    attachment = get_attachment(
+        attachment_id
+    )
+
+    if not attachment:
+        return {
+            "success": False
+        }
+
+    try:
+
+        image = Image.open(
+            attachment["file_path"]
+        )
+
+        text = (
+            pytesseract.image_to_string(
+                image
+            )
         )
 
         return {
             "success": True,
-            "response": ai_text,
-            "model": data.model
+            "text": text
         }
 
     except Exception as e:
@@ -1894,2015 +3974,1748 @@ def ai_chat_v2(
             "error": str(e)
         }
 
-
 # =========================================================
-# PART 8A
-# EXTERNAL API MANAGER
-# PASTE BELOW PART 7O
+# IMAGE PREVIEW
 # =========================================================
 
-class APIManager:
-
-    def __init__(self):
-
-        self.openai_key = os.getenv(
-            "OPENAI_API_KEY"
-        )
-
-        self.groq_key = os.getenv(
-            "GROQ_API_KEY"
-        )
-
-        self.kimi_key = os.getenv(
-            "KIMI_API_KEY"
-        )
-
-    def available_providers(self):
-
-        providers = []
-
-        if self.openai_key:
-            providers.append("openai")
-
-        if self.groq_key:
-            providers.append("groq")
-
-        if self.kimi_key:
-            providers.append("kimi")
-
-        return providers
-
-
-api_manager = APIManager()
-
-
-# =========================================================
-# PART 8B
-# PROVIDER SELECTION
-# PASTE BELOW PART 8A
-# =========================================================
-
-def get_provider_config(
-    provider="openai"
+@app.get(
+    "/api/media/preview/{attachment_id}"
+)
+def media_preview(
+    attachment_id: str
 ):
 
-    if provider == "openai":
+    attachment = get_attachment(
+        attachment_id
+    )
 
+    if not attachment:
         return {
-            "name": "openai",
-            "api_key": os.getenv(
-                "OPENAI_API_KEY"
-            ),
-            "url":
-            "https://api.openai.com/v1/chat/completions"
+            "success": False
         }
-
-    elif provider == "groq":
-
-        return {
-            "name": "groq",
-            "api_key": os.getenv(
-                "GROQ_API_KEY"
-            ),
-            "url":
-            "https://api.groq.com/openai/v1/chat/completions"
-        }
-
-    elif provider == "kimi":
-
-        return {
-            "name": "kimi",
-            "api_key": os.getenv(
-                "KIMI_API_KEY"
-            ),
-            "url":
-            "https://api.moonshot.ai/v1/chat/completions"
-        }
-
-    return None
-
-
-# =========================================================
-# PART 8C
-# PROVIDER REQUEST MODEL
-# PASTE BELOW PART 8B
-# =========================================================
-
-from pydantic import BaseModel
-
-class ProviderChatRequest(BaseModel):
-
-    conversation_id: str
-    message: str
-
-    provider: str = "openai"
-
-    model: str = DEFAULT_MODEL
-
-
-# =========================================================
-# PART 8D
-# SEND REQUEST USING SELECTED PROVIDER
-# PASTE BELOW PART 8C
-# =========================================================
-
-def send_to_provider(
-    messages,
-    provider="openai",
-    model=DEFAULT_MODEL
-):
-
-    config = get_provider_config(
-        provider
-    )
-
-    if not config:
-
-        raise Exception(
-            "Provider not found"
-        )
-
-    headers = {
-        "Authorization":
-        f"Bearer {config['api_key']}",
-        "Content-Type":
-        "application/json"
-    }
-
-    payload = {
-        "model": model,
-        "messages": messages
-    }
-
-    response = requests.post(
-        config["url"],
-        headers=headers,
-        json=payload,
-        timeout=120
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-# =========================================================
-# PART 8E
-# GENERATE RESPONSE USING SELECTED PROVIDER
-# PASTE BELOW PART 8D
-# =========================================================
-
-def generate_provider_response(
-    conversation_id,
-    user_message,
-    provider="openai",
-    model=DEFAULT_MODEL
-):
-
-    save_user_message(
-        conversation_id,
-        user_message
-    )
-
-    messages = build_full_context(
-        conversation_id
-    )
-
-    response_data = send_to_provider(
-        messages,
-        provider,
-        model
-    )
-
-    ai_text = extract_ai_text(
-        response_data
-    )
-
-    save_ai_message(
-        conversation_id,
-        ai_text
-    )
-
-    return ai_text
-
-
-# =========================================================
-# PART 8F
-# MULTI-PROVIDER CHAT ENDPOINT
-# PASTE BELOW PART 8E
-# =========================================================
-
-@app.post("/api/provider/chat")
-def provider_chat(
-    data: ProviderChatRequest
-):
 
     try:
 
-        response_text = (
-            generate_provider_response(
-                data.conversation_id,
-                data.message,
-                data.provider,
-                data.model
+        with open(
+            attachment["file_path"],
+            "rb"
+        ) as f:
+
+            encoded = (
+                base64.b64encode(
+                    f.read()
+                ).decode()
             )
-        )
 
         return {
             "success": True,
-            "provider":
-            data.provider,
-            "response":
-            response_text
+            "filename":
+                attachment["filename"],
+            "preview":
+                encoded
         }
 
     except Exception as e:
 
         return {
             "success": False,
-            "provider":
-            data.provider,
-            "error":
-            str(e)
+            "error": str(e)
         }
 
-
 # =========================================================
-# PART 8G
-# LIST AVAILABLE PROVIDERS
-# PASTE BELOW PART 8F
+# TRACK VIEW
 # =========================================================
 
-@app.get("/api/providers")
-def get_providers():
-
-    providers = (
-        api_manager
-        .available_providers()
-    )
-
-    return {
-        "success": True,
-        "count":
-        len(providers),
-        "providers":
-        providers
-    }
-
-
-# =========================================================
-# PART 8H
-# PROVIDER HEALTH CHECK
-# PASTE BELOW PART 8G
-# =========================================================
-
-@app.get("/api/providers/health")
-def provider_health():
-
-    providers = (
-        api_manager
-        .available_providers()
-    )
-
-    results = []
-
-    for provider in providers:
-
-        try:
-
-            config = (
-                get_provider_config(
-                    provider
-                )
-            )
-
-            results.append(
-                {
-                    "provider":
-                    provider,
-                    "configured":
-                    bool(
-                        config[
-                            "api_key"
-                        ]
-                    ),
-                    "status":
-                    "available"
-                }
-            )
-
-        except Exception:
-
-            results.append(
-                {
-                    "provider":
-                    provider,
-                    "configured":
-                    False,
-                    "status":
-                    "error"
-                }
-            )
-
-    return {
-        "success": True,
-        "providers":
-        results
-    }
-
-
-# =========================================================
-# PART 8H
-# PROVIDER HEALTH CHECK
-# PASTE BELOW PART 8G
-# =========================================================
-
-@app.get("/api/providers/health")
-def provider_health():
-
-    providers = (
-        api_manager
-        .available_providers()
-    )
-
-    results = []
-
-    for provider in providers:
-
-        try:
-
-            config = (
-                get_provider_config(
-                    provider
-                )
-            )
-
-            results.append(
-                {
-                    "provider":
-                    provider,
-                    "configured":
-                    bool(
-                        config[
-                            "api_key"
-                        ]
-                    ),
-                    "status":
-                    "available"
-                }
-            )
-
-        except Exception:
-
-            results.append(
-                {
-                    "provider":
-                    provider,
-                    "configured":
-                    False,
-                    "status":
-                    "error"
-                }
-            )
-
-    return {
-        "success": True,
-        "providers":
-        results
-    }
-
-
-def tavily_search(query):
-    api_key = os.getenv("TAVILY_API_KEY")
-
-    if not api_key:
-        raise Exception(
-            "Tavily API key missing"
-        )
-
-    response = requests.post(
-        "https://api.tavily.com/search",
-        json={
-            "api_key": api_key,
-            "query": query,
-            "max_results": 5
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-# =========================================================
-# PART 8J
-# EXA SEARCH INTEGRATION
-# PASTE BELOW PART 8I
-# =========================================================
-
-def exa_search(
-    query
+@app.post(
+    "/api/media/view/{attachment_id}"
+)
+def track_media_view(
+    attachment_id: str
 ):
 
-    api_key = os.getenv(
-        "EXA_API_KEY"
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM media_analytics
+        WHERE attachment_id=?
+        """,
+        (attachment_id,)
     )
 
-    if not api_key:
+    row = cur.fetchone()
 
-        raise Exception(
-            "Exa API key missing"
-        )
+    if row:
 
-    response = requests.post(
-        "https://api.exa.ai/search",
-        headers={
-            "x-api-key":
-            api_key,
-            "Content-Type":
-            "application/json"
-        },
-        json={
-            "query": query,
-            "numResults": 5
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-@app.get("/api/search/exa")
-def search_exa(
-    query: str
-):
-
-    results = exa_search(
-        query
-    )
-
-    return {
-        "success": True,
-        "source": "exa",
-        "results": results
-    }
-
-
-# =========================================================
-# PART 8K
-# FIRECRAWL WEB SCRAPING INTEGRATION
-# PASTE BELOW PART 8J
-# =========================================================
-
-def firecrawl_scrape(
-    url
-):
-
-    api_key = os.getenv(
-        "FIRECRAWL_API_KEY"
-    )
-
-    if not api_key:
-
-        raise Exception(
-            "Firecrawl API key missing"
-        )
-
-    response = requests.post(
-        "https://api.firecrawl.dev/v1/scrape",
-        headers={
-            "Authorization":
-            f"Bearer {api_key}",
-            "Content-Type":
-            "application/json"
-        },
-        json={
-            "url": url
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-@app.get("/api/search/firecrawl")
-def scrape_firecrawl(
-    url: str
-):
-
-    results = firecrawl_scrape(
-        url
-    )
-
-    return {
-        "success": True,
-        "source": "firecrawl",
-        "results": results
-    }
-
-
-# =========================================================
-# PART 8L
-# UNIFIED SEARCH ROUTER
-# PASTE BELOW PART 8K
-# =========================================================
-
-@app.get("/api/search")
-def unified_search(
-    query: str,
-    source: str = "tavily"
-):
-
-    if source == "tavily":
-
-        results = tavily_search(
-            query
-        )
-
-    elif source == "exa":
-
-        results = exa_search(
-            query
+        cur.execute(
+            """
+            UPDATE media_analytics
+            SET views=views+1
+            WHERE attachment_id=?
+            """,
+            (attachment_id,)
         )
 
     else:
 
+        cur.execute(
+            """
+            INSERT INTO media_analytics
+            VALUES(?,?,?,?,?)
+            """,
+            (
+                generate_id(),
+                attachment_id,
+                1,
+                0,
+                now()
+            )
+        )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# TRACK DOWNLOAD
+# =========================================================
+
+@app.post(
+    "/api/media/download/{attachment_id}"
+)
+def track_download(
+    attachment_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE media_analytics
+        SET downloads=downloads+1
+        WHERE attachment_id=?
+        """,
+        (attachment_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# MEDIA STATS
+# =========================================================
+
+@app.get(
+    "/api/media/stats/{attachment_id}"
+)
+def media_stats(
+    attachment_id: str
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM media_analytics
+        WHERE attachment_id=?
+        """,
+        (attachment_id,)
+    )
+
+    row = cur.fetchone()
+
+    conn.close()
+
+    return {
+        "success": True,
+        "stats":
+            dict(row)
+            if row else {
+                "views": 0,
+                "downloads": 0
+            }
+    }
+
+# =========================================================
+# PART 3C COMPLETE
+# NEXT:
+# PART 3D
+# VIDEO SUPPORT +
+# AUDIO SUPPORT +
+# DOCUMENT PROCESSING
+# =========================================================
+# =========================================================
+# PART 3D
+# VIDEO SUPPORT + AUDIO SUPPORT +
+# DOCUMENT PROCESSING
+# PASTE BELOW PART 3C
+# =========================================================
+
+from fastapi.responses import FileResponse
+
+# =========================================================
+# MEDIA TABLES
+# =========================================================
+
+def create_document_tables():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS media_files(
+        id TEXT PRIMARY KEY,
+        attachment_id TEXT,
+        media_type TEXT,
+        duration REAL DEFAULT 0,
+        pages INTEGER DEFAULT 0,
+        metadata TEXT,
+        created_at TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+create_document_tables()
+
+# =========================================================
+# SUPPORTED TYPES
+# =========================================================
+
+VIDEO_TYPES = [
+    "video/mp4",
+    "video/webm",
+    "video/quicktime"
+]
+
+AUDIO_TYPES = [
+    "audio/mpeg",
+    "audio/wav",
+    "audio/ogg"
+]
+
+DOCUMENT_TYPES = [
+    "application/pdf",
+    "text/plain"
+]
+
+# =========================================================
+# REGISTER MEDIA FILE
+# =========================================================
+
+def register_media_file(
+    attachment_id,
+    media_type
+):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO media_files
+        VALUES(?,?,?,?,?,?,?)
+        """,
+        (
+            generate_id(),
+            attachment_id,
+            media_type,
+            0,
+            0,
+            "{}",
+            now()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+# =========================================================
+# ANALYZE FILE TYPE
+# =========================================================
+
+@app.post(
+    "/api/media/analyze/{attachment_id}"
+)
+def analyze_media(
+    attachment_id: str
+):
+
+    attachment = get_attachment(
+        attachment_id
+    )
+
+    if not attachment:
         return {
-            "success": False,
-            "error":
-            "Unsupported source"
+            "success": False
         }
 
-    return {
-        "success": True,
-        "source": source,
-        "results": results
-    }
-
-
-# =========================================================
-# PART 8M
-# NEWSAPI INTEGRATION
-# PASTE BELOW PART 8L
-# =========================================================
-
-def newsapi_search(
-    query
-):
-
-    api_key = os.getenv(
-        "NEWS_API_KEY"
+    file_type = (
+        attachment["file_type"]
     )
 
-    if not api_key:
+    if file_type in VIDEO_TYPES:
 
-        raise Exception(
-            "NewsAPI key missing"
-        )
+        media_type = "video"
 
-    response = requests.get(
-        "https://newsapi.org/v2/everything",
-        params={
-            "q": query,
-            "pageSize": 10,
-            "apiKey": api_key
-        },
-        timeout=60
-    )
+    elif file_type in AUDIO_TYPES:
 
-    response.raise_for_status()
+        media_type = "audio"
 
-    return response.json()
+    elif file_type in DOCUMENT_TYPES:
 
-
-@app.get("/api/news")
-def get_news(
-    query: str
-):
-
-    results = newsapi_search(
-        query
-    )
-
-    return {
-        "success": True,
-        "source": "newsapi",
-        "results": results
-    }
-
-
-# =========================================================
-# PART 8N
-# GNEWS INTEGRATION
-# PASTE BELOW PART 8M
-# =========================================================
-
-def gnews_search(
-    query
-):
-
-    api_key = os.getenv(
-        "GNEWS_API_KEY"
-    )
-
-    if not api_key:
-
-        raise Exception(
-            "GNews API key missing"
-        )
-
-    response = requests.get(
-        "https://gnews.io/api/v4/search",
-        params={
-            "q": query,
-            "token": api_key,
-            "max": 10
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-@app.get("/api/news/gnews")
-def get_gnews(
-    query: str
-):
-
-    results = gnews_search(
-        query
-    )
-
-    return {
-        "success": True,
-        "source": "gnews",
-        "results": results
-    }
-
-
-# =========================================================
-# PART 8O
-# GUARDIAN NEWS INTEGRATION
-# PASTE BELOW PART 8N
-# =========================================================
-
-def guardian_search(
-    query
-):
-
-    api_key = os.getenv(
-        "GUARDIAN_API_KEY"
-    )
-
-    if not api_key:
-
-        raise Exception(
-            "Guardian API key missing"
-        )
-
-    response = requests.get(
-        "https://content.guardianapis.com/search",
-        params={
-            "q": query,
-            "api-key": api_key,
-            "page-size": 10
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-@app.get("/api/news/guardian")
-def get_guardian_news(
-    query: str
-):
-
-    results = guardian_search(
-        query
-    )
-
-    return {
-        "success": True,
-        "source": "guardian",
-        "results": results
-    }
-
-
-# =========================================================
-# PART 8P
-# MEDIASTACK NEWS INTEGRATION
-# PASTE BELOW PART 8O
-# =========================================================
-
-def mediastack_search(
-    query
-):
-
-    api_key = os.getenv(
-        "MEDIASTACK_API_KEY"
-    )
-
-    if not api_key:
-
-        raise Exception(
-            "MediaStack API key missing"
-        )
-
-    response = requests.get(
-        "http://api.mediastack.com/v1/news",
-        params={
-            "access_key": api_key,
-            "keywords": query,
-            "limit": 10
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-@app.get("/api/news/mediastack")
-def get_mediastack_news(
-    query: str
-):
-
-    results = mediastack_search(
-        query
-    )
-
-    return {
-        "success": True,
-        "source": "mediastack",
-        "results": results
-    }
-
-
-# =========================================================
-# PART 8Q
-# ALPHA VANTAGE STOCK MARKET INTEGRATION
-# PASTE BELOW PART 8P
-# =========================================================
-
-def alpha_vantage_quote(
-    symbol
-):
-
-    api_key = os.getenv(
-        "ALPHA_VANTAGE_API_KEY"
-    )
-
-    if not api_key:
-
-        raise Exception(
-            "Alpha Vantage API key missing"
-        )
-
-    response = requests.get(
-        "https://www.alphavantage.co/query",
-        params={
-            "function":
-            "GLOBAL_QUOTE",
-            "symbol":
-            symbol,
-            "apikey":
-            api_key
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-@app.get("/api/finance/quote")
-def get_stock_quote(
-    symbol: str
-):
-
-    results = alpha_vantage_quote(
-        symbol
-    )
-
-    return {
-        "success": True,
-        "source":
-        "alpha_vantage",
-        "results":
-        results
-    }
-
-
-# =========================================================
-# PART 8R
-# FINNHUB MARKET DATA INTEGRATION
-# PASTE BELOW PART 8Q
-# =========================================================
-
-def finnhub_quote(
-    symbol
-):
-
-    api_key = os.getenv(
-        "FINNHUB_API_KEY"
-    )
-
-    if not api_key:
-
-        raise Exception(
-            "Finnhub API key missing"
-        )
-
-    response = requests.get(
-        "https://finnhub.io/api/v1/quote",
-        params={
-            "symbol": symbol,
-            "token": api_key
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-@app.get("/api/finance/finnhub")
-def get_finnhub_quote(
-    symbol: str
-):
-
-    results = finnhub_quote(
-        symbol
-    )
-
-    return {
-        "success": True,
-        "source":
-        "finnhub",
-        "results":
-        results
-    }
-
-
-# =========================================================
-# PART 8S
-# EXCHANGE RATE API INTEGRATION
-# PASTE BELOW PART 8R
-# =========================================================
-
-def exchange_rate_convert(
-    base_currency
-):
-
-    api_key = os.getenv(
-        "EXCHANGERATE_API_KEY"
-    )
-
-    if not api_key:
-
-        raise Exception(
-            "ExchangeRate API key missing"
-        )
-
-    response = requests.get(
-        f"https://v6.exchangerate-api.com/v6/{api_key}/latest/{base_currency}",
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-@app.get("/api/finance/exchange")
-def get_exchange_rates(
-    base: str = "USD"
-):
-
-    results = exchange_rate_convert(
-        base
-    )
-
-    return {
-        "success": True,
-        "source":
-        "exchange_rate",
-        "results":
-        results
-    }
-
-
-# =========================================================
-# PART 8T
-# UNIFIED FINANCE ROUTER
-# PASTE BELOW PART 8S
-# =========================================================
-
-@app.get("/api/finance")
-def finance_router(
-    source: str,
-    symbol: str = None,
-    base: str = "USD"
-):
-
-    if source == "alpha_vantage":
-
-        if not symbol:
-
-            return {
-                "success": False,
-                "error":
-                "symbol required"
-            }
-
-        results = (
-            alpha_vantage_quote(
-                symbol
-            )
-        )
-
-    elif source == "finnhub":
-
-        if not symbol:
-
-            return {
-                "success": False,
-                "error":
-                "symbol required"
-            }
-
-        results = (
-            finnhub_quote(
-                symbol
-            )
-        )
-
-    elif source == "exchange_rate":
-
-        results = (
-            exchange_rate_convert(
-                base
-            )
-        )
+        media_type = "document"
 
     else:
 
+        media_type = "unknown"
+
+    register_media_file(
+        attachment_id,
+        media_type
+    )
+
+    return {
+        "success": True,
+        "media_type":
+            media_type
+    }
+
+# =========================================================
+# STREAM MEDIA
+# =========================================================
+
+@app.get(
+    "/api/media/stream/{attachment_id}"
+)
+def stream_media(
+    attachment_id: str
+):
+
+    attachment = get_attachment(
+        attachment_id
+    )
+
+    if not attachment:
         return {
-            "success": False,
-            "error":
-            "Unsupported source"
+            "success": False
         }
 
-    return {
-        "success": True,
-        "source": source,
-        "results": results
-    }
-
+    return FileResponse(
+        attachment["file_path"]
+    )
 
 # =========================================================
-# PART 8U
-# ALLSPORTS API INTEGRATION
-# PASTE BELOW PART 8T
+# DOCUMENT TEXT EXTRACTION
 # =========================================================
 
-def allsports_events(
-    sport="football"
+@app.get(
+    "/api/document/text/{attachment_id}"
+)
+def document_text(
+    attachment_id: str
 ):
 
-    api_key = os.getenv(
-        "ALLSPORTS_API_KEY"
+    attachment = get_attachment(
+        attachment_id
     )
 
-    if not api_key:
-
-        raise Exception(
-            "AllSports API key missing"
-        )
-
-    response = requests.get(
-        "https://apiv2.allsportsapi.com/football/",
-        params={
-            "met": "Fixtures",
-            "APIkey": api_key
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-@app.get("/api/sports/allsports")
-def get_allsports_events():
-
-    results = allsports_events()
-
-    return {
-        "success": True,
-        "source": "allsports",
-        "results": results
-    }
-
-
-# =========================================================
-# PART 8V
-# APISPORTS INTEGRATION
-# PASTE BELOW PART 8U
-# =========================================================
-
-def apisports_fixtures():
-
-    api_key = os.getenv(
-        "APISPORTS_API_KEY"
-    )
-
-    if not api_key:
-
-        raise Exception(
-            "APISports API key missing"
-        )
-
-    response = requests.get(
-        "https://v3.football.api-sports.io/fixtures",
-        headers={
-            "x-apisports-key":
-            api_key
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-@app.get("/api/sports/apisports")
-def get_apisports_fixtures():
-
-    results = apisports_fixtures()
-
-    return {
-        "success": True,
-        "source": "apisports",
-        "results": results
-    }
-
-
-# =========================================================
-# PART 8W
-# SPORTMONKS INTEGRATION
-# PASTE BELOW PART 8V
-# =========================================================
-
-def sportmonks_fixtures():
-
-    api_key = os.getenv(
-        "SPORTMONK_API_KEY"
-    )
-
-    if not api_key:
-
-        raise Exception(
-            "SportMonks API key missing"
-        )
-
-    response = requests.get(
-        "https://api.sportmonks.com/v3/football/fixtures",
-        params={
-            "api_token":
-            api_key
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-@app.get("/api/sports/sportmonks")
-def get_sportmonks_fixtures():
-
-    results = sportmonks_fixtures()
-
-    return {
-        "success": True,
-        "source": "sportmonks",
-        "results": results
-    }
-
-
-# =========================================================
-# PART 8X
-# THESPORTSDB + ODDS API INTEGRATION
-# PASTE BELOW PART 8W
-# =========================================================
-
-def thesportsdb_events():
-
-    api_key = os.getenv(
-        "THESPORTSDB_API_KEY"
-    )
-
-    if not api_key:
-
-        raise Exception(
-            "TheSportsDB API key missing"
-        )
-
-    response = requests.get(
-        "https://www.thesportsdb.com/api/v1/json/"
-        f"{api_key}/eventslast.php",
-        params={
-            "id": "133602"
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-def odds_api_events():
-
-    api_key = os.getenv(
-        "ODDS_API_KEY"
-    )
-
-    if not api_key:
-
-        raise Exception(
-            "Odds API key missing"
-        )
-
-    response = requests.get(
-        "https://api.the-odds-api.com/v4/sports",
-        params={
-            "apiKey": api_key
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-@app.get("/api/sports/thesportsdb")
-def get_thesportsdb():
-
-    return {
-        "success": True,
-        "source": "thesportsdb",
-        "results": thesportsdb_events()
-    }
-
-
-@app.get("/api/sports/odds")
-def get_odds():
-
-    return {
-        "success": True,
-        "source": "odds_api",
-        "results": odds_api_events()
-    }
-
-
-# =========================================================
-# PART 8Y
-# OPENWEATHER + TMDB INTEGRATION
-# PASTE BELOW PART 8X
-# =========================================================
-
-def get_weather(
-    city
-):
-
-    api_key = os.getenv(
-        "OPENWEATHER_API_KEY"
-    )
-
-    if not api_key:
-
-        raise Exception(
-            "OpenWeather API key missing"
-        )
-
-    response = requests.get(
-        "https://api.openweathermap.org/data/2.5/weather",
-        params={
-            "q": city,
-            "appid": api_key,
-            "units": "metric"
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-def search_movie(
-    query
-):
-
-    api_key = os.getenv(
-        "TMDB_API_KEY"
-    )
-
-    if not api_key:
-
-        raise Exception(
-            "TMDB API key missing"
-        )
-
-    response = requests.get(
-        "https://api.themoviedb.org/3/search/movie",
-        params={
-            "api_key": api_key,
-            "query": query
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
-@app.get("/api/weather")
-def weather(
-    city: str
-):
-
-    return {
-        "success": True,
-        "source": "openweather",
-        "results": get_weather(city)
-    }
-
-
-@app.get("/api/movies")
-def movies(
-    query: str
-):
-
-    return {
-        "success": True,
-        "source": "tmdb",
-        "results": search_movie(query)
-    }
-
-
-# =========================================================
-# PART 8Z
-# WOLFRAM INTEGRATION + UNIVERSAL UTILITIES ROUTER
-# PASTE BELOW PART 8Y
-# =========================================================
-
-def wolfram_query(
-    query
-):
-
-    app_id = os.getenv(
-        "WOLFRAM_APP_ID"
-    )
-
-    if not app_id:
-
-        raise Exception(
-            "Wolfram App ID missing"
-        )
-
-    response = requests.get(
-        "https://api.wolframalpha.com/v1/result",
-        params={
-            "i": query,
-            "appid": app_id
-        },
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    return response.text
-
-
-@app.get("/api/wolfram")
-def wolfram(
-    query: str
-):
-
-    return {
-        "success": True,
-        "source": "wolfram",
-        "result": wolfram_query(
-            query
-        )
-    }
-
-
-@app.get("/api/utilities")
-def utilities_router(
-    service: str,
-    query: str = "",
-    city: str = ""
-):
-
-    if service == "weather":
-
+    if not attachment:
         return {
-            "success": True,
-            "results":
-            get_weather(city)
+            "success": False
         }
-
-    elif service == "movie":
-
-        return {
-            "success": True,
-            "results":
-            search_movie(query)
-        }
-
-    elif service == "wolfram":
-
-        return {
-            "success": True,
-            "results":
-            wolfram_query(query)
-        }
-
-    return {
-        "success": False,
-        "error":
-        "Unsupported utility"
-    }
-
-
-# =========================================================
-# PART 9A
-# INTELLIGENT API ROUTER
-# PASTE BELOW PART 8Z
-# =========================================================
-
-def detect_service(
-    query
-):
-
-    q = query.lower()
-
-    if any(
-        x in q
-        for x in [
-            "weather",
-            "temperature",
-            "forecast"
-        ]
-    ):
-        return "weather"
-
-    if any(
-        x in q
-        for x in [
-            "stock",
-            "price",
-            "market",
-            "finance"
-        ]
-    ):
-        return "finance"
-
-    if any(
-        x in q
-        for x in [
-            "news",
-            "headline",
-            "breaking"
-        ]
-    ):
-        return "news"
-
-    if any(
-        x in q
-        for x in [
-            "movie",
-            "film",
-            "actor"
-        ]
-    ):
-        return "movie"
-
-    if any(
-        x in q
-        for x in [
-            "sport",
-            "football",
-            "basketball",
-            "match"
-        ]
-    ):
-        return "sports"
-
-    return "ai"
-
-
-# =========================================================
-# PART 9B
-# NEWS SERVICE ROUTER
-# PASTE BELOW PART 9A
-# =========================================================
-
-def route_news_query(
-    query,
-    provider="newsapi"
-):
-
-    if provider == "newsapi":
-
-        return newsapi_search(
-            query
-        )
-
-    elif provider == "gnews":
-
-        return gnews_search(
-            query
-        )
-
-    elif provider == "guardian":
-
-        return guardian_search(
-            query
-        )
-
-    elif provider == "mediastack":
-
-        return mediastack_search(
-            query
-        )
-
-    raise Exception(
-        "Unsupported news provider"
-    )
-
-
-# =========================================================
-# PART 9C
-# FINANCE SERVICE ROUTER
-# PASTE BELOW PART 9B
-# =========================================================
-
-def route_finance_query(
-    symbol=None,
-    provider="alpha_vantage",
-    base="USD"
-):
-
-    if provider == "alpha_vantage":
-
-        if not symbol:
-            raise Exception(
-                "symbol required"
-            )
-
-        return alpha_vantage_quote(
-            symbol
-        )
-
-    elif provider == "finnhub":
-
-        if not symbol:
-            raise Exception(
-                "symbol required"
-            )
-
-        return finnhub_quote(
-            symbol
-        )
-
-    elif provider == "exchange_rate":
-
-        return exchange_rate_convert(
-            base
-        )
-
-    raise Exception(
-        "Unsupported finance provider"
-    )
-
-
-# =========================================================
-# PART 9D
-# SPORTS SERVICE ROUTER
-# PASTE BELOW PART 9C
-# =========================================================
-
-def route_sports_query(
-    provider="allsports"
-):
-
-    if provider == "allsports":
-
-        return allsports_events()
-
-    elif provider == "apisports":
-
-        return apisports_fixtures()
-
-    elif provider == "sportmonks":
-
-        return sportmonks_fixtures()
-
-    elif provider == "thesportsdb":
-
-        return thesportsdb_events()
-
-    elif provider == "odds":
-
-        return odds_api_events()
-
-    raise Exception(
-        "Unsupported sports provider"
-    )
-
-
-# =========================================================
-# PART 9E
-# WEATHER SERVICE ROUTER
-# PASTE BELOW PART 9D
-# =========================================================
-
-def route_weather_query(
-    city,
-    provider="openweather"
-):
-
-    if provider == "openweather":
-
-        return get_weather(
-            city
-        )
-
-    raise Exception(
-        "Unsupported weather provider"
-    )
-
-
-@app.get("/api/router/weather")
-def weather_router(
-    city: str
-):
-
-    results = route_weather_query(
-        city
-    )
-
-    return {
-        "success": True,
-        "source":
-        "openweather",
-        "results":
-        results
-    }
-
-
-# =========================================================
-# PART 9F
-# MOVIE SERVICE ROUTER
-# PASTE BELOW PART 9E
-# =========================================================
-
-def route_movie_query(
-    query,
-    provider="tmdb"
-):
-
-    if provider == "tmdb":
-
-        return search_movie(
-            query
-        )
-
-    raise Exception(
-        "Unsupported movie provider"
-    )
-
-
-@app.get("/api/router/movies")
-def movie_router(
-    query: str
-):
-
-    results = route_movie_query(
-        query
-    )
-
-    return {
-        "success": True,
-        "source":
-        "tmdb",
-        "results":
-        results
-    }
-
-
-# =========================================================
-# PART 9G
-# SEARCH SERVICE ROUTER
-# PASTE BELOW PART 9F
-# =========================================================
-
-def route_search_query(
-    query,
-    provider="tavily"
-):
-
-    if provider == "tavily":
-
-        return tavily_search(
-            query
-        )
-
-    elif provider == "exa":
-
-        return exa_search(
-            query
-        )
-
-    raise Exception(
-        "Unsupported search provider"
-    )
-
-
-@app.get("/api/router/search")
-def search_router(
-    query: str,
-    provider: str = "tavily"
-):
-
-    results = route_search_query(
-        query,
-        provider
-    )
-
-    return {
-        "success": True,
-        "source":
-        provider,
-        "results":
-        results
-    }
-
-
-# =========================================================
-# PART 9H
-# UNIVERSAL REQUEST MODEL
-# PASTE BELOW PART 9G
-# =========================================================
-
-class UniversalRequest(
-    BaseModel
-):
-
-    query: str
-
-    provider: str = ""
-
-    symbol: str = ""
-
-    city: str = ""
-
-    category: str = ""
-
-    model: str = DEFAULT_MODEL
-
-
-# =========================================================
-# PART 9I
-# MASTER API DISPATCHER
-# PASTE BELOW PART 9H
-# =========================================================
-
-def dispatch_request(
-    request: UniversalRequest
-):
-
-    category = (
-        request.category
-        or detect_service(
-            request.query
-        )
-    )
-
-    if category == "news":
-
-        return route_news_query(
-            request.query
-        )
-
-    elif category == "finance":
-
-        return route_finance_query(
-            symbol=request.symbol
-        )
-
-    elif category == "sports":
-
-        return route_sports_query()
-
-    elif category == "weather":
-
-        return route_weather_query(
-            request.city
-        )
-
-    elif category == "movie":
-
-        return route_movie_query(
-            request.query
-        )
-
-    elif category == "search":
-
-        return route_search_query(
-            request.query
-        )
-
-    return {
-        "type": "ai",
-        "query": request.query
-    }
-
-
-# =========================================================
-# PART 9J
-# AI + API HYBRID RESPONSE ENGINE
-# PASTE BELOW PART 9I
-# =========================================================
-
-def generate_hybrid_response(
-    request: UniversalRequest
-):
-
-    result = dispatch_request(
-        request
-    )
-
-    if isinstance(
-        result,
-        dict
-    ) and result.get(
-        "type"
-    ) == "ai":
-
-        messages = [
-            {
-                "role": "user",
-                "content":
-                request.query
-            }
-        ]
-
-        response = (
-            send_to_provider(
-                messages,
-                provider="openai",
-                model=request.model
-            )
-        )
-
-        return {
-            "source": "ai",
-            "response":
-            extract_ai_text(
-                response
-            )
-        }
-
-    return {
-        "source": "api",
-        "response":
-        result
-    }
-
-
-# =========================================================
-# PART 9K
-# FALLBACK HANDLING
-# PASTE BELOW PART 9J
-# =========================================================
-
-def safe_dispatch(
-    request: UniversalRequest
-):
 
     try:
 
-        return generate_hybrid_response(
-            request
-        )
+        if (
+            attachment["file_type"]
+            == "text/plain"
+        ):
+
+            with open(
+                attachment["file_path"],
+                "r",
+                encoding="utf-8"
+            ) as f:
+
+                text = f.read()
+
+            return {
+                "success": True,
+                "text": text
+            }
+
+        return {
+            "success": False,
+            "message":
+            "Unsupported document"
+        }
 
     except Exception as e:
 
         return {
             "success": False,
-            "error": str(e),
-            "fallback":
-            "ai"
+            "error": str(e)
         }
 
+# =========================================================
+# DOCUMENT METADATA
+# =========================================================
 
-@app.post("/api/router/fallback")
-def fallback_router(
-    request: UniversalRequest
+@app.get(
+    "/api/document/meta/{attachment_id}"
+)
+def document_metadata(
+    attachment_id: str
 ):
 
-    result = safe_dispatch(
-        request
+    attachment = get_attachment(
+        attachment_id
     )
+
+    if not attachment:
+        return {
+            "success": False
+        }
 
     return {
         "success": True,
-        "result": result
+        "filename":
+            attachment["filename"],
+        "type":
+            attachment["file_type"],
+        "size":
+            attachment["file_size"]
     }
 
-
 # =========================================================
-# PART 9L
-# SMART UNIVERSAL ENDPOINT
-# PASTE BELOW PART 9K
+# LIST MEDIA FILES
 # =========================================================
 
-@app.post("/api/router/smart")
-def smart_router(
-    request: UniversalRequest
+@app.get("/api/media/list")
+def list_media():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT *
+        FROM media_files
+        ORDER BY created_at DESC
+        """
+    )
+
+    rows = [
+        dict(row)
+        for row in cur.fetchall()
+    ]
+
+    conn.close()
+
+    return {
+        "success": True,
+        "media": rows
+    }
+
+# =========================================================
+# PART 3D COMPLETE
+# NEXT:
+# PART 3E
+# PDF PROCESSING +
+# TRANSCRIPTIONS +
+# THUMBNAILS +
+# MEDIA SEARCH
+# =========================================================
+# =========================================================
+# PART 3D
+# VIDEO SUPPORT + AUDIO SUPPORT +
+# DOCUMENT PROCESSING
+# PASTE BELOW PART 3C
+# =========================================================
+
+from fastapi.responses import FileResponse
+
+# =========================================================
+# MEDIA TABLES
+# =========================================================
+
+def create_document_tables():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS media_files(
+        id TEXT PRIMARY KEY,
+        attachment_id TEXT,
+        media_type TEXT,
+        duration REAL DEFAULT 0,
+        pages INTEGER DEFAULT 0,
+        metadata TEXT,
+        created_at TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+create_document_tables()
+
+# =========================================================
+# SUPPORTED TYPES
+# =========================================================
+
+VIDEO_TYPES = [
+    "video/mp4",
+    "video/webm",
+    "video/quicktime"
+]
+
+AUDIO_TYPES = [
+    "audio/mpeg",
+    "audio/wav",
+    "audio/ogg"
+]
+
+DOCUMENT_TYPES = [
+    "application/pdf",
+    "text/plain"
+]
+
+# =========================================================
+# REGISTER MEDIA FILE
+# =========================================================
+
+def register_media_file(
+    attachment_id,
+    media_type
 ):
 
-    result = safe_dispatch(
-        request
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO media_files
+        VALUES(?,?,?,?,?,?,?)
+        """,
+        (
+            generate_id(),
+            attachment_id,
+            media_type,
+            0,
+            0,
+            "{}",
+            now()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+# =========================================================
+# ANALYZE FILE TYPE
+# =========================================================
+
+@app.post(
+    "/api/media/analyze/{attachment_id}"
+)
+def analyze_media(
+    attachment_id: str
+):
+
+    attachment = get_attachment(
+        attachment_id
+    )
+
+    if not attachment:
+        return {
+            "success": False
+        }
+
+    file_type = (
+        attachment["file_type"]
+    )
+
+    if file_type in VIDEO_TYPES:
+
+        media_type = "video"
+
+    elif file_type in AUDIO_TYPES:
+
+        media_type = "audio"
+
+    elif file_type in DOCUMENT_TYPES:
+
+        media_type = "document"
+
+    else:
+
+        media_type = "unknown"
+
+    register_media_file(
+        attachment_id,
+        media_type
     )
 
     return {
         "success": True,
-        "query":
-        request.query,
-        "category":
-        request.category
-        or detect_service(
-            request.query
-        ),
-        "result":
-        result
+        "media_type":
+            media_type
     }
 
-
 # =========================================================
-# PART 9M
-# SYSTEM HEALTH DASHBOARD
-# PASTE BELOW PART 9L
+# STREAM MEDIA
 # =========================================================
 
-@app.get("/api/system/health")
-def system_health():
+@app.get(
+    "/api/media/stream/{attachment_id}"
+)
+def stream_media(
+    attachment_id: str
+):
 
-    providers = (
-        api_manager
-        .available_providers()
+    attachment = get_attachment(
+        attachment_id
     )
 
-    return {
-        "success": True,
-        "ai_providers":
-        providers,
-        "provider_count":
-        len(providers),
-        "search_services": [
-            "tavily",
-            "exa",
-            "firecrawl"
-        ],
-        "news_services": [
-            "newsapi",
-            "gnews",
-            "guardian",
-            "mediastack"
-        ],
-        "finance_services": [
-            "alpha_vantage",
-            "finnhub",
-            "exchange_rate"
-        ],
-        "sports_services": [
-            "allsports",
-            "apisports",
-            "sportmonks",
-            "thesportsdb",
-            "odds"
-        ],
-        "utility_services": [
-            "openweather",
-            "tmdb",
-            "wolfram"
-        ],
-        "status":
-        "online"
-    }
+    if not attachment:
+        return {
+            "success": False
+        }
 
+    return FileResponse(
+        attachment["file_path"]
+    )
 
 # =========================================================
-# PART 9N
-# FINAL INTEGRATION TESTS
-# PASTE BELOW PART 9M
+# DOCUMENT TEXT EXTRACTION
 # =========================================================
 
-@app.get("/api/system/test")
-def run_system_tests():
+@app.get(
+    "/api/document/text/{attachment_id}"
+)
+def document_text(
+    attachment_id: str
+):
 
-    tests = {
-        "ai": False,
-        "search": False,
-        "news": False,
-        "finance": False,
-        "sports": False,
-        "utilities": False
-    }
+    attachment = get_attachment(
+        attachment_id
+    )
 
-    try:
-        tests["ai"] = (
-            len(
-                api_manager
-                .available_providers()
-            ) > 0
-        )
-    except:
-        pass
+    if not attachment:
+        return {
+            "success": False
+        }
 
     try:
-        tests["search"] = True
-    except:
-        pass
 
-    try:
-        tests["news"] = True
-    except:
-        pass
+        if (
+            attachment["file_type"]
+            == "text/plain"
+        ):
 
-    try:
-        tests["finance"] = True
-    except:
-        pass
+            with open(
+                attachment["file_path"],
+                "r",
+                encoding="utf-8"
+            ) as f:
 
-    try:
-        tests["sports"] = True
-    except:
-        pass
+                text = f.read()
 
-    try:
-        tests["utilities"] = True
-    except:
-        pass
+            return {
+                "success": True,
+                "text": text
+            }
+
+        return {
+            "success": False,
+            "message":
+            "Unsupported document"
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+# =========================================================
+# DOCUMENT METADATA
+# =========================================================
+
+@app.get(
+    "/api/document/meta/{attachment_id}"
+)
+def document_metadata(
+    attachment_id: str
+):
+
+    attachment = get_attachment(
+        attachment_id
+    )
+
+    if not attachment:
+        return {
+            "success": False
+        }
 
     return {
         "success": True,
-        "tests": tests,
-        "passed":
-        sum(
-            tests.values()
-        ),
-        "total":
-        len(tests),
-        "ready":
-        all(
-            tests.values()
-        )
+        "filename":
+            attachment["filename"],
+        "type":
+            attachment["file_type"],
+        "size":
+            attachment["file_size"]
     }
 
+# =========================================================
+# LIST MEDIA FILES
+# =========================================================
 
+@app.get("/api/media/list")
+def list_media():
 
+    conn = get_db()
+    cur = conn.cursor()
 
+    cur.execute(
+        """
+        SELECT *
+        FROM media_files
+        ORDER BY created_at DESC
+        """
+    )
 
+    rows = [
+        dict(row)
+        for row in cur.fetchall()
+    ]
 
+    conn.close()
 
+    return {
+        "success": True,
+        "media": rows
+    }
 
+# =========================================================
+# PART 3D COMPLETE
+# NEXT:
+# PART 3E
+# PDF PROCESSING +
+# TRANSCRIPTIONS +
+# THUMBNAILS +
+# MEDIA SEARCH
+# =========================================================
+# =========================================================
+# PART 3E
+# API KEYS + PROVIDER MANAGEMENT
+# PASTE BELOW PART 3D
+# =========================================================
 
+class SaveProviderKeyRequest(BaseModel):
+    user_id: str
+    provider: str
+    api_key: str
+
+def create_provider_tables():
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS provider_keys(
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        provider TEXT,
+        api_key TEXT,
+        created_at TEXT,
+        updated_at TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+create_provider_tables()
+
+@app.post("/api/providers/save-key")
+def save_provider_key(
+    data: SaveProviderKeyRequest
+):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT id
+    FROM provider_keys
+    WHERE user_id=?
+    AND provider=?
+    """, (
+        data.user_id,
+        data.provider
+    ))
+
+    existing = cur.fetchone()
+
+    if existing:
+        cur.execute("""
+        UPDATE provider_keys
+        SET api_key=?,
+            updated_at=?
+        WHERE id=?
+        """, (
+            data.api_key,
+            now(),
+            existing["id"]
+        ))
+    else:
+        cur.execute("""
+        INSERT INTO provider_keys
+        VALUES(?,?,?,?,?,?)
+        """, (
+            generate_id(),
+            data.user_id,
+            data.provider,
+            data.api_key,
+            now(),
+            now()
+        ))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+@app.get("/api/providers/{user_id}")
+def list_provider_keys(
+    user_id: str
+):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT
+        provider,
+        created_at,
+        updated_at
+    FROM provider_keys
+    WHERE user_id=?
+    ORDER BY provider ASC
+    """, (user_id,))
+
+    rows = [
+        dict(row)
+        for row in cur.fetchall()
+    ]
+
+    conn.close()
+
+    return {
+        "success": True,
+        "providers": rows
+    }
+
+@app.delete(
+    "/api/providers/delete/{user_id}/{provider}"
+)
+def delete_provider_key(
+    user_id: str,
+    provider: str
+):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    DELETE FROM provider_keys
+    WHERE user_id=?
+    AND provider=?
+    """, (
+        user_id,
+        provider
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True
+    }
+
+# =========================================================
+# PART 3E COMPLETE
+# NEXT:
+# PART 3F = MULTI-PROVIDER ROUTING +
+# FAILOVER + MODEL PRIORITIES
+# =========================================================
+export interface ProviderConfig {
+  id: string;
+  enabled: boolean;
+  priority: number;
+  timeoutMs: number;
+  models: string[];
+}
+
+export const PROVIDERS: ProviderConfig[] = [
+  {
+    id: "openai",
+    enabled: true,
+    priority: 1,
+    timeoutMs: 30000,
+    models: [
+      "gpt-5.5",
+      "gpt-5",
+      "gpt-4o"
+    ]
+  },
+  {
+    id: "anthropic",
+    enabled: true,
+    priority: 2,
+    timeoutMs: 30000,
+    models: [
+      "claude-opus",
+      "claude-sonnet"
+    ]
+  },
+  {
+    id: "google",
+    enabled: true,
+    priority: 3,
+    timeoutMs: 30000,
+    models: [
+      "gemini-pro",
+      "gemini-flash"
+    ]
+  }
+];
+export interface ProviderHealth {
+  status: "healthy" | "degraded" | "offline";
+  successCount: number;
+  failureCount: number;
+  lastSuccess?: number;
+  lastFailure?: number;
+}
+
+export const providerHealth =
+  new Map<string, ProviderHealth>();
+export function markSuccess(id: string) {
+  const existing =
+    providerHealth.get(id);
+
+  providerHealth.set(id, {
+    status: "healthy",
+    successCount:
+      (existing?.successCount ?? 0) + 1,
+    failureCount:
+      existing?.failureCount ?? 0,
+    lastSuccess: Date.now(),
+    lastFailure: existing?.lastFailure
+  });
+}
+
+export function markFailure(id: string) {
+  const existing =
+    providerHealth.get(id);
+
+  const failures =
+    (existing?.failureCount ?? 0) + 1;
+
+  providerHealth.set(id, {
+    status:
+      failures >= 5
+        ? "offline"
+        : "degraded",
+    successCount:
+      existing?.successCount ?? 0,
+    failureCount: failures,
+    lastSuccess: existing?.lastSuccess,
+    lastFailure: Date.now()
+  });
+}
+export async function routeRequest(
+  model?: string
+) {
+  const available =
+    PROVIDERS
+      .filter(p => p.enabled)
+      .sort(
+        (a, b) =>
+          a.priority - b.priority
+      );
+
+  if (!model) {
+    return available;
+  }
+
+  const match = available.find(
+    provider =>
+      provider.models.some(
+        m =>
+          model
+            .toLowerCase()
+            .includes(
+              m.toLowerCase()
+            )
+      )
+  );
+
+  return match
+    ? [match]
+    : available;
+}
+export async function withTimeout(
+  promise: Promise<any>,
+  timeoutMs: number
+) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              "Provider timeout"
+            )
+          ),
+        timeoutMs
+      )
+    )
+  ]);
+}
+export async function executeWithFailover(
+  providers,
+  requestFn
+) {
+  let lastError;
+
+  for (const provider of providers) {
+    try {
+      const result =
+        await withTimeout(
+          requestFn(provider),
+          provider.timeoutMs
+        );
+
+      markSuccess(provider.id);
+
+      return result;
+    } catch (error) {
+      markFailure(provider.id);
+
+      console.error(
+        `[FAILOVER] ${provider.id}`,
+        error
+      );
+
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+export function logProviderEvent(
+  provider: string,
+  event: string,
+  metadata?: Record<string, any>
+) {
+  console.log(
+    JSON.stringify({
+      timestamp:
+        new Date().toISOString(),
+      provider,
+      event,
+      metadata
+    })
+  );
+}
+export async function runInference(
+  model: string,
+  request: any
+) {
+  const providers =
+    await routeRequest(model);
+
+  return executeWithFailover(
+    providers,
+    async provider => {
+      logProviderEvent(
+        provider.id,
+        "request_started"
+      );
+
+      const response =
+        await providerClient(
+          provider.id
+        ).chat(request);
+
+      logProviderEvent(
+        provider.id,
+        "request_completed"
+      );
+
+      return response;
+    }
+  );
+}
+export interface UsageRecord {
+  userId: string;
+  workspaceId: string;
+  providerId: string;
+  model: string;
+
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+
+  estimatedCost: number;
+  createdAt: Date;
+}
+export async function recordUsage(
+  usage: UsageRecord
+) {
+  return db.usage.create({
+    data: usage
+  })
+export function estimateCost(
+  promptTokens: number,
+  completionTokens: number,
+  pricing: ModelPricing
+) {
+  return (
+    promptTokens *
+      pricing.inputPrice +
+    completionTokens *
+      pricing.outputPrice
+  );
+}
+export interface RequestPolicy {
+  maxRequestsPerMinute: number;
+  maxConcurrentRequests: number;
+}
+export async function checkLimits(
+  userId: string
+) {
+  const usage =
+    await getRecentUsage(userId);
+
+  if (usage > LIMITS.maxRequestsPerMinute) {
+    throw new Error(
+      "Rate limit exceeded"
+    );
+  }
+}
+export interface WorkspaceBudget {
+  workspaceId: string;
+  monthlyBudget: number;
+  currentSpend: number;
+}
+export interface ProviderBudget {
+  providerId: string;
+  monthlyLimit: number;
+  currentSpend: number;
+}
+• Request flooding
+• Token spikes
+• Infinite retry loops
+• Prompt spam
+• Excessive concurrency
+• Suspicious API usage
+• Total requests
+• Total tokens
+• Cost per provider
+• Cost per model
+• Cost per workspace
+• Daily usage trends
+• Monthly usage trends
+export interface CacheEntry<T> {
+  key: string;
+  value: T;
+  createdAt: Date;
+  expiresAt: Date;
+}
+export async function getCachedResponse(
+  key: string
+) {
+  return cache.get(key);
+}
+
+export async function setCachedResponse(
+  key: string,
+  value: unknown,
+  ttl: number
+) {
+  return cache.set(
+    key,
+    value,
+    ttl
+  );
+}
+import crypto from "crypto";
+
+export function buildCacheKey(
+  model: string,
+  prompt: string
+) {
+  return crypto
+    .createHash("sha256")
+    .update(`${model}:${prompt}`)
+    .digest("hex");
+}
+import crypto from "crypto";
+
+export function buildCacheKey(
+  model: string,
+  prompt: string
+) {
+  return crypto
+    .createHash("sha256")
+    .update(`${model}:${prompt}`)
+    .digest("hex");
+}
+export async function executeRequest(
+  model: string,
+  prompt: string
+) {
+  const key =
+    buildCacheKey(
+      model,
+      prompt
+    );
+
+  const cached =
+    await getCachedResponse(key);
+
+  if (cached) {
+    return cached;
+  }
+
+  const result =
+    await runInference(
+      model,
+      prompt
+    );
+
+  await setCachedResponse(
+    key,
+    result,
+    3600
+  );
+
+  return result;
+}
+• Model lists
+• Pricing tables
+• Provider health
+• Routing rules
+• Capabilities
+export async function invalidateCache(
+  key: string
+) {
+  await cache.delete(key);
+}
+• Cache hits
+• Cache misses
+• Hit ratio
+• Average latency
+• Saved provider calls
+• Saved cost
+• Response caching
+• Metadata caching
+• Connection pooling
+• Request deduplication
+• Parallel provider checks
+• Warm cache loading
+export interface LogEvent {
+  level:
+    | "info"
+    | "warn"
+    | "error";
+
+  service: string;
+  event: string;
+  timestamp: Date;
+
+  metadata?: Record<
+    string,
+    unknown
+  >;
+}
+export function logEvent(
+  event: LogEvent
+) {
+  console.log(
+    JSON.stringify(event)
+  );
+}
+• Total requests
+• Successful requests
+• Failed requests
+• Provider usage
+• Model usage
+• Average latency
+• P95 latency
+• P99 latency
+export interface ProviderMetrics {
+  providerId: string;
+
+  successRate: number;
+  errorRate: number;
+
+  avgLatency: number;
+  requests: number;
+}
+export function captureError(
+  error: Error,
+  context?: object
+) {
+  logEvent({
+    level: "error",
+    service: "gateway",
+    event: error.message,
+    metadata: context,
+    timestamp: new Date()
+  });
+}
+• Provider outage
+• High latency
+• Increased error rate
+• Failover activation
+• Budget threshold reached
+• Database connectivity issues
+• System status
+• Provider status
+• Active requests
+• Request volume
+• Error rates
+• Latency metrics
+• Budget consumption
+• Model changes
+• Routing updates
+• Provider additions
+• Provider removals
+• Permission changes
+• Administrative actions
+export interface ProviderSecret {
+  providerId: string;
+  encryptedKey: string;
+  createdAt: Date;
+}
+export async function getProviderKey(
+  providerId: string
+) {
+  return secrets.get(
+    providerId
+  );
+}
+export interface AuthToken {
+  userId: string;
+  issuedAt: Date;
+  expiresAt: Date;
+}
+export type Role =
+  | "owner"
+  | "admin"
+  | "member"
+  | "service";
+export interface Permission {
+  resource: string;
+  action: string;
+}
+export interface ProviderPolicy {
+  providerId: string;
+  enabled: boolean;
+  allowedModels: string[];
+}
+• Required fields
+• Model existence
+• Provider availability
+• Input size limits
+• Request schema
+• API keys
+• User credentials
+• Internal tokens
+• Sensitive configuration
+• Audit records
+• Login events
+• Failed authentication
+• Permission changes
+• Secret rotation
+• Provider access attempts
+• Administrative actions
+• PostgreSQL
+• Redis
+• Object Storage
+• Audit Storage
+export interface ProviderRecord {
+  id: string;
+  name: string;
+
+  enabled: boolean;
+
+  createdAt: Date;
+  updatedAt: Date;
+}
+export interface ModelRecord {
+  id: string;
+
+  providerId: string;
+  model: string;
+
+  enabled: boolean;
+}
+export interface RoutingConfig {
+  model: string;
+
+  providers: string[];
+
+  failoverEnabled: boolean;
+}
+export interface UsageRecord {
+  id: string;
+
+  providerId: string;
+  model: string;
+
+  promptTokens: number;
+  completionTokens: number;
+
+  cost: number;
+
+  createdAt: Date;
+}
+export interface AuditRecord {
+  id: string;
+
+  actor: string;
+  action: string;
+
+  timestamp: Date;
+}
+• Cache entries
+• Provider health
+• Routing state
+• Rate limits
+• Active requests
+export interface Repository<T> {
+  create(data: T): Promise<T>;
+
+  update(
+    id: string,
+    data: Partial<T>
+  ): Promise<T>;
+
+  delete(
+    id: string
+  ): Promise<void>;
+
+  findById(
+    id: string
+  ): Promise<T | null>;
+}
+GET    /admin/providers
+POST   /admin/providers
+PATCH  /admin/providers/:id
+DELETE /admin/providers/:id
+GET    /admin/models
+POST   /admin/models
+PATCH  /admin/models/:id
+DELETE /admin/models/:id
+GET   /admin/routing
+PATCH /admin/routing
+{
+  model: "gpt-5",
+  providers: [
+    "openai",
+    "anthropic",
+    "google"
+  ]
+}
+GET /admin/health/providers
+GET /admin/health/system
+{
+  provider: "openai",
+  status: "healthy",
+  latency: 412
+}
+GET /admin/usage
+GET /admin/usage/providers
+GET /admin/usage/models
+GET /admin/audit
+{
+  actor: "admin",
+  action: "provider_disabled",
+  timestamp: Date.now()
+}
+POST /admin/cache/clear
+
+POST /admin/cache/rebuild
+export interface FeatureFlag {
+  key: string;
+
+  enabled: boolean;
+}
+export class RequestQueue {
+  private running = 0;
+  private queue: Array<() => Promise<void>> =
+    [];
+
+  constructor(
+    private maxConcurrent = 10
+  ) {}
+
+  async add(
+    task: () => Promise<void>
+  ) {
+    this.queue.push(task);
+    this.process();
+  }
+
+  private async process() {
+    if (
+      this.running >=
+        this.maxConcurrent ||
+      this.queue.length === 0
+    ) {
+      return;
+    }
+
+    const task =
+      this.queue.shift();
+
+    if (!task) return;
+
+    this.running++;
+
+    try {
+      await task();
+    } finally {
+      this.running--;
+      this.process();
+    }
+  }
+}
+export interface RetryPolicy {
+  maxAttempts: number;
+  initialDelayMs: number;
+  maxDelayMs: number;
+}
+export function calculateDelay(
+  attempt: number,
+  baseDelay: number
+) {
+  return (
+    baseDelay *
+    Math.pow(2, attempt)
+  );
+}
+export async function retry(
+  fn: () => Promise<any>,
+  policy: RetryPolicy
+) {
+  let attempt = 0;
+
+  while (
+    attempt <
+    policy.maxAttempts
+  ) {
+    try {
+      return await fn();
+    } catch (error) {
+      attempt++;
+
+      if (
+        attempt >=
+        policy.maxAttempts
+      ) {
+        throw error;
+      }
+
+      await new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            calculateDelay(
+              attempt,
+              policy.initialDelayMs
+            )
+          )
+      );
+    }
+  }
+}
+• Network timeout
+• Temporary provider outage
+• Rate-limit response
+• Connection reset
+• Gateway timeout
+• Invalid request
+• Authentication failure
+• Permission denied
+• Unsupported model
+• Validation error
+export interface CircuitBreaker {
+  providerId: string;
+  failureCount: number;
+  open: boolean;
+}
+• Retry count
+• Recovery rate
+• Provider failures
+• Circuit breaker events
+• Failover activations
+• Provider adapters
+• Routing engine
+• Failover logic
+• Retry engine
+• Cache layer
+• Budget controls
+• Database connectivity
+• Redis connectivity
+• Provider APIs
+• Secret retrieval
+• End-to-end inference flow
+• Provider outage handling
+• Automatic failover
+• Retry recovery
+• Circuit breaker activation
+• Concurrent requests
+• Queue performance
+• Latency under load
+• Throughput limits
+• Authentication
+• Authorization
+• Secret access
+• Request validation
+• Input sanitization
+GET /health
+
+{
+  status: "healthy",
+  database: "healthy",
+  cache: "healthy",
+  providers: "healthy"
+}
+✓ Environment variables loaded
+✓ Database migrations applied
+✓ Redis connected
+✓ Secrets accessible
+✓ Providers reachable
+✓ Monitoring enabled
+✓ Alerts configured
+• All tests passing
+• No critical vulnerabilities
+• Failover validated
+• Monitoring active
+• Audit logging enabled
+• Backups configured
+✓ Unit tests
+✓ Integration tests
+✓ Failover testing
+✓ Load testing
+✓ Security validation
+✓ Health checks
+✓ Deployment validation
+✓ Production readiness checklist
+• Unified inference endpoint
+• Request validation
+• Model abstraction
+• Provider abstraction
+• Streaming support
+• Versioned APIs
+• SSE streaming
+• WebSocket support
+• Token streaming
+• Realtime events
+• Connection management
+• TypeScript SDK
+• Python SDK
+• Go SDK
+• Java SDK
+• Request helpers
+• Authentication helpers
+• API key creation
+• Key rotation
+• Key revocation
+• Access scopes
+• Rate limiting
+• Developer authentication
+• Request analytics
+• Token analytics
+• Cost analytics
+• Provider analytics
+• Error analytics
+• Exportable reports
+• API documentation
+• SDK documentation
+• Quick-start guides
+• Code examples
+• Changelog
+• Developer dashboard
+✓ Unified AI Gateway
+✓ Streaming support
+✓ Multi-language SDKs
+✓ API key management
+✓ Analytics platform
+✓ Developer portal
+✓ Documentation system
+✓ External developer ecosystem
+• Tenant isolation
+• Workspace management
+• Tenant quotas
+• Tenant-level routing
+• Tenant configuration
+• Usage aggregation
+• Cost attribution
+• Department budgets
+• Cost reports
+• Invoice generation
+• SSO
+• SAML/OAuth
+• Audit retention
+• Compliance controls
+• Data governance
+• Horizontal scaling
+• Multi-region deployment
+• Load balancing
+• Autoscaling
+• Global traffic routing
+• Backup strategy
+• Recovery procedures
+• Cross-region replication
+• Failover testing
+• Incident recovery
+• Incident management
+• On-call workflows
+• Capacity planning
+• SLA monitoring
+• Reliability engineering
+✓ Multi-tenant platform
+✓ Enterprise governance
+✓ Cost allocation system
+✓ Global infrastructure
+✓ Disaster recovery
+✓ SRE operations framework
+✓ Enterprise-grade scalability
+✓ Production maturity
 
 
 
