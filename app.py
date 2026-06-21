@@ -5133,7 +5133,7 @@ export interface ProviderBudget {
   monthlyLimit: number;
   currentSpend: number;
 }
-• Request flooding
+ Request flooding
 • Token spikes
 • Infinite retry loops
 • Prompt spam
