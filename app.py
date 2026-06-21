@@ -5134,18 +5134,18 @@ export interface ProviderBudget {
   currentSpend: number;
 }
  Request flooding
-• Token spikes
-• Infinite retry loops
-• Prompt spam
-• Excessive concurrency
-• Suspicious API usage
-• Total requests
-• Total tokens
-• Cost per provider
-• Cost per model
-• Cost per workspace
-• Daily usage trends
-• Monthly usage trends
+ Token spikes
+ Infinite retry loops
+ Prompt spam
+ Excessive concurrency
+ Suspicious API usage
+ Total requests
+ Total tokens
+ Cost per provider
+ Cost per model
+ Cost per workspace
+ Daily usage trends
+ Monthly usage trends
 export interface CacheEntry<T> {
   key: string;
   value: T;
@@ -5232,18 +5232,18 @@ export async function invalidateCache(
 ) {
   await cache.delete(key);
 }
-• Cache hits
-• Cache misses
-• Hit ratio
-• Average latency
-• Saved provider calls
-• Saved cost
-• Response caching
-• Metadata caching
-• Connection pooling
-• Request deduplication
-• Parallel provider checks
-• Warm cache loading
+ Cache hits
+ Cache misses
+ Hit ratio
+ Average latency
+ Saved provider calls
+ Saved cost
+ Response caching
+ Metadata caching
+ Connection pooling
+ Request deduplication
+ Parallel provider checks
+ Warm cache loading
 export interface LogEvent {
   level:
     | "info"
@@ -5266,14 +5266,14 @@ export function logEvent(
     JSON.stringify(event)
   );
 }
-• Total requests
-• Successful requests
-• Failed requests
-• Provider usage
-• Model usage
-• Average latency
-• P95 latency
-• P99 latency
+ Total requests
+ Successful requests
+ Failed requests
+ Provider usage
+ Model usage
+ Average latency
+ P95 latency
+ P99 latency
 export interface ProviderMetrics {
   providerId: string;
 
@@ -5295,25 +5295,24 @@ export function captureError(
     timestamp: new Date()
   });
 }
-• Provider outage
-• High latency
-• Increased error rate
-• Failover activation
-• Budget threshold reached
-• Database connectivity issues
-• System status
-• Provider status
-• Active requests
-• Request volume
-• Error rates
-• Latency metrics
-• Budget consumption
-• Model changes
-• Routing updates
-• Provider additions
-• Provider removals
-• Permission changes
-• Administrative actions
+ Provider outage
+ High latency
+ Increased error rate
+ Failover activation
+ Budget threshold reached
+ Database connectivity issues
+ System status
+ Provider status
+ Active requests
+ Request volume
+ Error rates
+ Latency metrics
+ Budget consumption Model changes
+ Routing updates
+ Provider additions
+ Provider removals
+ Permission changes
+ Administrative actions
 export interface ProviderSecret {
   providerId: string;
   encryptedKey: string;
@@ -5345,26 +5344,26 @@ export interface ProviderPolicy {
   enabled: boolean;
   allowedModels: string[];
 }
-• Required fields
-• Model existence
-• Provider availability
-• Input size limits
-• Request schema
-• API keys
-• User credentials
-• Internal tokens
-• Sensitive configuration
-• Audit records
-• Login events
-• Failed authentication
-• Permission changes
-• Secret rotation
-• Provider access attempts
-• Administrative actions
-• PostgreSQL
-• Redis
-• Object Storage
-• Audit Storage
+ Required fields
+ Model existence
+ Provider availability
+ Input size limits
+ Request schema
+ API keys
+ User credentials
+ Internal tokens
+ Sensitive configuration
+ Audit records 
+ Login events
+ Failed authentication
+ Permission changes
+ Secret rotation
+ Provider access attempts
+ Administrative actions
+ PostgreSQL
+ Redis
+ Object Storage
+ Audit Storage
 export interface ProviderRecord {
   id: string;
   name: string;
@@ -5410,11 +5409,11 @@ export interface AuditRecord {
 
   timestamp: Date;
 }
-• Cache entries
-• Provider health
-• Routing state
-• Rate limits
-• Active requests
+ Cache entries
+ Provider health
+ Routing state
+ Rate limits
+ Active requests
 export interface Repository<T> {
   create(data: T): Promise<T>;
 
@@ -5562,50 +5561,50 @@ export async function retry(
     }
   }
 }
-• Network timeout
-• Temporary provider outage
-• Rate-limit response
-• Connection reset
-• Gateway timeout
-• Invalid request
-• Authentication failure
-• Permission denied
-• Unsupported model
-• Validation error
+ Network timeout
+ Temporary provider outage
+ Rate-limit response
+ Connection reset
+ Gateway timeout
+ Invalid request
+ Authentication failure
+ Permission denied
+ Unsupported model
+ Validation error
 export interface CircuitBreaker {
   providerId: string;
   failureCount: number;
   open: boolean;
 }
-• Retry count
-• Recovery rate
-• Provider failures
-• Circuit breaker events
-• Failover activations
-• Provider adapters
-• Routing engine
-• Failover logic
-• Retry engine
-• Cache layer
-• Budget controls
-• Database connectivity
-• Redis connectivity
-• Provider APIs
-• Secret retrieval
-• End-to-end inference flow
-• Provider outage handling
-• Automatic failover
-• Retry recovery
-• Circuit breaker activation
-• Concurrent requests
-• Queue performance
-• Latency under load
-• Throughput limits
-• Authentication
-• Authorization
-• Secret access
-• Request validation
-• Input sanitization
+ Retry count
+ Recovery rate
+ Provider failures
+ Circuit breaker events
+ Failover activations
+ Provider adapters
+ Routing engine
+ Failover logic
+ Retry engine
+ Cache layer
+ Budget controls
+ Database connectivity
+ Redis connectivity
+ Provider APIs
+ Secret retrieval
+ End-to-end inference flow
+ Provider outage handling
+ Automatic failover
+ Retry recovery
+ Circuit breaker activation
+ Concurrent requests
+ Queue performance
+ Latency under load
+ Throughput limits
+ Authentication
+ Authorization
+ Secret access
+ Request validation
+ Input sanitization
 GET /health
 
 {
@@ -5621,11 +5620,11 @@ GET /health
 ✓ Providers reachable
 ✓ Monitoring enabled
 ✓ Alerts configured
-• All tests passing
-• No critical vulnerabilities
-• Failover validated
-• Monitoring active
-• Audit logging enabled
+ All tests passing
+ No critical vulnerabilities
+ Failover validated
+ Monitoring active
+ Audit logging enabled
 • Backups configured
 ✓ Unit tests
 ✓ Integration tests
@@ -5635,41 +5634,41 @@ GET /health
 ✓ Health checks
 ✓ Deployment validation
 ✓ Production readiness checklist
-• Unified inference endpoint
-• Request validation
-• Model abstraction
-• Provider abstraction
-• Streaming support
-• Versioned APIs
-• SSE streaming
-• WebSocket support
-• Token streaming
-• Realtime events
-• Connection management
-• TypeScript SDK
-• Python SDK
-• Go SDK
-• Java SDK
-• Request helpers
-• Authentication helpers
-• API key creation
-• Key rotation
-• Key revocation
-• Access scopes
-• Rate limiting
-• Developer authentication
-• Request analytics
-• Token analytics
-• Cost analytics
-• Provider analytics
-• Error analytics
-• Exportable reports
-• API documentation
-• SDK documentation
-• Quick-start guides
-• Code examples
-• Changelog
-• Developer dashboard
+ Unified inference endpoint
+ Request validation
+ Model abstraction
+ Provider abstraction
+ Streaming support
+ Versioned APIs
+ SSE streaming
+ WebSocket support
+ Token streaming
+ Realtime events
+ Connection management
+ TypeScript SDK
+ Python SDK
+ Go SDK
+ Java SDK
+ Request helpers
+ Authentication helpers
+ API key creation
+ Key rotation
+ Key revocation
+ Access scopes
+ Rate limiting
+ Developer authentication
+ Request analytics
+ Token analytics
+ Cost analytics
+ Provider analytics
+ Error analytics
+ Exportable reports
+ API documentation
+ SDK documentation
+ Quick-start guides
+ Code examples
+ Changelog
+ Developer dashboard
 ✓ Unified AI Gateway
 ✓ Streaming support
 ✓ Multi-language SDKs
@@ -5678,36 +5677,36 @@ GET /health
 ✓ Developer portal
 ✓ Documentation system
 ✓ External developer ecosystem
-• Tenant isolation
-• Workspace management
-• Tenant quotas
-• Tenant-level routing
-• Tenant configuration
-• Usage aggregation
-• Cost attribution
-• Department budgets
-• Cost reports
-• Invoice generation
-• SSO
-• SAML/OAuth
-• Audit retention
-• Compliance controls
-• Data governance
-• Horizontal scaling
-• Multi-region deployment
-• Load balancing
-• Autoscaling
-• Global traffic routing
-• Backup strategy
-• Recovery procedures
-• Cross-region replication
-• Failover testing
-• Incident recovery
-• Incident management
-• On-call workflows
-• Capacity planning
-• SLA monitoring
-• Reliability engineering
+ Tenant isolation
+ Workspace management
+ Tenant quotas
+ Tenant-level routing
+ Tenant configuration
+ Usage aggregation
+ Cost attribution
+ Department budgets
+ Cost reports
+ Invoice generation
+ SSO
+ SAML/OAuth
+ Audit retention
+ Compliance controls
+ Data governance
+ Horizontal scaling
+ Multi-region deployment
+ Load balancing
+ Autoscaling
+ Global traffic routing
+ Backup strategy
+ Recovery procedures
+ Cross-region replication
+ Failover testing
+ Incident recovery
+ Incident management
+ On-call workflows
+ Capacity planning
+ SLA monitoring
+ Reliability engineering
 ✓ Multi-tenant platform
 ✓ Enterprise governance
 ✓ Cost allocation system
