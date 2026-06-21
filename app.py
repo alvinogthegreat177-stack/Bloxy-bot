@@ -1,7 +1,7 @@
 # =========================================================
 # PART 1A
 # FOUNDATION + CONFIGURATION + DATABASE
-# Bloxy-Bot X
+# Bloxy-Bot 
 # =========================================================
 
 from fastapi import FastAPI
