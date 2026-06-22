@@ -2820,9 +2820,7 @@ os.makedirs(
     exist_ok=True
 )
 
-app.config[
-    "UPLOAD_FOLDER"
-] = UPLOAD_FOLDER
+
 
 # =========================================================
 # FILE METADATA STORE
