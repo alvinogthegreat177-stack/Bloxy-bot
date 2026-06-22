@@ -1,1 +1,1307 @@
+<!-- =========================================================
+SCRIPT 2
+PART 2A — CHATGPT STYLE APPLICATION SHELL
+FILE: templates/index.html
+Paste at the top of index.html
+========================================================= -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+    <title>Unified AI Gateway</title>
+
+    <link
+        rel="stylesheet"
+        href="/static/styles.css">
+
+</head>
+
+<body>
+
+    <div id="app">
+
+        <aside id="sidebar">
+
+            <div id="sidebar-top">
+
+                <button id="newChatButton">
+                    New Chat
+                </button>
+
+            </div>
+
+            <div id="workspaceSection">
+
+                <select id="workspaceSelector">
+
+                    <option>
+                        Default Workspace
+                    </option>
+
+                </select>
+
+            </div>
+
+            <div id="conversationContainer">
+
+            </div>
+
+            <div id="sidebarBottom">
+
+                <button id="dashboardButton">
+                    Dashboard
+                </button>
+
+                <button id="settingsButton">
+                    Settings
+                </button>
+
+                <button id="profileButton">
+                    Profile
+                </button>
+
+            </div>
+
+        </aside>
+
+        <main id="mainContent">
+
+            <header id="chatHeader">
+
+                <div id="chatTitle">
+
+                    Unified AI Gateway
+
+                </div>
+
+                <div id="headerActions">
+
+                    <button id="shareButton">
+                        Share
+                    </button>
+
+                    <button id="exportButton">
+                        Export
+                    </button>
+
+                </div>
+
+            </header>
+
+            <section id="messageArea">
+
+            </section>
+
+            <section id="inputSection">
+
+                <div id="attachments">
+
+                    <input
+                        type="file"
+                        id="fileInput"
+                        multiple>
+
+                </div>
+
+                <div id="inputContainer">
+
+                    <textarea
+                        id="promptInput"
+                        placeholder="Message AI..."
+                    ></textarea>
+
+                    <button id="sendButton">
+                        Send
+                    </button>
+
+                </div>
+
+                <div id="modelContainer">
+
+                    <select id="modelSelector">
+
+                        <option>
+                            GPT-5
+                        </option>
+
+                        <option>
+                            Claude
+                        </option>
+
+                        <option>
+                            Gemini
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </section>
+
+        </main>
+
+    </div>
+
+    <script src="/static/app.js"></script>
+
+</body>
+
+</html>
+
+<!-- =========================================================
+PART 2A DELIVERABLE
+
+Application Shell
+Sidebar
+Workspace Selector
+Conversation List
+Chat Header
+Message Area
+Prompt Input
+File Upload Area
+Model Selector
+Share Button
+Export Button
+Settings Button
+Dashboard Button
+Profile Button
+
+Ready For Part 2B
+========================================================= -->
+<!-- =========================================================
+SCRIPT 2
+PART 2B — CHAT MESSAGE COMPONENTS
+Paste directly BELOW Part 2A inside index.html
+========================================================= -->
+
+<!-- Assistant Message -->
+<template id="assistantMessageTemplate">
+
+    <div class="message assistant-message">
+
+        <div class="message-avatar">
+            AI
+        </div>
+
+        <div class="message-content">
+
+            <div class="message-text">
+            </div>
+
+            <div class="message-actions">
+
+                <button class="copy-message">
+                    Copy
+                </button>
+
+                <button class="regenerate-message">
+                    Regenerate
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</template>
+
+<!-- User Message -->
+<template id="userMessageTemplate">
+
+    <div class="message user-message">
+
+        <div class="message-avatar">
+            U
+        </div>
+
+        <div class="message-content">
+
+            <div class="message-text">
+            </div>
+
+        </div>
+
+    </div>
+
+</template>
+
+<!-- System Message -->
+<template id="systemMessageTemplate">
+
+    <div class="message system-message">
+
+        <div class="message-content">
+
+            <div class="message-text">
+            </div>
+
+        </div>
+
+    </div>
+
+</template>
+
+<!-- Typing Indicator -->
+<div id="typingIndicator">
+
+    <span></span>
+    <span></span>
+    <span></span>
+
+</div>
+
+<!-- Empty Chat State -->
+<div id="emptyState">
+
+    <h1>
+        Unified AI Gateway
+    </h1>
+
+    <p>
+        Start a new conversation
+    </p>
+
+</div>
+
+<!-- Suggested Prompts -->
+<div id="promptSuggestions">
+
+    <button class="suggestion">
+        Explain a concept
+    </button>
+
+    <button class="suggestion">
+        Write code
+    </button>
+
+    <button class="suggestion">
+        Analyze data
+    </button>
+
+    <button class="suggestion">
+        Create content
+    </button>
+
+</div>
+
+<!-- =========================================================
+PART 2B DELIVERABLE
+
+Assistant Messages
+User Messages
+System Messages
+Message Actions
+Copy Button
+Regenerate Button
+Typing Indicator
+Empty State
+Prompt Suggestions
+Message Templates
+
+Ready For Part 2C
+========================================================= -->
+<!-- =========================================================
+SCRIPT 2
+PART 2C — WORKSPACE, DASHBOARD & SETTINGS PANELS
+Paste directly BELOW Part 2B inside index.html
+========================================================= -->
+
+<!-- Workspace Panel -->
+
+<div id="workspacePanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Workspace
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <input
+            type="text"
+            id="workspaceName"
+            placeholder="Workspace Name">
+
+        <button id="createWorkspaceButton">
+            Create Workspace
+        </button>
+
+    </div>
+
+</div>
+
+<!-- Dashboard Panel -->
+
+<div id="dashboardPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Dashboard
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <div class="stat-card">
+
+            <h3>
+                Total Requests
+            </h3>
+
+            <span id="totalRequests">
+                0
+            </span>
+
+        </div>
+
+        <div class="stat-card">
+
+            <h3>
+                Total Tokens
+            </h3>
+
+            <span id="totalTokens">
+                0
+            </span>
+
+        </div>
+
+        <div class="stat-card">
+
+            <h3>
+                Total Cost
+            </h3>
+
+            <span id="totalCost">
+                $0.00
+            </span>
+
+        </div>
+
+        <div class="stat-card">
+
+            <h3>
+                Active Models
+            </h3>
+
+            <span id="activeModels">
+                0
+            </span>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Settings Panel -->
+
+<div id="settingsPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Settings
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <label>
+
+            Theme
+
+            <select id="themeSelector">
+
+                <option>
+                    Dark
+                </option>
+
+                <option>
+                    Light
+                </option>
+
+            </select>
+
+        </label>
+
+        <label>
+
+            Default Model
+
+            <select id="defaultModel">
+
+                <option>
+                    GPT-5
+                </option>
+
+                <option>
+                    Claude
+                </option>
+
+                <option>
+                    Gemini
+                </option>
+
+            </select>
+
+        </label>
+
+        <label>
+
+            Streaming
+
+            <input
+                type="checkbox"
+                id="streamingEnabled"
+                checked>
+
+        </label>
+
+    </div>
+
+</div>
+
+<!-- Provider Management -->
+
+<div id="providerPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Providers
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <div class="provider-row">
+
+            <span>OpenAI</span>
+
+            <span id="openaiStatus">
+                Online
+            </span>
+
+        </div>
+
+        <div class="provider-row">
+
+            <span>Anthropic</span>
+
+            <span id="anthropicStatus">
+                Online
+            </span>
+
+        </div>
+
+        <div class="provider-row">
+
+            <span>Google</span>
+
+            <span id="googleStatus">
+                Online
+            </span>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- =========================================================
+PART 2C DELIVERABLE
+
+Workspace Panel
+Workspace Creation
+Dashboard Panel
+Usage Statistics
+Token Statistics
+Cost Statistics
+Model Statistics
+Settings Panel
+Theme Selection
+Default Model Selection
+Streaming Toggle
+Provider Panel
+Provider Status Display
+
+Ready For Part 2D
+========================================================= -->
+<!-- =========================================================
+SCRIPT 2
+PART 2D — ANALYTICS, ADMIN & MONITORING PANELS
+Paste directly BELOW Part 2C inside index.html
+========================================================= -->
+
+<!-- Analytics Panel -->
+
+<div id="analyticsPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Analytics
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <div class="analytics-card">
+
+            <h3>
+                Daily Requests
+            </h3>
+
+            <div id="dailyRequestsChart">
+            </div>
+
+        </div>
+
+        <div class="analytics-card">
+
+            <h3>
+                Daily Tokens
+            </h3>
+
+            <div id="dailyTokensChart">
+            </div>
+
+        </div>
+
+        <div class="analytics-card">
+
+            <h3>
+                Daily Cost
+            </h3>
+
+            <div id="dailyCostChart">
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Provider Analytics -->
+
+<div id="providerAnalyticsPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Provider Analytics
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <table id="providerAnalyticsTable">
+
+            <thead>
+
+                <tr>
+
+                    <th>
+                        Provider
+                    </th>
+
+                    <th>
+                        Requests
+                    </th>
+
+                    <th>
+                        Latency
+                    </th>
+
+                    <th>
+                        Errors
+                    </th>
+
+                    <th>
+                        Cost
+                    </th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+<!-- Model Analytics -->
+
+<div id="modelAnalyticsPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Model Analytics
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <table id="modelAnalyticsTable">
+
+            <thead>
+
+                <tr>
+
+                    <th>
+                        Model
+                    </th>
+
+                    <th>
+                        Requests
+                    </th>
+
+                    <th>
+                        Tokens
+                    </th>
+
+                    <th>
+                        Cost
+                    </th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+<!-- Admin Panel -->
+
+<div id="adminPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Administration
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <button id="clearCacheButton">
+            Clear Cache
+        </button>
+
+        <button id="rebuildCacheButton">
+            Rebuild Cache
+        </button>
+
+        <button id="reloadProvidersButton">
+            Reload Providers
+        </button>
+
+        <button id="refreshModelsButton">
+            Refresh Models
+        </button>
+
+    </div>
+
+</div>
+
+<!-- Health Monitoring -->
+
+<div id="healthPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            System Health
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <div class="health-item">
+
+            <span>
+                Database
+            </span>
+
+            <span id="databaseHealth">
+                Healthy
+            </span>
+
+        </div>
+
+        <div class="health-item">
+
+            <span>
+                Redis
+            </span>
+
+            <span id="redisHealth">
+                Healthy
+            </span>
+
+        </div>
+
+        <div class="health-item">
+
+            <span>
+                AI Providers
+            </span>
+
+            <span id="providerHealth">
+                Healthy
+            </span>
+
+        </div>
+
+        <div class="health-item">
+
+            <span>
+                Storage
+            </span>
+
+            <span id="storageHealth">
+                Healthy
+            </span>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Audit Log Panel -->
+
+<div id="auditPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Audit Logs
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <div id="auditLogContainer">
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- =========================================================
+PART 2D DELIVERABLE
+
+Analytics Dashboard
+Provider Analytics
+Model Analytics
+Cost Analytics
+Usage Analytics
+Health Monitoring
+Admin Controls
+Cache Controls
+Provider Controls
+Audit Logs
+Database Health
+Redis Health
+Storage Health
+System Monitoring
+
+Ready For Part 2E
+========================================================= -->
+<!-- =========================================================
+SCRIPT 2
+PART 2E — SECURITY, AUTHENTICATION & API MANAGEMENT
+Paste directly BELOW Part 2D inside index.html
+========================================================= -->
+
+<!-- Authentication Panel -->
+
+<div id="authenticationPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Authentication
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <input
+            type="email"
+            id="loginEmail"
+            placeholder="Email">
+
+        <input
+            type="password"
+            id="loginPassword"
+            placeholder="Password">
+
+        <button id="loginButton">
+            Login
+        </button>
+
+        <button id="logoutButton">
+            Logout
+        </button>
+
+    </div>
+
+</div>
+
+<!-- API Keys Panel -->
+
+<div id="apiKeysPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            API Keys
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <button id="createApiKeyButton">
+            Create API Key
+        </button>
+
+        <button id="rotateApiKeyButton">
+            Rotate API Key
+        </button>
+
+        <button id="revokeApiKeyButton">
+            Revoke API Key
+        </button>
+
+        <div id="apiKeyList">
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Roles Panel -->
+
+<div id="rolesPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Roles & Permissions
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <table id="rolesTable">
+
+            <thead>
+
+                <tr>
+
+                    <th>User</th>
+                    <th>Role</th>
+                    <th>Status</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+<!-- Security Events -->
+
+<div id="securityPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Security Events
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <div id="securityEvents">
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Budget Controls -->
+
+<div id="budgetPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Budget Controls
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <input
+            type="number"
+            id="monthlyBudget"
+            placeholder="Monthly Budget">
+
+        <button id="saveBudgetButton">
+            Save Budget
+        </button>
+
+        <div id="budgetUsage">
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Rate Limits -->
+
+<div id="rateLimitPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Rate Limits
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <input
+            type="number"
+            id="requestsPerMinute"
+            placeholder="Requests Per Minute">
+
+        <input
+            type="number"
+            id="maxConcurrency"
+            placeholder="Max Concurrent Requests">
+
+        <button id="saveLimitsButton">
+            Save Limits
+        </button>
+
+    </div>
+
+</div>
+
+<!-- =========================================================
+PART 2E DELIVERABLE
+
+Authentication UI
+Login Controls
+Logout Controls
+API Key Management
+Key Rotation
+Key Revocation
+Role Management
+Permission Management
+Security Monitoring
+Security Events
+Budget Controls
+Cost Controls
+Rate Limiting Controls
+Concurrency Controls
+
+Ready For Part 2F
+========================================================= -->
+<!-- =========================================================
+SCRIPT 2
+PART 2F — ENTERPRISE, MULTI-TENANT & DEVELOPER PORTAL
+Paste directly BELOW Part 2E inside index.html
+========================================================= -->
+
+<!-- Tenant Management -->
+
+<div id="tenantPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Tenant Management
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <button id="createTenantButton">
+            Create Tenant
+        </button>
+
+        <div id="tenantList">
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Department Budgets -->
+
+<div id="departmentBudgetPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Department Budgets
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <div id="departmentBudgetTable">
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Invoice Center -->
+
+<div id="invoicePanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Invoices
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <button id="generateInvoiceButton">
+            Generate Invoice
+        </button>
+
+        <div id="invoiceList">
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Compliance Center -->
+
+<div id="compliancePanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Compliance
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <div id="complianceStatus">
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- SSO Configuration -->
+
+<div id="ssoPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            SSO / SAML / OAuth
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <button id="configureSSOButton">
+            Configure SSO
+        </button>
+
+    </div>
+
+</div>
+
+<!-- Developer Portal -->
+
+<div id="developerPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Developer Portal
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <button id="apiDocsButton">
+            API Documentation
+        </button>
+
+        <button id="sdkDocsButton">
+            SDK Documentation
+        </button>
+
+        <button id="examplesButton">
+            Code Examples
+        </button>
+
+        <button id="changelogButton">
+            Changelog
+        </button>
+
+    </div>
+
+</div>
+
+<!-- Global Infrastructure -->
+
+<div id="infrastructurePanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Infrastructure
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <div id="regionStatus">
+
+        </div>
+
+        <div id="failoverStatus">
+
+        </div>
+
+        <div id="backupStatus">
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Production Readiness -->
+
+<div id="productionPanel">
+
+    <div class="panel-header">
+
+        <h2>
+            Production Readiness
+        </h2>
+
+    </div>
+
+    <div class="panel-content">
+
+        <div id="readinessChecklist">
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- =========================================================
+PART 2F DELIVERABLE
+
+Tenant Isolation
+Workspace Management
+Department Budgets
+Cost Attribution
+Invoice Generation
+Compliance Controls
+Audit Retention
+SSO
+SAML
+OAuth
+Developer Portal
+API Documentation
+SDK Documentation
+Code Examples
+Changelog
+Global Infrastructure
+Multi Region Deployment
+Disaster Recovery
+Backup Management
+Failover Monitoring
+Production Readiness
+
+SCRIPT 2 COMPLETE
+Ready For SCRIPT 3 PART 3A
+========================================================= -->
 
