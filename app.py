@@ -1,5721 +1,2237 @@
-# =========================================================
-# PART 1A
-# FOUNDATION + CONFIGURATION + DATABASE
-# Bloxy-Bot 
-# =========================================================
+# ============================================================
+# SCRIPT 1
+# PART 1A — CORE PLATFORM FOUNDATION
+# ============================================================
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-import sqlite3
-import uuid
-import hashlib
-import secrets
+from contextlib import asynccontextmanager
+from typing import Dict, Any, Optional
 import os
-from datetime import datetime
+import uuid
+import time
+import logging
 
-# =========================================================
-# APP SETUP
-# =========================================================
+# ============================================================
+# 1A.1 APPLICATION CONFIGURATION
+# ============================================================
+
+class Settings(BaseModel):
+    app_name: str = "AI Platform"
+    version: str = "1.0.0"
+    environment: str = os.getenv(
+        "ENVIRONMENT",
+        "development"
+    )
+
+    debug: bool = (
+        os.getenv("DEBUG", "false")
+        .lower() == "true"
+    )
+
+settings = Settings()
+
+# ============================================================
+# 1A.2 SERVICE REGISTRY
+# ============================================================
+
+class ServiceRegistry:
+    def __init__(self):
+        self._services = {}
+
+    def register(
+        self,
+        name: str,
+        service: Any
+    ):
+        self._services[name] = service
+
+    def get(
+        self,
+        name: str
+    ):
+        return self._services.get(name)
+
+    def all(self):
+        return self._services
+
+
+services = ServiceRegistry()
+
+# ============================================================
+# 1A.3 EVENT BUS
+# ============================================================
+
+class EventBus:
+    def __init__(self):
+        self.events = []
+
+    def emit(
+        self,
+        event_type: str,
+        payload: dict
+    ):
+        self.events.append(
+            {
+                "event": event_type,
+                "payload": payload,
+                "timestamp": int(time.time())
+            }
+        )
+
+event_bus = EventBus()
+
+# ============================================================
+# 1A.4 HEALTH MANAGER
+# ============================================================
+
+class HealthManager:
+    def __init__(self):
+        self.status = "healthy"
+
+    def get_status(self):
+        return self.status
+
+health_manager = HealthManager()
+
+# ============================================================
+# 1A.5 REQUEST CONTEXT
+# ============================================================
+
+class RequestContext(BaseModel):
+    request_id: str
+    timestamp: int
+    workspace_id: Optional[str] = None
+    user_id: Optional[str] = None
+
+# ============================================================
+# 1A.6 ERROR MODELS
+# ============================================================
+
+class PlatformError(Exception):
+    def __init__(
+        self,
+        code: str,
+        message: str
+    ):
+        self.code = code
+        self.message = message
+
+class ValidationError(
+    PlatformError
+):
+    pass
+
+class AuthenticationError(
+    PlatformError
+):
+    pass
+
+class AuthorizationError(
+    PlatformError
+):
+    pass
+
+# ============================================================
+# 1A.7 LOGGING
+# ============================================================
+
+logging.basicConfig(
+    level=logging.INFO,
+    format=(
+        "%(asctime)s "
+        "%(levelname)s "
+        "%(message)s"
+    )
+)
+
+logger = logging.getLogger(
+    "ai-platform"
+)
+
+# ============================================================
+# 1A.8 LIFECYCLE MANAGEMENT
+# ============================================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    logger.info(
+        "Starting AI Platform"
+    )
+
+    services.register(
+        "event_bus",
+        event_bus
+    )
+
+    services.register(
+        "health",
+        health_manager
+    )
+
+    event_bus.emit(
+        "application_started",
+        {
+            "version":
+            settings.version
+        }
+    )
+
+    yield
+
+    event_bus.emit(
+        "application_shutdown",
+        {}
+    )
+
+    logger.info(
+        "Shutting down AI Platform"
+    )
+
+# ============================================================
+# 1A.9 APPLICATION INSTANCE
+# ============================================================
 
 app = FastAPI(
-    title="Bloxy-Bot X",
-    version="2.0.0"
+    title=settings.app_name,
+    version=settings.version,
+    lifespan=lifespan
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
+# ============================================================
+# 1A.10 REQUEST MIDDLEWARE
+# ============================================================
+
+@app.middleware("http")
+async def request_middleware(
+    request: Request,
+    call_next
+):
+    request_id = str(
+        uuid.uuid4()
+    )
+
+    request.state.request_id = (
+        request_id
+    )
+
+    start = time.time()
+
+    response = await call_next(
+        request
+    )
+
+    duration = (
+        time.time() - start
+    )
+
+    logger.info(
+        f"{request.method} "
+        f"{request.url.path} "
+        f"{duration:.3f}s"
+    )
+
+    response.headers[
+        "X-Request-ID"
+    ] = request_id
+
+    return response
+
+# ============================================================
+# 1A.11 GLOBAL ERROR HANDLER
+# ============================================================
+
+@app.exception_handler(
+    PlatformError
+)
+async def platform_error_handler(
+    request: Request,
+    exc: PlatformError
+):
+    return JSONResponse(
+        status_code=400,
+        content={
+            "success": False,
+            "error": exc.code,
+            "message": exc.message
+        }
+    )
+
+# ============================================================
+# 1A.12 HEALTH ENDPOINT
+# ============================================================
+
+@app.get("/health")
+async def health():
+
+    return {
+        "status":
+            health_manager
+            .get_status(),
+        "version":
+            settings.version,
+        "environment":
+            settings.environment
+    }
+
+# ============================================================
+# 1A.13 VERSION ENDPOINT
+# ============================================================
+
+@app.get("/version")
+async def version():
+
+    return {
+        "app":
+            settings.app_name,
+        "version":
+            settings.version
+    }
+
+# ============================================================
+# 1A.14 ROOT ENDPOINT
+# ============================================================
+
+@app.get("/")
+async def root():
+
+    return {
+        "name":
+            settings.app_name,
+        "version":
+            settings.version,
+        "status":
+            "running"
+    }
+
+# ============================================================
+# 1A.15 SERVICE INSPECTION
+# ============================================================
+
+@app.get("/system/services")
+async def system_services():
+
+    return {
+        "services":
+            list(
+                services
+                .all()
+                .keys()
+            )
+    }
+
+# ============================================================
+# PART 1A DELIVERABLE
+# ============================================================
+#
+#  FastAPI application
+#  Configuration system
+#  Service registry
+#  Event bus
+#  Health manager
+#  Request lifecycle
+#  Logging framework
+#  Error framework
+#  Startup/shutdown lifecycle
+#  Version management
+#  Middleware foundation
+#  Platform bootstrap
+#
+# Ready for PART 1B — AI Gateway
+# ============================================================
+# ============================================================
+# SCRIPT 1
+# PART 1B — AI GATEWAY
+# Paste directly below Part 1A
+# ============================================================
+
+from typing import Dict, Any, List, Optional
+from pydantic import BaseModel
+import time
+
+# ============================================================
+# 1B.1 REQUEST MODELS
+# ============================================================
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class InferenceRequest(BaseModel):
+    model: str
+    messages: List[ChatMessage]
+    temperature: float = 0.7
+    max_tokens: int = 4096
+    stream: bool = False
+
+
+class InferenceResponse(BaseModel):
+    provider: str
+    model: str
+    content: str
+    usage: Dict[str, Any]
+    latency_ms: int
+
+
+# ============================================================
+# 1B.2 PROVIDER ABSTRACTION
+# ============================================================
+
+class BaseProvider:
+
+    provider_name = "base"
+
+    async def chat(
+        self,
+        request: InferenceRequest
+    ):
+        raise NotImplementedError
+
+
+# ============================================================
+# 1B.3 PROVIDER REGISTRY
+# ============================================================
+
+class ProviderRegistry:
+
+    def __init__(self):
+        self.providers = {}
+
+    def register(
+        self,
+        provider_id: str,
+        provider: BaseProvider
+    ):
+        self.providers[
+            provider_id
+        ] = provider
+
+    def get(
+        self,
+        provider_id: str
+    ):
+        return self.providers.get(
+            provider_id
+        )
+
+    def all(self):
+        return self.providers
+
+
+provider_registry = ProviderRegistry()
+
+# ============================================================
+# 1B.4 OPENAI ADAPTER PLACEHOLDER
+# ============================================================
+
+class OpenAIProvider(
+    BaseProvider
+):
+
+    provider_name = "openai"
+
+    async def chat(
+        self,
+        request: InferenceRequest
+    ):
+
+        return InferenceResponse(
+            provider="openai",
+            model=request.model,
+            content="OpenAI response placeholder",
+            usage={
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0
+            },
+            latency_ms=0
+        )
+
+
+# ============================================================
+# 1B.5 ANTHROPIC ADAPTER PLACEHOLDER
+# ============================================================
+
+class AnthropicProvider(
+    BaseProvider
+):
+
+    provider_name = "anthropic"
+
+    async def chat(
+        self,
+        request: InferenceRequest
+    ):
+
+        return InferenceResponse(
+            provider="anthropic",
+            model=request.model,
+            content="Anthropic response placeholder",
+            usage={
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0
+            },
+            latency_ms=0
+        )
+
+
+# ============================================================
+# 1B.6 GEMINI ADAPTER PLACEHOLDER
+# ============================================================
+
+class GeminiProvider(
+    BaseProvider
+):
+
+    provider_name = "google"
+
+    async def chat(
+        self,
+        request: InferenceRequest
+    ):
+
+        return InferenceResponse(
+            provider="google",
+            model=request.model,
+            content="Gemini response placeholder",
+            usage={
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0
+            },
+            latency_ms=0
+        )
+
+
+# ============================================================
+# 1B.7 PROVIDER REGISTRATION
+# ============================================================
+
+provider_registry.register(
+    "openai",
+    OpenAIProvider()
 )
 
-# =========================================================
-# CONFIGURATION
-# =========================================================
-
-DB_NAME = os.getenv(
-    "DATABASE_NAME",
-    "bloxybotx.db"
+provider_registry.register(
+    "anthropic",
+    AnthropicProvider()
 )
 
-APP_NAME = "Bloxy-Bot X"
+provider_registry.register(
+    "google",
+    GeminiProvider()
+)
 
-OWNER_USERNAME = "aTg"
+# ============================================================
+# 1B.8 MODEL ROUTING
+# ============================================================
 
-OWNER_EMAILS = [
-    "alvinogthegreat177@gmail.com",
-    "alvinogthegreat177@outlook.com"
-]
+MODEL_ROUTING = {
+    "gpt": "openai",
+    "claude": "anthropic",
+    "gemini": "google"
+}
 
-# =========================================================
-# HELPERS
-# =========================================================
 
-def generate_id():
-    return str(uuid.uuid4())
+def route_provider(
+    model: str
+):
 
-def generate_token():
-    return secrets.token_hex(32)
+    model_lower = model.lower()
 
-def now():
-    return datetime.utcnow().isoformat()
+    for key, provider in (
+        MODEL_ROUTING.items()
+    ):
+        if key in model_lower:
+            return provider
 
-def hash_password(password: str):
+    return "openai"
+
+
+# ============================================================
+# 1B.9 CAPABILITY REGISTRY
+# ============================================================
+
+MODEL_CAPABILITIES = {
+    "chat": True,
+    "streaming": True,
+    "vision": True,
+    "reasoning": True,
+    "tools": True
+}
+
+# ============================================================
+# 1B.10 REQUEST VALIDATION
+# ============================================================
+
+def validate_request(
+    request: InferenceRequest
+):
+
+    if not request.messages:
+        raise ValidationError(
+            "EMPTY_MESSAGES",
+            "Messages required"
+        )
+
+    if not request.model:
+        raise ValidationError(
+            "MODEL_REQUIRED",
+            "Model required"
+        )
+
+# ============================================================
+# 1B.11 RESPONSE NORMALIZATION
+# ============================================================
+
+def normalize_response(
+    response: InferenceResponse
+):
+
+    return {
+        "provider":
+            response.provider,
+        "model":
+            response.model,
+        "content":
+            response.content,
+        "usage":
+            response.usage,
+        "latency_ms":
+            response.latency_ms
+    }
+
+# ============================================================
+# 1B.12 GATEWAY EXECUTION
+# ============================================================
+
+async def execute_inference(
+    request: InferenceRequest
+):
+
+    validate_request(
+        request
+    )
+
+    provider_id = (
+        route_provider(
+            request.model
+        )
+    )
+
+    provider = (
+        provider_registry.get(
+            provider_id
+        )
+    )
+
+    if not provider:
+        raise ValidationError(
+            "PROVIDER_NOT_FOUND",
+            provider_id
+        )
+
+    start = time.time()
+
+    result = await provider.chat(
+        request
+    )
+
+    latency = int(
+        (
+            time.time()
+            - start
+        )
+        * 1000
+    )
+
+    result.latency_ms = (
+        latency
+    )
+
+    return normalize_response(
+        result
+    )
+
+# ============================================================
+# 1B.13 INFERENCE ENDPOINT
+# ============================================================
+
+@app.post("/v1/chat")
+async def chat_endpoint(
+    request: InferenceRequest
+):
+
+    return await execute_inference(
+        request
+    )
+
+# ============================================================
+# 1B.14 PROVIDER LIST ENDPOINT
+# ============================================================
+
+@app.get("/v1/providers")
+async def get_providers():
+
+    return {
+        "providers":
+            list(
+                provider_registry
+                .all()
+                .keys()
+            )
+    }
+
+# ============================================================
+# 1B.15 MODEL CAPABILITIES ENDPOINT
+# ============================================================
+
+@app.get("/v1/capabilities")
+async def capabilities():
+
+    return MODEL_CAPABILITIES
+
+# ============================================================
+# PART 1B DELIVERABLE
+#
+# Unified AI Gateway
+# Provider Registry
+# OpenAI Adapter Placeholder
+# Anthropic Adapter Placeholder
+# Gemini Adapter Placeholder
+# Model Routing
+# Request Validation
+# Response Normalization
+# Inference Execution
+# Provider Discovery Endpoint
+# Capabilities Endpoint
+#
+# Ready For Part 1C
+# ============================================================
+# ============================================================
+# SCRIPT 1
+# PART 1C — AUTHENTICATION & USER MANAGEMENT
+# Paste directly below Part 1B
+# ============================================================
+
+from pydantic import BaseModel, EmailStr
+from typing import Optional, List
+from datetime import datetime, timedelta
+import secrets
+import hashlib
+
+# ============================================================
+# 1C.1 USER MODEL
+# ============================================================
+
+class User(BaseModel):
+    id: str
+    email: EmailStr
+    username: str
+    password_hash: str
+    active: bool = True
+    created_at: datetime
+
+# ============================================================
+# 1C.2 SESSION MODEL
+# ============================================================
+
+class Session(BaseModel):
+    token: str
+    user_id: str
+    created_at: datetime
+    expires_at: datetime
+
+# ============================================================
+# 1C.3 ROLE MODEL
+# ============================================================
+
+class UserRole(BaseModel):
+    user_id: str
+    role: str
+
+# ============================================================
+# 1C.4 IN-MEMORY STORAGE
+# ============================================================
+
+USERS = {}
+SESSIONS = {}
+USER_ROLES = {}
+
+# ============================================================
+# 1C.5 PASSWORD HASHING
+# ============================================================
+
+def hash_password(
+    password: str
+) -> str:
+
     return hashlib.sha256(
         password.encode()
     ).hexdigest()
 
-# =========================================================
-# DATABASE
-# =========================================================
+# ============================================================
+# 1C.6 PASSWORD VERIFICATION
+# ============================================================
 
-def get_db():
-    conn = sqlite3.connect(
-        DB_NAME
+def verify_password(
+    password: str,
+    password_hash: str
+) -> bool:
+
+    return (
+        hash_password(password)
+        == password_hash
     )
-    conn.row_factory = sqlite3.Row
-    return conn
 
-# =========================================================
-# DATABASE TABLES
-# =========================================================
+# ============================================================
+# 1C.7 TOKEN GENERATION
+# ============================================================
 
-def create_tables():
-    conn = get_db()
-    cur = conn.cursor()
+def generate_token():
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS users(
-        id TEXT PRIMARY KEY,
-        username TEXT UNIQUE,
-        email TEXT UNIQUE,
-        password TEXT,
-        verified INTEGER DEFAULT 0,
-        role TEXT DEFAULT 'user',
-        created_at TEXT
+    return secrets.token_urlsafe(
+        64
     )
-    """)
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS sessions(
-        token TEXT PRIMARY KEY,
-        user_id TEXT,
-        created_at TEXT
-    )
-    """)
+# ============================================================
+# 1C.8 REGISTER REQUEST
+# ============================================================
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS user_badges(
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        badge_type TEXT,
-        badge_color TEXT,
-        granted_by TEXT,
-        granted_at TEXT
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS settings(
-        user_id TEXT PRIMARY KEY,
-        theme TEXT DEFAULT 'dark',
-        model TEXT DEFAULT 'gpt-4o-mini',
-        updated_at TEXT
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS audit_logs(
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        action TEXT,
-        created_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-# =========================================================
-# AUDIT LOGGING
-# =========================================================
-
-def create_audit_log(
-    user_id,
-    action
+class RegisterRequest(
+    BaseModel
 ):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO audit_logs
-        VALUES(?,?,?,?)
-        """,
-        (
-            generate_id(),
-            user_id,
-            action,
-            now()
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-# =========================================================
-# OWNER BOOTSTRAP
-# =========================================================
-
-def owner_exists():
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM users
-        WHERE role='super_admin'
-        LIMIT 1
-        """
-    )
-
-    row = cur.fetchone()
-
-    conn.close()
-    return row
-
-def create_owner():
-
-    if owner_exists():
-        return
-
-    owner_id = generate_id()
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO users
-        VALUES(?,?,?,?,?,?,?)
-        """,
-        (
-            owner_id,
-            OWNER_USERNAME,
-            OWNER_EMAILS[0],
-            hash_password("CHANGE_ME"),
-            1,
-            "super_admin",
-            now()
-        )
-    )
-
-    cur.execute(
-        """
-        INSERT INTO user_badges
-        VALUES(?,?,?,?,?,?)
-        """,
-        (
-            generate_id(),
-            owner_id,
-            "owner",
-            "#ff8c00",
-            owner_id,
-            now()
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-# =========================================================
-# SYSTEM STARTUP
-# =========================================================
-
-create_tables()
-create_owner()
-
-# =========================================================
-# HEALTH CHECK
-# =========================================================
-
-@app.get("/health")
-def health():
-    return {
-        "success": True,
-        "app": APP_NAME,
-        "status": "online",
-        "timestamp": now()
-    }
-
-# =========================================================
-# SYSTEM INFO
-# =========================================================
-
-@app.get("/api/system/info")
-def system_info():
-    return {
-        "success": True,
-        "app": APP_NAME,
-        "version": "2.0.0",
-        "database": DB_NAME
-    }
-
-# =========================================================
-# PART 1A COMPLETE
-# NEXT:
-# PART 1B = AUTHENTICATION + VERIFICATION
-# =========================================================
-# =========================================================
-# PART 1B
-# AUTHENTICATION + EMAIL VERIFICATION
-# PASTE BELOW PART 1A
-# =========================================================
-
-from pydantic import EmailStr
-
-# =========================================================
-# REQUEST MODELS
-# =========================================================
-
-class RegisterRequest(BaseModel):
+    email: EmailStr
     username: str
+    password: str
+
+# ============================================================
+# 1C.9 LOGIN REQUEST
+# ============================================================
+
+class LoginRequest(
+    BaseModel
+):
     email: EmailStr
     password: str
 
-class LoginRequest(BaseModel):
-    email: EmailStr
+# ============================================================
+# 1C.10 USER CREATION
+# ============================================================
+
+def create_user(
+    email: str,
+    username: str,
     password: str
-
-class VerifyEmailRequest(BaseModel):
-    token: str
-
-class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
-
-class ResetPasswordRequest(BaseModel):
-    token: str
-    new_password: str
-
-# =========================================================
-# AUTH TABLES
-# =========================================================
-
-def create_auth_tables():
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS email_verifications(
-        token TEXT PRIMARY KEY,
-        user_id TEXT,
-        email TEXT,
-        created_at TEXT
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS password_resets(
-        token TEXT PRIMARY KEY,
-        user_id TEXT,
-        created_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_auth_tables()
-
-# =========================================================
-# USER HELPERS
-# =========================================================
-
-def get_user_by_email(email):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        "SELECT * FROM users WHERE email=?",
-        (email,)
-    )
-
-    row = cur.fetchone()
-    conn.close()
-    return row
-
-def get_user_by_id(user_id):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        "SELECT * FROM users WHERE id=?",
-        (user_id,)
-    )
-
-    row = cur.fetchone()
-    conn.close()
-    return row
-
-# =========================================================
-# SESSION HELPERS
-# =========================================================
-
-def create_session(user_id):
-    token = generate_token()
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        "INSERT INTO sessions VALUES(?,?,?)",
-        (
-            token,
-            user_id,
-            now()
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-    return token
-
-def get_session(token):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        "SELECT * FROM sessions WHERE token=?",
-        (token,)
-    )
-
-    row = cur.fetchone()
-    conn.close()
-
-    return row
-
-# =========================================================
-# TOKEN HELPERS
-# =========================================================
-
-def create_verification_token(
-    user_id,
-    email
 ):
-    token = generate_token()
 
-    conn = get_db()
-    cur = conn.cursor()
+    user_id = generate_token()
 
-    cur.execute(
-        """
-        INSERT INTO email_verifications
-        VALUES(?,?,?,?)
-        """,
-        (
-            token,
-            user_id,
-            email,
-            now()
-        )
+    user = User(
+        id=user_id,
+        email=email,
+        username=username,
+        password_hash=
+            hash_password(password),
+        created_at=
+            datetime.utcnow()
     )
 
-    conn.commit()
-    conn.close()
+    USERS[user_id] = user
 
-    return token
+    USER_ROLES[user_id] = "member"
 
-def create_password_reset_token(
-    user_id
+    return user
+
+# ============================================================
+# 1C.11 USER LOOKUP
+# ============================================================
+
+def get_user_by_email(
+    email: str
 ):
+
+    for user in USERS.values():
+
+        if user.email == email:
+            return user
+
+    return None
+
+# ============================================================
+# 1C.12 SESSION CREATION
+# ============================================================
+
+def create_session(
+    user_id: str
+):
+
     token = generate_token()
 
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO password_resets
-        VALUES(?,?,?)
-        """,
-        (
-            token,
-            user_id,
-            now()
-        )
+    session = Session(
+        token=token,
+        user_id=user_id,
+        created_at=
+            datetime.utcnow(),
+        expires_at=
+            datetime.utcnow()
+            + timedelta(days=30)
     )
 
-    conn.commit()
-    conn.close()
+    SESSIONS[token] = session
 
-    return token
+    return session
 
-# =========================================================
-# REGISTER
-# =========================================================
+# ============================================================
+# 1C.13 SESSION VALIDATION
+# ============================================================
 
-@app.post("/api/register")
-def register(data: RegisterRequest):
+def validate_session(
+    token: str
+):
 
-    if get_user_by_email(data.email):
-        return JSONResponse(
-            status_code=400,
-            content={
-                "success": False,
-                "message": "Email already exists"
-            }
-        )
-
-    user_id = generate_id()
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO users
-        VALUES(?,?,?,?,?,?,?)
-        """,
-        (
-            user_id,
-            data.username,
-            data.email,
-            hash_password(data.password),
-            0,
-            "user",
-            now()
-        )
+    session = SESSIONS.get(
+        token
     )
 
-    conn.commit()
-    conn.close()
-
-    verification_token = (
-        create_verification_token(
-            user_id,
-            data.email
-        )
-    )
-
-    create_audit_log(
-        user_id,
-        "user_registered"
-    )
-
-    return {
-        "success": True,
-        "user_id": user_id,
-        "verification_token":
-            verification_token
-    }
-
-# =========================================================
-# LOGIN
-# =========================================================
-
-@app.post("/api/login")
-def login(data: LoginRequest):
-
-    user = get_user_by_email(
-        data.email
-    )
+    if not session:
+        return None
 
     if (
-        not user or
-        user["password"] !=
-        hash_password(data.password)
+        session.expires_at
+        < datetime.utcnow()
     ):
-        return JSONResponse(
-            status_code=401,
-            content={
-                "success": False,
-                "message":
-                "Invalid credentials"
-            }
+        return None
+
+    return session
+
+# ============================================================
+# 1C.14 CURRENT USER
+# ============================================================
+
+def get_current_user(
+    token: str
+):
+
+    session = validate_session(
+        token
+    )
+
+    if not session:
+        return None
+
+    return USERS.get(
+        session.user_id
+    )
+
+# ============================================================
+# 1C.15 ROLE CHECK
+# ============================================================
+
+def has_role(
+    user_id: str,
+    role: str
+):
+
+    return (
+        USER_ROLES.get(user_id)
+        == role
+    )
+
+# ============================================================
+# 1C.16 REGISTER ENDPOINT
+# ============================================================
+
+@app.post("/auth/register")
+async def register(
+    request:
+    RegisterRequest
+):
+
+    existing = (
+        get_user_by_email(
+            request.email
+        )
+    )
+
+    if existing:
+        raise ValidationError(
+            "EMAIL_EXISTS",
+            "Email already exists"
         )
 
-    token = create_session(
-        user["id"]
-    )
-
-    create_audit_log(
-        user["id"],
-        "user_login"
+    user = create_user(
+        request.email,
+        request.username,
+        request.password
     )
 
     return {
-        "success": True,
-        "token": token,
-        "user_id": user["id"]
+        "user_id": user.id,
+        "email": user.email,
+        "username":
+            user.username
     }
 
-# =========================================================
-# LOGOUT
-# =========================================================
+# ============================================================
+# 1C.17 LOGIN ENDPOINT
+# ============================================================
 
-@app.delete("/api/logout/{token}")
-def logout(token: str):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        "DELETE FROM sessions WHERE token=?",
-        (token,)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {"success": True}
-
-# =========================================================
-# VERIFY EMAIL
-# =========================================================
-
-@app.post("/api/verify-email")
-def verify_email(
-    data: VerifyEmailRequest
+@app.post("/auth/login")
+async def login(
+    request:
+    LoginRequest
 ):
-    conn = get_db()
-    cur = conn.cursor()
 
-    cur.execute(
-        """
-        SELECT *
-        FROM email_verifications
-        WHERE token=?
-        """,
-        (data.token,)
-    )
-
-    row = cur.fetchone()
-
-    if not row:
-        conn.close()
-        return {
-            "success": False,
-            "message": "Invalid token"
-        }
-
-    cur.execute(
-        """
-        UPDATE users
-        SET verified=1
-        WHERE id=?
-        """,
-        (row["user_id"],)
-    )
-
-    cur.execute(
-        """
-        DELETE FROM email_verifications
-        WHERE token=?
-        """,
-        (data.token,)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True,
-        "message": "Email verified"
-    }
-
-# =========================================================
-# FORGOT PASSWORD
-# =========================================================
-
-@app.post("/api/forgot-password")
-def forgot_password(
-    data: ForgotPasswordRequest
-):
     user = get_user_by_email(
-        data.email
+        request.email
     )
 
     if not user:
-        return {"success": True}
+        raise AuthenticationError(
+            "INVALID_LOGIN",
+            "Invalid credentials"
+        )
 
-    token = create_password_reset_token(
-        user["id"]
+    if not verify_password(
+        request.password,
+        user.password_hash
+    ):
+        raise AuthenticationError(
+            "INVALID_LOGIN",
+            "Invalid credentials"
+        )
+
+    session = create_session(
+        user.id
     )
 
     return {
-        "success": True,
-        "reset_token": token
+        "token":
+            session.token,
+        "expires_at":
+            session.expires_at
     }
 
-# =========================================================
-# RESET PASSWORD
-# =========================================================
+# ============================================================
+# 1C.18 PROFILE ENDPOINT
+# ============================================================
 
-@app.post("/api/reset-password")
-def reset_password(
-    data: ResetPasswordRequest
+@app.get("/auth/profile")
+async def profile(
+    token: str
 ):
-    conn = get_db()
-    cur = conn.cursor()
 
-    cur.execute(
-        """
-        SELECT *
-        FROM password_resets
-        WHERE token=?
-        """,
-        (data.token,)
+    user = get_current_user(
+        token
     )
 
-    row = cur.fetchone()
-
-    if not row:
-        conn.close()
-        return {
-            "success": False,
-            "message": "Invalid token"
-        }
-
-    cur.execute(
-        """
-        UPDATE users
-        SET password=?
-        WHERE id=?
-        """,
-        (
-            hash_password(
-                data.new_password
-            ),
-            row["user_id"]
+    if not user:
+        raise AuthenticationError(
+            "UNAUTHORIZED",
+            "Login required"
         )
-    )
-
-    conn.commit()
-    conn.close()
 
     return {
-        "success": True,
-        "message": "Password updated"
-    }
-
-# =========================================================
-# PART 1B COMPLETE
-# NEXT:
-# PART 1C = PROFILES + ROLES + VERIFICATION
-# =========================================================
-# =========================================================
-# PART 1C
-# PROFILES + ROLES + VERIFICATION SYSTEM
-# PASTE BELOW PART 1B
-# =========================================================
-
-from enum import Enum
-
-# =========================================================
-# USER ROLES
-# =========================================================
-
-class UserRole(str, Enum):
-    USER = "user"
-    MODERATOR = "moderator"
-    ADMIN = "admin"
-    OWNER = "owner"
-    SUPER_ADMIN = "super_admin"
-
-# =========================================================
-# VERIFICATION TYPES
-# =========================================================
-
-class VerificationType(str, Enum):
-    NONE = "none"
-    ORANGE = "orange"
-
-# =========================================================
-# DATABASE UPGRADE
-# =========================================================
-
-def upgrade_user_table():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    try:
-        cur.execute(
-            """
-            ALTER TABLE users
-            ADD COLUMN display_name TEXT
-            """
-        )
-    except:
-        pass
-
-    try:
-        cur.execute(
-            """
-            ALTER TABLE users
-            ADD COLUMN bio TEXT
-            """
-        )
-    except:
-        pass
-
-    try:
-        cur.execute(
-            """
-            ALTER TABLE users
-            ADD COLUMN verification_type TEXT
-            DEFAULT 'none'
-            """
-        )
-    except:
-        pass
-
-    conn.commit()
-    conn.close()
-
-upgrade_user_table()
-
-# =========================================================
-# PROFILE REQUEST MODELS
-# =========================================================
-
-class UpdateProfileRequest(BaseModel):
-    user_id: str
-    display_name: str = ""
-    bio: str = ""
-
-# =========================================================
-# VERIFICATION HELPERS
-# =========================================================
-
-OWNER_EMAILS = {
-    "alvinogthegreat177@gmail.com",
-    "alvinogthegreat177@outlook.com"
-}
-
-def assign_special_badge(user):
-
-    if user["email"] in OWNER_EMAILS:
-        return {
-            "role":
-                UserRole.OWNER,
-            "verified":
-                1,
-            "verification_type":
-                VerificationType.ORANGE
-        }
-
-    return {
-        "role":
-            UserRole.USER,
-        "verified":
-            0,
-        "verification_type":
-            VerificationType.NONE
-    }
-
-def verification_tooltip(role):
-
-    if role in [
-        UserRole.OWNER,
-        UserRole.SUPER_ADMIN
-    ]:
-        return (
-            "This badge belongs to the "
-            "rightful owner of the platform."
-        )
-
-    if role in [
-        UserRole.ADMIN,
-        UserRole.MODERATOR
-    ]:
-        return (
-            "This badge belongs to an "
-            "administrator or contributor."
-        )
-
-    return ""
-
-# =========================================================
-# PUBLIC USER FORMATTER
-# =========================================================
-
-def public_user(user):
-
-    return {
-        "id":
-            user["id"],
+        "id": user.id,
+        "email": user.email,
         "username":
-            user["username"],
-        "display_name":
-            user["display_name"],
-        "bio":
-            user["bio"],
+            user.username
+    }
+
+# ============================================================
+# 1C.19 LOGOUT ENDPOINT
+# ============================================================
+
+@app.post("/auth/logout")
+async def logout(
+    token: str
+):
+
+    if token in SESSIONS:
+        del SESSIONS[token]
+
+    return {
+        "success": True
+    }
+
+# ============================================================
+# 1C.20 ROLE ENDPOINT
+# ============================================================
+
+@app.get("/auth/role")
+async def role(
+    token: str
+):
+
+    user = get_current_user(
+        token
+    )
+
+    if not user:
+        raise AuthenticationError(
+            "UNAUTHORIZED",
+            "Login required"
+        )
+
+    return {
         "role":
-            user["role"],
-        "verified":
-            bool(user["verified"]),
-        "verification_type":
-            user["verification_type"],
-        "verification_tooltip":
-            verification_tooltip(
-                user["role"]
+            USER_ROLES.get(
+                user.id
             )
     }
 
-# =========================================================
-# PROFILE ENDPOINTS
-# =========================================================
+# ============================================================
+# PART 1C DELIVERABLE
+#
+# User Model
+# Session Model
+# Role Model
+# Password Hashing
+# Password Verification
+# Session Management
+# Token Generation
+# User Registration
+# User Login
+# User Logout
+# Profile Endpoint
+# Role Endpoint
+#
+# Ready For Part 1D
+# ============================================================
+# ============================================================
+# SCRIPT 1
+# PART 1D — WORKSPACE MANAGEMENT
+# Paste directly below Part 1C
+# ============================================================
 
-@app.get("/api/profile/{user_id}")
-def get_profile(
+from pydantic import BaseModel
+from typing import Optional, List
+from datetime import datetime
+import uuid
+
+# ============================================================
+# 1D.1 WORKSPACE MODEL
+# ============================================================
+
+class Workspace(BaseModel):
+    id: str
+    name: str
+    owner_id: str
+    created_at: datetime
+    active: bool = True
+
+# ============================================================
+# 1D.2 WORKSPACE MEMBER MODEL
+# ============================================================
+
+class WorkspaceMember(BaseModel):
+    workspace_id: str
     user_id: str
+    role: str
+    joined_at: datetime
+
+# ============================================================
+# 1D.3 WORKSPACE SETTINGS MODEL
+# ============================================================
+
+class WorkspaceSettings(BaseModel):
+    workspace_id: str
+    default_model: str = "gpt-5"
+    allow_streaming: bool = True
+    allow_tools: bool = True
+
+# ============================================================
+# 1D.4 STORAGE
+# ============================================================
+
+WORKSPACES = {}
+WORKSPACE_MEMBERS = {}
+WORKSPACE_SETTINGS = {}
+
+# ============================================================
+# 1D.5 CREATE WORKSPACE REQUEST
+# ============================================================
+
+class CreateWorkspaceRequest(
+    BaseModel
 ):
-    user = get_user_by_id(
-        user_id
-    )
+    name: str
+    owner_id: str
 
-    if not user:
-        return {
-            "success": False,
-            "message":
-            "User not found"
-        }
+# ============================================================
+# 1D.6 UPDATE WORKSPACE REQUEST
+# ============================================================
 
-    return {
-        "success": True,
-        "user":
-        public_user(user)
-    }
-
-@app.post("/api/profile/update")
-def update_profile(
-    data: UpdateProfileRequest
+class UpdateWorkspaceRequest(
+    BaseModel
 ):
-    conn = get_db()
-    cur = conn.cursor()
+    name: Optional[str] = None
+    active: Optional[bool] = None
 
-    cur.execute(
-        """
-        UPDATE users
-        SET display_name=?,
-            bio=?
-        WHERE id=?
-        """,
-        (
-            data.display_name,
-            data.bio,
-            data.user_id
-        )
-    )
+# ============================================================
+# 1D.7 CREATE WORKSPACE
+# ============================================================
 
-    conn.commit()
-    conn.close()
-
-    create_audit_log(
-        data.user_id,
-        "profile_updated"
-    )
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# STAFF BADGE HELPER
-# =========================================================
-
-def grant_staff_badge(
-    user_id,
-    role="admin"
-):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        UPDATE users
-        SET role=?,
-            verified=1,
-            verification_type='orange'
-        WHERE id=?
-        """,
-        (
-            role,
-            user_id
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-    return True
-
-# =========================================================
-# PART 1C COMPLETE
-# NEXT:
-# PART 1D
-# ADMIN SYSTEM + BADGES + AUDIT LOGS
-# =========================================================
-# =========================================================
-# PART 1D
-# ADMIN SYSTEM + BADGES + AUDIT LOGS
-# PASTE BELOW PART 1C
-# =========================================================
-
-# =========================================================
-# REQUEST MODELS
-# =========================================================
-
-class GrantBadgeRequest(BaseModel):
-    admin_user_id: str
-    target_user_id: str
-    role: str = "admin"
-
-class RevokeBadgeRequest(BaseModel):
-    admin_user_id: str
-    target_user_id: str
-
-# =========================================================
-# PERMISSION HELPERS
-# =========================================================
-
-def is_admin(user_id):
-
-    user = get_user_by_id(
-        user_id
-    )
-
-    if not user:
-        return False
-
-    return user["role"] in [
-        "super_admin",
-        "owner",
-        "admin"
-    ]
-
-def is_owner(user_id):
-
-    user = get_user_by_id(
-        user_id
-    )
-
-    if not user:
-        return False
-
-    return user["role"] in [
-        "super_admin",
-        "owner"
-    ]
-
-# =========================================================
-# GRANT STAFF BADGE
-# =========================================================
-
-@app.post("/api/admin/grant-badge")
-def grant_badge(
-    data: GrantBadgeRequest
+def create_workspace(
+    name: str,
+    owner_id: str
 ):
 
-    if not is_owner(
-        data.admin_user_id
-    ):
-        return {
-            "success": False,
-            "message":
-            "Owner permission required"
-        }
+    workspace_id = str(
+        uuid.uuid4()
+    )
 
-    conn = get_db()
-    cur = conn.cursor()
+    workspace = Workspace(
+        id=workspace_id,
+        name=name,
+        owner_id=owner_id,
+        created_at=
+            datetime.utcnow()
+    )
 
-    cur.execute(
-        """
-        UPDATE users
-        SET role=?,
-            verified=1,
-            verification_type='orange'
-        WHERE id=?
-        """,
-        (
-            data.role,
-            data.target_user_id
+    WORKSPACES[
+        workspace_id
+    ] = workspace
+
+    WORKSPACE_MEMBERS[
+        workspace_id
+    ] = []
+
+    WORKSPACE_MEMBERS[
+        workspace_id
+    ].append(
+        WorkspaceMember(
+            workspace_id=
+                workspace_id,
+            user_id=owner_id,
+            role="owner",
+            joined_at=
+                datetime.utcnow()
         )
     )
 
-    cur.execute(
-        """
-        INSERT INTO user_badges
-        VALUES(?,?,?,?,?,?)
-        """,
-        (
-            generate_id(),
-            data.target_user_id,
-            data.role,
-            "#ff8c00",
-            data.admin_user_id,
-            now()
-        )
+    WORKSPACE_SETTINGS[
+        workspace_id
+    ] = WorkspaceSettings(
+        workspace_id=
+            workspace_id
     )
 
-    conn.commit()
-    conn.close()
+    return workspace
 
-    create_audit_log(
-        data.admin_user_id,
-        f"grant_{data.role}"
-    )
+# ============================================================
+# 1D.8 GET WORKSPACE
+# ============================================================
 
-    return {
-        "success": True,
-        "role": data.role,
-        "badge": "orange_checkmark"
-    }
-
-# =========================================================
-# REVOKE STAFF BADGE
-# =========================================================
-
-@app.post("/api/admin/revoke-badge")
-def revoke_badge(
-    data: RevokeBadgeRequest
+def get_workspace(
+    workspace_id: str
 ):
 
-    if not is_owner(
-        data.admin_user_id
-    ):
-        return {
-            "success": False,
-            "message":
-            "Owner permission required"
-        }
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        UPDATE users
-        SET role='user',
-            verified=0,
-            verification_type='none'
-        WHERE id=?
-        """,
-        (
-            data.target_user_id,
-        )
+    return WORKSPACES.get(
+        workspace_id
     )
 
-    cur.execute(
-        """
-        DELETE FROM user_badges
-        WHERE user_id=?
-        """,
-        (
-            data.target_user_id,
-        )
+# ============================================================
+# 1D.9 ADD MEMBER
+# ============================================================
+
+def add_member(
+    workspace_id: str,
+    user_id: str,
+    role: str = "member"
+):
+
+    member = WorkspaceMember(
+        workspace_id=
+            workspace_id,
+        user_id=user_id,
+        role=role,
+        joined_at=
+            datetime.utcnow()
     )
 
-    conn.commit()
-    conn.close()
+    WORKSPACE_MEMBERS[
+        workspace_id
+    ].append(member)
 
-    create_audit_log(
-        data.admin_user_id,
-        "revoke_badge"
-    )
+    return member
 
-    return {
-        "success": True
-    }
+# ============================================================
+# 1D.10 REMOVE MEMBER
+# ============================================================
 
-# =========================================================
-# LIST STAFF
-# =========================================================
-
-@app.get("/api/admin/staff")
-def list_staff():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT
-            id,
-            username,
-            display_name,
-            email,
-            role,
-            verified
-        FROM users
-        WHERE role != 'user'
-        ORDER BY role
-        """
-    )
-
-    staff = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "staff": staff
-    }
-
-# =========================================================
-# AUDIT LOGS
-# =========================================================
-
-@app.get("/api/admin/audit")
-def audit_logs():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM audit_logs
-        ORDER BY created_at DESC
-        LIMIT 500
-        """
-    )
-
-    logs = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "logs": logs
-    }
-
-# =========================================================
-# BADGE TOOLTIP
-# =========================================================
-
-@app.get("/api/badge-tooltip/{user_id}")
-def badge_tooltip(
+def remove_member(
+    workspace_id: str,
     user_id: str
 ):
 
-    user = get_user_by_id(
-        user_id
-    )
-
-    if not user:
-        return {
-            "success": False
-        }
-
-    return {
-        "success": True,
-        "tooltip":
-            verification_tooltip(
-                user["role"]
-            ),
-        "verification_type":
-            user["verification_type"]
-    }
-
-# =========================================================
-# PLATFORM HEALTH
-# =========================================================
-
-@app.get("/api/system/health")
-def system_health():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        "SELECT COUNT(*) FROM users"
-    )
-    total_users = (
-        cur.fetchone()[0]
-    )
-
-    cur.execute(
-        "SELECT COUNT(*) FROM sessions"
-    )
-    active_sessions = (
-        cur.fetchone()[0]
-    )
-
-    cur.execute(
-        "SELECT COUNT(*) FROM audit_logs"
-    )
-    audit_entries = (
-        cur.fetchone()[0]
-    )
-
-    conn.close()
-
-    return {
-        "success": True,
-        "app": APP_NAME,
-        "status": "online",
-        "users": total_users,
-        "active_sessions":
-            active_sessions,
-        "audit_entries":
-            audit_entries,
-        "timestamp": now()
-    }
-
-# =========================================================
-# PART 1 COMPLETE
-# NEXT:
-# PART 2A
-# CONVERSATIONS + CHAT FOUNDATION
-# =========================================================
-# =========================================================
-# PART 2A
-# CONVERSATIONS + CHAT FOUNDATION
-# PASTE BELOW PART 1D
-# =========================================================
-
-# =========================================================
-# REQUEST MODELS
-# =========================================================
-
-class CreateConversationRequest(BaseModel):
-    user_id: str
-    title: str = "New Chat"
-
-class RenameConversationRequest(BaseModel):
-    conversation_id: str
-    title: str
-
-class DeleteConversationRequest(BaseModel):
-    conversation_id: str
-
-class MessageRequest(BaseModel):
-    conversation_id: str
-    user_id: str
-    message: str
-
-# =========================================================
-# CONVERSATION TABLES
-# =========================================================
-
-def create_conversation_tables():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS conversations(
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        title TEXT,
-        pinned INTEGER DEFAULT 0,
-        archived INTEGER DEFAULT 0,
-        created_at TEXT,
-        updated_at TEXT
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS messages(
-        id TEXT PRIMARY KEY,
-        conversation_id TEXT,
-        user_id TEXT,
-        role TEXT,
-        content TEXT,
-        created_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_conversation_tables()
-
-# =========================================================
-# HELPERS
-# =========================================================
-
-def get_conversation(
-    conversation_id
-):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM conversations
-        WHERE id=?
-        """,
-        (conversation_id,)
-    )
-
-    row = cur.fetchone()
-
-    conn.close()
-    return row
-
-def conversation_exists(
-    conversation_id
-):
-    return bool(
-        get_conversation(
-            conversation_id
+    members = (
+        WORKSPACE_MEMBERS.get(
+            workspace_id,
+            []
         )
     )
 
-# =========================================================
-# CREATE CONVERSATION
-# =========================================================
+    WORKSPACE_MEMBERS[
+        workspace_id
+    ] = [
+        m
+        for m in members
+        if m.user_id != user_id
+    ]
 
-@app.post(
-    "/api/conversations/create"
-)
-def create_conversation(
-    data: CreateConversationRequest
+# ============================================================
+# 1D.11 LIST MEMBERS
+# ============================================================
+
+def list_members(
+    workspace_id: str
 ):
 
-    conversation_id = generate_id()
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO conversations
-        VALUES(?,?,?,?,?,?,?)
-        """,
-        (
-            conversation_id,
-            data.user_id,
-            data.title,
-            0,
-            0,
-            now(),
-            now()
+    return (
+        WORKSPACE_MEMBERS.get(
+            workspace_id,
+            []
         )
     )
 
-    conn.commit()
-    conn.close()
+# ============================================================
+# 1D.12 UPDATE SETTINGS
+# ============================================================
 
-    create_audit_log(
-        data.user_id,
-        "conversation_created"
+def update_workspace_settings(
+    workspace_id: str,
+    settings:
+    WorkspaceSettings
+):
+
+    WORKSPACE_SETTINGS[
+        workspace_id
+    ] = settings
+
+# ============================================================
+# 1D.13 CREATE WORKSPACE ENDPOINT
+# ============================================================
+
+@app.post("/workspaces")
+async def create_workspace_api(
+    request:
+    CreateWorkspaceRequest
+):
+
+    workspace = (
+        create_workspace(
+            request.name,
+            request.owner_id
+        )
     )
 
-    return {
-        "success": True,
-        "conversation_id":
-            conversation_id
-    }
+    return workspace
 
-# =========================================================
-# LIST CONVERSATIONS
-# =========================================================
+# ============================================================
+# 1D.14 GET WORKSPACE ENDPOINT
+# ============================================================
 
 @app.get(
-    "/api/conversations/{user_id}"
+    "/workspaces/{workspace_id}"
 )
-def get_conversations(
-    user_id: str
+async def get_workspace_api(
+    workspace_id: str
 ):
 
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM conversations
-        WHERE user_id=?
-        ORDER BY updated_at DESC
-        """,
-        (user_id,)
-    )
-
-    conversations = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "conversations":
-            conversations
-    }
-
-# =========================================================
-# RENAME CONVERSATION
-# =========================================================
-
-@app.post(
-    "/api/conversations/rename"
-)
-def rename_conversation(
-    data: RenameConversationRequest
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        UPDATE conversations
-        SET title=?,
-            updated_at=?
-        WHERE id=?
-        """,
-        (
-            data.title,
-            now(),
-            data.conversation_id
+    workspace = (
+        get_workspace(
+            workspace_id
         )
     )
 
-    conn.commit()
-    conn.close()
+    if not workspace:
+        raise ValidationError(
+            "WORKSPACE_NOT_FOUND",
+            "Workspace not found"
+        )
+
+    return workspace
+
+# ============================================================
+# 1D.15 LIST WORKSPACES ENDPOINT
+# ============================================================
+
+@app.get("/workspaces")
+async def list_workspaces():
 
     return {
-        "success": True
+        "workspaces":
+            list(
+                WORKSPACES.values()
+            )
     }
 
-# =========================================================
-# PIN CONVERSATION
-# =========================================================
+# ============================================================
+# 1D.16 ADD MEMBER ENDPOINT
+# ============================================================
 
 @app.post(
-    "/api/conversations/pin/{conversation_id}"
+    "/workspaces/{workspace_id}/members"
 )
-def pin_conversation(
-    conversation_id: str
+async def add_member_api(
+    workspace_id: str,
+    user_id: str,
+    role: str = "member"
 ):
 
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        UPDATE conversations
-        SET pinned=1
-        WHERE id=?
-        """,
-        (conversation_id,)
+    return add_member(
+        workspace_id,
+        user_id,
+        role
     )
 
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# ARCHIVE CONVERSATION
-# =========================================================
-
-@app.post(
-    "/api/conversations/archive/{conversation_id}"
-)
-def archive_conversation(
-    conversation_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        UPDATE conversations
-        SET archived=1
-        WHERE id=?
-        """,
-        (conversation_id,)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# DELETE CONVERSATION
-# =========================================================
+# ============================================================
+# 1D.17 REMOVE MEMBER ENDPOINT
+# ============================================================
 
 @app.delete(
-    "/api/conversations/delete/{conversation_id}"
+    "/workspaces/{workspace_id}/members/{user_id}"
 )
-def delete_conversation(
-    conversation_id: str
+async def remove_member_api(
+    workspace_id: str,
+    user_id: str
 ):
 
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        DELETE FROM messages
-        WHERE conversation_id=?
-        """,
-        (conversation_id,)
+    remove_member(
+        workspace_id,
+        user_id
     )
-
-    cur.execute(
-        """
-        DELETE FROM conversations
-        WHERE id=?
-        """,
-        (conversation_id,)
-    )
-
-    conn.commit()
-    conn.close()
 
     return {
         "success": True
     }
 
-# =========================================================
-# SAVE MESSAGE
-# =========================================================
+# ============================================================
+# 1D.18 LIST MEMBERS ENDPOINT
+# ============================================================
 
-def save_message(
-    conversation_id,
-    user_id,
-    role,
-    content
+@app.get(
+    "/workspaces/{workspace_id}/members"
+)
+async def list_members_api(
+    workspace_id: str
 ):
 
-    conn = get_db()
-    cur = conn.cursor()
+    return {
+        "members":
+            list_members(
+                workspace_id
+            )
+    }
 
-    cur.execute(
-        """
-        INSERT INTO messages
-        VALUES(?,?,?,?,?,?)
-        """,
-        (
-            generate_id(),
-            conversation_id,
-            user_id,
-            role,
-            content,
-            now()
+# ============================================================
+# 1D.19 SETTINGS ENDPOINT
+# ============================================================
+
+@app.get(
+    "/workspaces/{workspace_id}/settings"
+)
+async def workspace_settings_api(
+    workspace_id: str
+):
+
+    return (
+        WORKSPACE_SETTINGS.get(
+            workspace_id
         )
     )
 
-    cur.execute(
-        """
-        UPDATE conversations
-        SET updated_at=?
-        WHERE id=?
-        """,
-        (
-            now(),
+# ============================================================
+# 1D.20 UPDATE SETTINGS ENDPOINT
+# ============================================================
+
+@app.put(
+    "/workspaces/{workspace_id}/settings"
+)
+async def update_settings_api(
+    workspace_id: str,
+    settings:
+    WorkspaceSettings
+):
+
+    update_workspace_settings(
+        workspace_id,
+        settings
+    )
+
+    return {
+        "success": True
+    }
+
+# ============================================================
+# PART 1D DELIVERABLE
+#
+# Workspace Model
+# Workspace Members
+# Workspace Settings
+# Workspace Creation
+# Workspace Retrieval
+# Workspace Listing
+# Member Management
+# Settings Management
+# Workspace APIs
+#
+# Ready For Part 1E
+# ============================================================
+# ============================================================
+# ============================================================
+# ============================================================
+# SCRIPT 1
+# PART 1E — CONVERSATIONS & CHAT STORAGE
+# Paste directly below Part 1D
+# ============================================================
+
+from pydantic import BaseModel
+from typing import Optional, List
+from datetime import datetime
+import uuid
+
+# ============================================================
+# 1E.1 CONVERSATION MODEL
+# ============================================================
+
+class Conversation(BaseModel):
+    id: str
+    workspace_id: str
+    title: str
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+# ============================================================
+# 1E.2 MESSAGE MODEL
+# ============================================================
+
+class Message(BaseModel):
+    id: str
+    conversation_id: str
+    role: str
+    content: str
+    created_at: datetime
+
+# ============================================================
+# 1E.3 ATTACHMENT MODEL
+# ============================================================
+
+class Attachment(BaseModel):
+    id: str
+    message_id: str
+    filename: str
+    content_type: str
+    created_at: datetime
+
+# ============================================================
+# 1E.4 STORAGE
+# ============================================================
+
+CONVERSATIONS = {}
+MESSAGES = {}
+ATTACHMENTS = {}
+
+# ============================================================
+# 1E.5 CREATE CONVERSATION REQUEST
+# ============================================================
+
+class CreateConversationRequest(
+    BaseModel
+):
+    workspace_id: str
+    title: str
+    created_by: str
+
+# ============================================================
+# 1E.6 CREATE MESSAGE REQUEST
+# ============================================================
+
+class CreateMessageRequest(
+    BaseModel
+):
+    conversation_id: str
+    role: str
+    content: str
+
+# ============================================================
+# 1E.7 CREATE CONVERSATION
+# ============================================================
+
+def create_conversation(
+    workspace_id: str,
+    title: str,
+    created_by: str
+):
+
+    conversation_id = str(
+        uuid.uuid4()
+    )
+
+    conversation = Conversation(
+        id=conversation_id,
+        workspace_id=workspace_id,
+        title=title,
+        created_by=created_by,
+        created_at=
+            datetime.utcnow(),
+        updated_at=
+            datetime.utcnow()
+    )
+
+    CONVERSATIONS[
+        conversation_id
+    ] = conversation
+
+    MESSAGES[
+        conversation_id
+    ] = []
+
+    return conversation
+
+# ============================================================
+# 1E.8 GET CONVERSATION
+# ============================================================
+
+def get_conversation(
+    conversation_id: str
+):
+
+    return CONVERSATIONS.get(
+        conversation_id
+    )
+
+# ============================================================
+# 1E.9 LIST CONVERSATIONS
+# ============================================================
+
+def list_conversations(
+    workspace_id: str
+):
+
+    return [
+        conversation
+        for conversation in
+        CONVERSATIONS.values()
+        if conversation.workspace_id
+        == workspace_id
+    ]
+
+# ============================================================
+# 1E.10 ADD MESSAGE
+# ============================================================
+
+def add_message(
+    conversation_id: str,
+    role: str,
+    content: str
+):
+
+    message = Message(
+        id=str(uuid.uuid4()),
+        conversation_id=
+            conversation_id,
+        role=role,
+        content=content,
+        created_at=
+            datetime.utcnow()
+    )
+
+    MESSAGES[
+        conversation_id
+    ].append(message)
+
+    conversation = (
+        CONVERSATIONS.get(
             conversation_id
         )
     )
 
-    conn.commit()
-    conn.close()
+    if conversation:
+        conversation.updated_at = (
+            datetime.utcnow()
+        )
 
-# =========================================================
-# SEND MESSAGE
-# =========================================================
+    return message
 
-@app.post(
-    "/api/messages/send"
-)
-def send_message(
-    data: MessageRequest
-):
+# ============================================================
+# 1E.11 GET MESSAGES
+# ============================================================
 
-    if not conversation_exists(
-        data.conversation_id
-    ):
-        return {
-            "success": False,
-            "message":
-            "Conversation not found"
-        }
-
-    save_message(
-        data.conversation_id,
-        data.user_id,
-        "user",
-        data.message
-    )
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# GET MESSAGES
-# =========================================================
-
-@app.get(
-    "/api/messages/{conversation_id}"
-)
 def get_messages(
     conversation_id: str
 ):
 
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM messages
-        WHERE conversation_id=?
-        ORDER BY created_at ASC
-        """,
-        (conversation_id,)
-    )
-
-    messages = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "messages":
-            messages
-    }
-
-# =========================================================
-# CONVERSATION STATS
-# =========================================================
-
-@app.get(
-    "/api/conversations/stats/{conversation_id}"
-)
-def conversation_stats(
-    conversation_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT COUNT(*)
-        FROM messages
-        WHERE conversation_id=?
-        """,
-        (conversation_id,)
-    )
-
-    count = cur.fetchone()[0]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "message_count":
-            count
-    }
-
-# =========================================================
-# PART 2A COMPLETE
-# NEXT:
-# PART 2B
-# MESSAGE HISTORY + SEARCH + EXPORT
-# =========================================================
-# =========================================================
-# PART 2B
-# ADVANCED MESSAGE HISTORY + SEARCH + EXPORT
-# =========================================================
-
-import json
-
-class SearchMessagesRequest(BaseModel):
-    conversation_id: str
-    query: str
-
-# =========================================================
-# SEARCH MESSAGES
-# =========================================================
-@app.post("/api/messages/search")
-def search_messages(data: SearchMessagesRequest):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM messages
-        WHERE conversation_id=?
-        AND content LIKE ?
-        ORDER BY created_at DESC
-        """,
-        (
-            data.conversation_id,
-            f"%{data.query}%"
-        )
-    )
-
-    results = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "count": len(results),
-        "results": results
-    }
-
-# =========================================================
-# DELETE MESSAGE
-# =========================================================
-@app.delete("/api/messages/{message_id}")
-def delete_message(message_id: str):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        DELETE FROM messages
-        WHERE id=?
-        """,
-        (message_id,)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {"success": True}
-
-# =========================================================
-# EXPORT CONVERSATION
-# =========================================================
-@app.get(
-    "/api/conversations/export/{conversation_id}"
-)
-def export_conversation(
-    conversation_id: str
-):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM conversations
-        WHERE id=?
-        """,
-        (conversation_id,)
-    )
-
-    conversation = cur.fetchone()
-
-    if not conversation:
-        conn.close()
-        return {
-            "success": False,
-            "message":
-            "Conversation not found"
-        }
-
-    cur.execute(
-        """
-        SELECT *
-        FROM messages
-        WHERE conversation_id=?
-        ORDER BY created_at ASC
-        """,
-        (conversation_id,)
-    )
-
-    messages = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "conversation":
-            dict(conversation),
-        "messages":
-            messages,
-        "exported_at": now()
-    }
-
-# =========================================================
-# CLEAR CONVERSATION
-# =========================================================
-@app.delete(
-    "/api/conversations/clear/{conversation_id}"
-)
-def clear_conversation(
-    conversation_id: str
-):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        DELETE FROM messages
-        WHERE conversation_id=?
-        """,
-        (conversation_id,)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {"success": True}
-
-# =========================================================
-# PART 2B COMPLETE
-# NEXT:
-# PART 2C
-# AI RESPONSES + MODEL MANAGEMENT
-# =========================================================
-# =========================================================
-# PART 2C
-# AI RESPONSES + MODEL MANAGEMENT + CHAT COMPLETIONS
-# =========================================================
-
-# =========================================================
-# REQUEST MODELS
-# =========================================================
-
-class AIMessageRequest(BaseModel):
-    conversation_id: str
-    user_id: str
-    message: str
-    model: str = "gpt-4o-mini"
-
-# =========================================================
-# SUPPORTED MODELS
-# =========================================================
-
-SUPPORTED_MODELS = [
-    "gpt-4o",
-    "gpt-4o-mini",
-    "gpt-4.1",
-    "gpt-4.1-mini"
-]
-
-# =========================================================
-# MODEL VALIDATION
-# =========================================================
-
-def valid_model(model):
-    return model in SUPPORTED_MODELS
-
-# =========================================================
-# AI ENGINE
-# REPLACE WITH OPENAI API
-# =========================================================
-
-def generate_ai_response(
-    user_message,
-    model
-):
-    return (
-        f"[{model}] "
-        f"Response to: {user_message}"
-    )
-
-# =========================================================
-# SAVE ASSISTANT MESSAGE
-# =========================================================
-
-def save_assistant_message(
-    conversation_id,
-    content
-):
-    save_message(
+    return MESSAGES.get(
         conversation_id,
-        "assistant",
-        "assistant",
-        content
+        []
     )
 
-# =========================================================
-# CHAT COMPLETION
-# =========================================================
+# ============================================================
+# 1E.12 DELETE CONVERSATION
+# ============================================================
 
-@app.post("/api/chat/completion")
-def chat_completion(
-    data: AIMessageRequest
-):
-
-    if not conversation_exists(
-        data.conversation_id
-    ):
-        return {
-            "success": False,
-            "message":
-            "Conversation not found"
-        }
-
-    if not valid_model(
-        data.model
-    ):
-        return {
-            "success": False,
-            "message":
-            "Unsupported model"
-        }
-
-    save_message(
-        data.conversation_id,
-        data.user_id,
-        "user",
-        data.message
-    )
-
-    ai_response = (
-        generate_ai_response(
-            data.message,
-            data.model
-        )
-    )
-
-    save_assistant_message(
-        data.conversation_id,
-        ai_response
-    )
-
-    create_audit_log(
-        data.user_id,
-        "ai_completion"
-    )
-
-    return {
-        "success": True,
-        "model": data.model,
-        "response": ai_response
-    }
-
-# =========================================================
-# LIST MODELS
-# =========================================================
-
-@app.get("/api/models")
-def list_models():
-    return {
-        "success": True,
-        "models":
-        SUPPORTED_MODELS
-    }
-
-# =========================================================
-# CONVERSATION CONTEXT
-# =========================================================
-
-@app.get(
-    "/api/chat/context/{conversation_id}"
-)
-def conversation_context(
+def delete_conversation(
     conversation_id: str
 ):
 
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT role,content
-        FROM messages
-        WHERE conversation_id=?
-        ORDER BY created_at ASC
-        LIMIT 100
-        """,
-        (conversation_id,)
-    )
-
-    rows = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "context": rows
-    }
-
-# =========================================================
-# TOKEN ESTIMATION
-# =========================================================
-
-@app.get(
-    "/api/chat/tokens/{conversation_id}"
-)
-def estimate_tokens(
-    conversation_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT content
-        FROM messages
-        WHERE conversation_id=?
-        """,
-        (conversation_id,)
-    )
-
-    total = 0
-
-    for row in cur.fetchall():
-        total += len(
-            row["content"].split()
-        )
-
-    conn.close()
-
-    return {
-        "success": True,
-        "estimated_tokens":
-            total
-    }
-
-# =========================================================
-# REGENERATE RESPONSE
-# =========================================================
-
-@app.post(
-    "/api/chat/regenerate/{conversation_id}"
-)
-def regenerate_response(
-    conversation_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM messages
-        WHERE conversation_id=?
-        AND role='user'
-        ORDER BY created_at DESC
-        LIMIT 1
-        """,
-        (conversation_id,)
-    )
-
-    last_user = cur.fetchone()
-
-    conn.close()
-
-    if not last_user:
-        return {
-            "success": False
-        }
-
-    ai_response = (
-        generate_ai_response(
-            last_user["content"],
-            "gpt-4o-mini"
-        )
-    )
-
-    save_assistant_message(
+    CONVERSATIONS.pop(
         conversation_id,
-        ai_response
+        None
     )
 
-    return {
-        "success": True,
-        "response": ai_response
-    }
+    MESSAGES.pop(
+        conversation_id,
+        None
+    )
 
-# =========================================================
-# PART 2C COMPLETE
-# NEXT:
-# PART 2D
-# CHAT EXPORT + IMPORT
-# =========================================================
-# =========================================================
-# PART 2D
-# CHAT EXPORT + IMPORT
-# PASTE BELOW PART 2C
-# =========================================================
+# ============================================================
+# 1E.13 CREATE CONVERSATION ENDPOINT
+# ============================================================
 
-import json
-
-# =========================================================
-# IMPORT REQUEST MODEL
-# =========================================================
-
-class ImportConversationRequest(
-    BaseModel
+@app.post("/conversations")
+async def create_conversation_api(
+    request:
+    CreateConversationRequest
 ):
-    user_id: str
-    title: str
-    messages: list
 
-# =========================================================
-# EXPORT CONVERSATION
-# =========================================================
+    return create_conversation(
+        request.workspace_id,
+        request.title,
+        request.created_by
+    )
+
+# ============================================================
+# 1E.14 GET CONVERSATION ENDPOINT
+# ============================================================
 
 @app.get(
-    "/api/conversations/export/{conversation_id}"
+    "/conversations/{conversation_id}"
 )
-def export_conversation(
+async def get_conversation_api(
     conversation_id: str
 ):
 
-    conversation = get_conversation(
+    return get_conversation(
         conversation_id
     )
 
-    if not conversation:
-        return {
-            "success": False,
-            "message":
-            "Conversation not found"
-        }
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM messages
-        WHERE conversation_id=?
-        ORDER BY created_at ASC
-        """,
-        (conversation_id,)
-    )
-
-    messages = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "conversation":
-            dict(conversation),
-        "messages":
-            messages,
-        "exported_at":
-            now()
-    }
-
-# =========================================================
-# IMPORT CONVERSATION
-# =========================================================
-
-@app.post(
-    "/api/conversations/import"
-)
-def import_conversation(
-    data: ImportConversationRequest
-):
-
-    conversation_id = generate_id()
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO conversations
-        VALUES(?,?,?,?,?,?,?)
-        """,
-        (
-            conversation_id,
-            data.user_id,
-            data.title,
-            0,
-            0,
-            now(),
-            now()
-        )
-    )
-
-    for msg in data.messages:
-
-        cur.execute(
-            """
-            INSERT INTO messages
-            VALUES(?,?,?,?,?,?)
-            """,
-            (
-                generate_id(),
-                conversation_id,
-                msg.get(
-                    "user_id",
-                    data.user_id
-                ),
-                msg.get(
-                    "role",
-                    "user"
-                ),
-                msg.get(
-                    "content",
-                    ""
-                ),
-                msg.get(
-                    "created_at",
-                    now()
-                )
-            )
-        )
-
-    conn.commit()
-    conn.close()
-
-    create_audit_log(
-        data.user_id,
-        "conversation_imported"
-    )
-
-    return {
-        "success": True,
-        "conversation_id":
-            conversation_id
-    }
-
-# =========================================================
-# DUPLICATE CONVERSATION
-# =========================================================
-
-@app.post(
-    "/api/conversations/duplicate/{conversation_id}"
-)
-def duplicate_conversation(
-    conversation_id: str
-):
-
-    original = get_conversation(
-        conversation_id
-    )
-
-    if not original:
-        return {
-            "success": False
-        }
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    new_id = generate_id()
-
-    cur.execute(
-        """
-        INSERT INTO conversations
-        VALUES(?,?,?,?,?,?,?)
-        """,
-        (
-            new_id,
-            original["user_id"],
-            f"{original['title']} Copy",
-            0,
-            0,
-            now(),
-            now()
-        )
-    )
-
-    cur.execute(
-        """
-        SELECT *
-        FROM messages
-        WHERE conversation_id=?
-        ORDER BY created_at ASC
-        """,
-        (conversation_id,)
-    )
-
-    for msg in cur.fetchall():
-
-        cur.execute(
-            """
-            INSERT INTO messages
-            VALUES(?,?,?,?,?,?)
-            """,
-            (
-                generate_id(),
-                new_id,
-                msg["user_id"],
-                msg["role"],
-                msg["content"],
-                msg["created_at"]
-            )
-        )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True,
-        "conversation_id":
-            new_id
-    }
-
-# =========================================================
-# CLEAR CONVERSATION
-# =========================================================
-
-@app.delete(
-    "/api/conversations/clear/{conversation_id}"
-)
-def clear_conversation(
-    conversation_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        DELETE FROM messages
-        WHERE conversation_id=?
-        """,
-        (conversation_id,)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# PART 2D COMPLETE
-# NEXT:
-# PART 2E
-# CHAT SHARING + FAVORITES + FOLDERS
-# =========================================================
-# =========================================================
-# PART 2E
-# CHAT SHARING + FAVORITES + FOLDERS
-# PASTE BELOW PART 2D
-# =========================================================
-
-# =========================================================
-# TABLES
-# =========================================================
-
-def create_organization_tables():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS folders(
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        name TEXT,
-        created_at TEXT
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS shared_chats(
-        id TEXT PRIMARY KEY,
-        conversation_id TEXT,
-        share_token TEXT,
-        created_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_organization_tables()
-
-# =========================================================
-# REQUEST MODELS
-# =========================================================
-
-class CreateFolderRequest(BaseModel):
-    user_id: str
-    name: str
-
-class MoveConversationRequest(BaseModel):
-    conversation_id: str
-    folder_id: str
-
-# =========================================================
-# ADD OPTIONAL COLUMNS
-# =========================================================
-
-try:
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        "ALTER TABLE conversations ADD COLUMN folder_id TEXT"
-    )
-
-    cur.execute(
-        "ALTER TABLE conversations ADD COLUMN favorite INTEGER DEFAULT 0"
-    )
-
-    conn.commit()
-    conn.close()
-
-except:
-    pass
-
-# =========================================================
-# FAVORITE CONVERSATION
-# =========================================================
-
-@app.post(
-    "/api/conversations/favorite/{conversation_id}"
-)
-def favorite_conversation(
-    conversation_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        UPDATE conversations
-        SET favorite=1
-        WHERE id=?
-        """,
-        (conversation_id,)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# CREATE FOLDER
-# =========================================================
-
-@app.post("/api/folders/create")
-def create_folder(
-    data: CreateFolderRequest
-):
-
-    folder_id = generate_id()
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO folders
-        VALUES(?,?,?,?)
-        """,
-        (
-            folder_id,
-            data.user_id,
-            data.name,
-            now()
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True,
-        "folder_id": folder_id
-    }
-
-# =========================================================
-# LIST FOLDERS
-# =========================================================
-
-@app.get("/api/folders/{user_id}")
-def list_folders(
-    user_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM folders
-        WHERE user_id=?
-        ORDER BY name ASC
-        """,
-        (user_id,)
-    )
-
-    folders = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "folders": folders
-    }
-
-# =========================================================
-# MOVE CONVERSATION
-# =========================================================
-
-@app.post("/api/conversations/move")
-def move_conversation(
-    data: MoveConversationRequest
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        UPDATE conversations
-        SET folder_id=?
-        WHERE id=?
-        """,
-        (
-            data.folder_id,
-            data.conversation_id
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# SHARE CHAT
-# =========================================================
-
-@app.post(
-    "/api/conversations/share/{conversation_id}"
-)
-def share_chat(
-    conversation_id: str
-):
-
-    share_token = generate_token()
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO shared_chats
-        VALUES(?,?,?,?)
-        """,
-        (
-            generate_id(),
-            conversation_id,
-            share_token,
-            now()
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True,
-        "share_token": share_token
-    }
-
-# =========================================================
-# VIEW SHARED CHAT
-# =========================================================
-
-@app.get("/api/shared/{share_token}")
-def view_shared_chat(
-    share_token: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM shared_chats
-        WHERE share_token=?
-        """,
-        (share_token,)
-    )
-
-    shared = cur.fetchone()
-
-    if not shared:
-        conn.close()
-        return {
-            "success": False
-        }
-
-    cur.execute(
-        """
-        SELECT *
-        FROM messages
-        WHERE conversation_id=?
-        ORDER BY created_at ASC
-        """,
-        (
-            shared["conversation_id"],
-        )
-    )
-
-    messages = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "messages": messages
-    }
-
-# =========================================================
-# PART 2E COMPLETE
-# NEXT:
-# PART 2F
-# TAGS + SEARCH INDEXING +
-# CHAT ANALYTICS + SMART FILTERS
-# =========================================================
-# =========================================================
-# PART 2F
-# TAGS + SEARCH INDEXING + ANALYTICS
-# PASTE BELOW PART 2E
-# =========================================================
-
-# =========================================================
-# TABLES
-# =========================================================
-
-def create_tag_tables():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS conversation_tags(
-        id TEXT PRIMARY KEY,
-        conversation_id TEXT,
-        tag TEXT,
-        created_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_tag_tables()
-
-# =========================================================
-# REQUEST MODELS
-# =========================================================
-
-class AddTagRequest(BaseModel):
-    conversation_id: str
-    tag: str
-
-class RemoveTagRequest(BaseModel):
-    conversation_id: str
-    tag: str
-
-# =========================================================
-# ADD TAG
-# =========================================================
-
-@app.post("/api/tags/add")
-def add_tag(
-    data: AddTagRequest
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO conversation_tags
-        VALUES(?,?,?,?)
-        """,
-        (
-            generate_id(),
-            data.conversation_id,
-            data.tag.lower(),
-            now()
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# REMOVE TAG
-# =========================================================
-
-@app.post("/api/tags/remove")
-def remove_tag(
-    data: RemoveTagRequest
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        DELETE FROM conversation_tags
-        WHERE conversation_id=?
-        AND tag=?
-        """,
-        (
-            data.conversation_id,
-            data.tag.lower()
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# LIST TAGS
-# =========================================================
+# ============================================================
+# 1E.15 LIST CONVERSATIONS ENDPOINT
+# ============================================================
 
 @app.get(
-    "/api/tags/{conversation_id}"
+    "/workspaces/{workspace_id}/conversations"
 )
-def list_tags(
-    conversation_id: str
+async def list_conversations_api(
+    workspace_id: str
 ):
 
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT tag
-        FROM conversation_tags
-        WHERE conversation_id=?
-        ORDER BY tag ASC
-        """,
-        (conversation_id,)
-    )
-
-    tags = [
-        row["tag"]
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
     return {
-        "success": True,
-        "tags": tags
-    }
-
-# =========================================================
-# SEARCH BY TAG
-# =========================================================
-
-@app.get(
-    "/api/search/tag/{tag}"
-)
-def search_by_tag(
-    tag: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT c.*
-        FROM conversations c
-        JOIN conversation_tags t
-        ON c.id=t.conversation_id
-        WHERE t.tag=?
-        ORDER BY c.updated_at DESC
-        """,
-        (
-            tag.lower(),
-        )
-    )
-
-    rows = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "results": rows
-    }
-
-# =========================================================
-# USER ANALYTICS
-# =========================================================
-
-@app.get(
-    "/api/analytics/user/{user_id}"
-)
-def user_analytics(
-    user_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT COUNT(*)
-        FROM conversations
-        WHERE user_id=?
-        """,
-        (user_id,)
-    )
-
-    conversations = (
-        cur.fetchone()[0]
-    )
-
-    cur.execute(
-        """
-        SELECT COUNT(*)
-        FROM messages
-        WHERE user_id=?
-        """,
-        (user_id,)
-    )
-
-    messages = (
-        cur.fetchone()[0]
-    )
-
-    conn.close()
-
-    return {
-        "success": True,
         "conversations":
-            conversations,
-        "messages":
-            messages
+            list_conversations(
+                workspace_id
+            )
     }
 
-# =========================================================
-# TOP ACTIVE CHATS
-# =========================================================
-
-@app.get(
-    "/api/analytics/top-chats"
-)
-def top_chats():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT
-            conversation_id,
-            COUNT(*) as total
-        FROM messages
-        GROUP BY conversation_id
-        ORDER BY total DESC
-        LIMIT 20
-        """
-    )
-
-    rows = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "results": rows
-    }
-
-# =========================================================
-# PART 2F COMPLETE
-# NEXT:
-# PART 2G
-# CHAT MEMORY + PINNED MESSAGES +
-# PROMPTS + SYSTEM INSTRUCTIONS
-# =========================================================
-# =========================================================
-# PART 2G
-# CHAT MEMORY + PINNED MESSAGES +
-# PROMPTS + SYSTEM INSTRUCTIONS
-# PASTE BELOW PART 2F
-# =========================================================
-
-# =========================================================
-# TABLES
-# =========================================================
-
-def create_memory_tables():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS pinned_messages(
-        id TEXT PRIMARY KEY,
-        message_id TEXT,
-        conversation_id TEXT,
-        created_at TEXT
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS system_prompts(
-        id TEXT PRIMARY KEY,
-        conversation_id TEXT,
-        prompt TEXT,
-        created_at TEXT,
-        updated_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_memory_tables()
-
-# =========================================================
-# REQUEST MODELS
-# =========================================================
-
-class PinMessageRequest(BaseModel):
-    message_id: str
-    conversation_id: str
-
-class SystemPromptRequest(BaseModel):
-    conversation_id: str
-    prompt: str
-
-# =========================================================
-# PIN MESSAGE
-# =========================================================
-
-@app.post("/api/messages/pin")
-def pin_message(
-    data: PinMessageRequest
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO pinned_messages
-        VALUES(?,?,?,?)
-        """,
-        (
-            generate_id(),
-            data.message_id,
-            data.conversation_id,
-            now()
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# UNPIN MESSAGE
-# =========================================================
-
-@app.delete(
-    "/api/messages/unpin/{message_id}"
-)
-def unpin_message(
-    message_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        DELETE FROM pinned_messages
-        WHERE message_id=?
-        """,
-        (message_id,)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# LIST PINNED MESSAGES
-# =========================================================
-
-@app.get(
-    "/api/messages/pinned/{conversation_id}"
-)
-def pinned_messages(
-    conversation_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT m.*
-        FROM messages m
-        JOIN pinned_messages p
-        ON m.id=p.message_id
-        WHERE p.conversation_id=?
-        ORDER BY p.created_at DESC
-        """,
-        (conversation_id,)
-    )
-
-    rows = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "messages": rows
-    }
-
-# =========================================================
-# SAVE SYSTEM PROMPT
-# =========================================================
+# ============================================================
+# 1E.16 ADD MESSAGE ENDPOINT
+# ============================================================
 
 @app.post(
-    "/api/system-prompt/save"
+    "/messages"
 )
-def save_system_prompt(
-    data: SystemPromptRequest
+async def add_message_api(
+    request:
+    CreateMessageRequest
 ):
 
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM system_prompts
-        WHERE conversation_id=?
-        """,
-        (
-            data.conversation_id,
-        )
+    return add_message(
+        request.conversation_id,
+        request.role,
+        request.content
     )
 
-    existing = cur.fetchone()
-
-    if existing:
-
-        cur.execute(
-            """
-            UPDATE system_prompts
-            SET prompt=?,
-                updated_at=?
-            WHERE conversation_id=?
-            """,
-            (
-                data.prompt,
-                now(),
-                data.conversation_id
-            )
-        )
-
-    else:
-
-        cur.execute(
-            """
-            INSERT INTO system_prompts
-            VALUES(?,?,?,?,?)
-            """,
-            (
-                generate_id(),
-                data.conversation_id,
-                data.prompt,
-                now(),
-                now()
-            )
-        )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# GET SYSTEM PROMPT
-# =========================================================
+# ============================================================
+# 1E.17 GET MESSAGES ENDPOINT
+# ============================================================
 
 @app.get(
-    "/api/system-prompt/{conversation_id}"
+    "/conversations/{conversation_id}/messages"
 )
-def get_system_prompt(
+async def get_messages_api(
     conversation_id: str
 ):
 
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM system_prompts
-        WHERE conversation_id=?
-        """,
-        (conversation_id,)
-    )
-
-    row = cur.fetchone()
-
-    conn.close()
-
     return {
-        "success": True,
-        "prompt":
-            row["prompt"]
-            if row else ""
-    }
-
-# =========================================================
-# MEMORY SUMMARY
-# =========================================================
-
-@app.get(
-    "/api/chat/memory/{conversation_id}"
-)
-def chat_memory(
-    conversation_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT COUNT(*)
-        FROM messages
-        WHERE conversation_id=?
-        """,
-        (conversation_id,)
-    )
-
-    total_messages = (
-        cur.fetchone()[0]
-    )
-
-    conn.close()
-
-    return {
-        "success": True,
-        "conversation_id":
-            conversation_id,
         "messages":
-            total_messages
+            get_messages(
+                conversation_id
+            )
     }
 
-# =========================================================
-# PART 2G COMPLETE
-# NEXT:
-# PART 3A
-# FILE UPLOADS + ATTACHMENTS +
-# IMAGE STORAGE + MEDIA SYSTEM
-# =========================================================
-# =========================================================
-# PART 3A
-# FILE UPLOADS + ATTACHMENTS + MEDIA SYSTEM
-# PASTE BELOW PART 2G
-# =========================================================
-
-import os
-import shutil
-
-# =========================================================
-# FASTAPI FILES
-# =========================================================
-
-from fastapi import UploadFile, File
-
-# =========================================================
-# UPLOAD DIRECTORY
-# =========================================================
-
-UPLOAD_DIR = "uploads"
-
-os.makedirs(
-    UPLOAD_DIR,
-    exist_ok=True
-)
-
-# =========================================================
-# TABLES
-# =========================================================
-
-def create_media_tables():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS attachments(
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        conversation_id TEXT,
-        filename TEXT,
-        file_type TEXT,
-        file_size INTEGER,
-        file_path TEXT,
-        created_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_media_tables()
-
-# =========================================================
-# FILE HELPERS
-# =========================================================
-
-def get_attachment(
-    attachment_id
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM attachments
-        WHERE id=?
-        """,
-        (attachment_id,)
-    )
-
-    row = cur.fetchone()
-
-    conn.close()
-
-    return row
-
-# =========================================================
-# UPLOAD FILE
-# =========================================================
-
-@app.post("/api/files/upload")
-async def upload_file(
-    user_id: str,
-    conversation_id: str,
-    file: UploadFile = File(...)
-):
-
-    attachment_id = generate_id()
-
-    filename = (
-        f"{attachment_id}_"
-        f"{file.filename}"
-    )
-
-    filepath = os.path.join(
-        UPLOAD_DIR,
-        filename
-    )
-
-    with open(
-        filepath,
-        "wb"
-    ) as buffer:
-
-        shutil.copyfileobj(
-            file.file,
-            buffer
-        )
-
-    file_size = (
-        os.path.getsize(filepath)
-    )
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO attachments
-        VALUES(?,?,?,?,?,?,?,?)
-        """,
-        (
-            attachment_id,
-            user_id,
-            conversation_id,
-            file.filename,
-            file.content_type,
-            file_size,
-            filepath,
-            now()
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-    create_audit_log(
-        user_id,
-        "file_uploaded"
-    )
-
-    return {
-        "success": True,
-        "attachment_id":
-            attachment_id,
-        "filename":
-            file.filename,
-        "size":
-            file_size
-    }
-
-# =========================================================
-# LIST ATTACHMENTS
-# =========================================================
-
-@app.get(
-    "/api/files/{conversation_id}"
-)
-def list_attachments(
-    conversation_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM attachments
-        WHERE conversation_id=?
-        ORDER BY created_at DESC
-        """,
-        (conversation_id,)
-    )
-
-    files = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "files": files
-    }
-
-# =========================================================
-# ATTACHMENT DETAILS
-# =========================================================
-
-@app.get(
-    "/api/file/{attachment_id}"
-)
-def file_details(
-    attachment_id: str
-):
-
-    attachment = get_attachment(
-        attachment_id
-    )
-
-    if not attachment:
-        return {
-            "success": False
-        }
-
-    return {
-        "success": True,
-        "file":
-            dict(attachment)
-    }
-
-# =========================================================
-# DELETE FILE
-# =========================================================
+# ============================================================
+# 1E.18 DELETE CONVERSATION ENDPOINT
+# ============================================================
 
 @app.delete(
-    "/api/file/delete/{attachment_id}"
+    "/conversations/{conversation_id}"
 )
-def delete_file(
-    attachment_id: str
+async def delete_conversation_api(
+    conversation_id: str
 ):
 
-    attachment = get_attachment(
-        attachment_id
+    delete_conversation(
+        conversation_id
     )
-
-    if not attachment:
-        return {
-            "success": False
-        }
-
-    try:
-
-        if os.path.exists(
-            attachment["file_path"]
-        ):
-            os.remove(
-                attachment["file_path"]
-            )
-
-    except:
-        pass
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        DELETE FROM attachments
-        WHERE id=?
-        """,
-        (attachment_id,)
-    )
-
-    conn.commit()
-    conn.close()
 
     return {
         "success": True
     }
 
-# =========================================================
-# STORAGE STATS
-# =========================================================
+# ============================================================
+# 1E.19 CHAT HISTORY SEARCH
+# ============================================================
 
-@app.get(
-    "/api/storage/stats"
-)
-def storage_stats():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT COUNT(*)
-        FROM attachments
-        """
-    )
-
-    total_files = (
-        cur.fetchone()[0]
-    )
-
-    cur.execute(
-        """
-        SELECT SUM(file_size)
-        FROM attachments
-        """
-    )
-
-    total_storage = (
-        cur.fetchone()[0] or 0
-    )
-
-    conn.close()
-
-    return {
-        "success": True,
-        "files":
-            total_files,
-        "storage_bytes":
-            total_storage
-    }
-
-# =========================================================
-# PART 3A COMPLETE
-# NEXT:
-# PART 3B
-# IMAGE PROCESSING +
-# AVATARS + PROFILE MEDIA +
-# IMAGE GENERATION
-# =========================================================
-# =========================================================
-# PART 3B
-# IMAGE PROCESSING + AVATARS + PROFILE MEDIA
-# PASTE BELOW PART 3A
-# =========================================================
-
-from PIL import Image
-
-# =========================================================
-# PROFILE MEDIA TABLE
-# =========================================================
-
-def create_profile_media_tables():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS profile_media(
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        avatar_path TEXT,
-        banner_path TEXT,
-        updated_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_profile_media_tables()
-
-# =========================================================
-# IMAGE DIRECTORY
-# =========================================================
-
-IMAGE_DIR = "uploads/images"
-
-os.makedirs(
-    IMAGE_DIR,
-    exist_ok=True
-)
-
-# =========================================================
-# RESIZE IMAGE
-# =========================================================
-
-def resize_image(
-    filepath,
-    width=512,
-    height=512
+def search_messages(
+    conversation_id: str,
+    query: str
 ):
 
-    try:
+    results = []
 
-        image = Image.open(
-            filepath
-        )
+    for message in get_messages(
+        conversation_id
+    ):
+        if (
+            query.lower()
+            in message.content.lower()
+        ):
+            results.append(
+                message
+            )
 
-        image.thumbnail(
-            (width, height)
-        )
+    return results
 
-        image.save(
-            filepath
-        )
+# ============================================================
+# 1E.20 SEARCH ENDPOINT
+# ============================================================
 
-        return True
+@app.get(
+    "/conversations/{conversation_id}/search"
+)
+async def search_messages_api(
+    conversation_id: str,
+    query: str
+):
 
-    except:
+    return {
+        "results":
+            search_messages(
+                conversation_id,
+                query
+            )
+    }
+
+# ============================================================
+# PART 1E DELIVERABLE
+#
+# Conversation Model
+# Message Model
+# Attachment Model
+# Conversation Creation
+# Conversation Retrieval
+# Conversation Listing
+# Message Storage
+# Chat History
+# Search Functionality
+# Conversation APIs
+#
+# Ready For Part 1F
+# ============================================================
+# ============================================================
+# SCRIPT 1
+# PART 1F — FILES, ATTACHMENTS & STORAGE
+# Paste directly below Part 1E
+# ============================================================
+
+from pydantic import BaseModel
+from typing import Optional, List
+from datetime import datetime
+import uuid
+import os
+
+# ============================================================
+# 1F.1 FILE RECORD MODEL
+# ============================================================
+
+class FileRecord(BaseModel):
+    id: str
+    workspace_id: str
+    uploaded_by: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    path: str
+    created_at: datetime
+
+# ============================================================
+# 1F.2 FILE PERMISSION MODEL
+# ============================================================
+
+class FilePermission(BaseModel):
+    file_id: str
+    user_id: str
+    can_read: bool = True
+    can_write: bool = False
+
+# ============================================================
+# 1F.3 STORAGE CONFIGURATION
+# ============================================================
+
+STORAGE_ROOT = "storage"
+
+# ============================================================
+# 1F.4 STORAGE TABLES
+# ============================================================
+
+FILES = {}
+FILE_PERMISSIONS = {}
+
+# ============================================================
+# 1F.5 STORAGE INITIALIZATION
+# ============================================================
+
+def initialize_storage():
+
+    os.makedirs(
+        STORAGE_ROOT,
+        exist_ok=True
+    )
+
+# ============================================================
+# 1F.6 CREATE FILE RECORD
+# ============================================================
+
+def create_file_record(
+    workspace_id: str,
+    uploaded_by: str,
+    filename: str,
+    content_type: str,
+    size_bytes: int,
+    path: str
+):
+
+    file_record = FileRecord(
+        id=str(uuid.uuid4()),
+        workspace_id=workspace_id,
+        uploaded_by=uploaded_by,
+        filename=filename,
+        content_type=content_type,
+        size_bytes=size_bytes,
+        path=path,
+        created_at=
+            datetime.utcnow()
+    )
+
+    FILES[
+        file_record.id
+    ] = file_record
+
+    return file_record
+
+# ============================================================
+# 1F.7 GET FILE
+# ============================================================
+
+def get_file(
+    file_id: str
+):
+
+    return FILES.get(
+        file_id
+    )
+
+# ============================================================
+# 1F.8 DELETE FILE
+# ============================================================
+
+def delete_file(
+    file_id: str
+):
+
+    file_record = (
+        FILES.get(file_id)
+    )
+
+    if not file_record:
         return False
 
-# =========================================================
-# UPLOAD AVATAR
-# =========================================================
+    if os.path.exists(
+        file_record.path
+    ):
+        os.remove(
+            file_record.path
+        )
 
-@app.post(
-    "/api/profile/avatar"
-)
-async def upload_avatar(
-    user_id: str,
-    file: UploadFile = File(...)
+    FILES.pop(
+        file_id,
+        None
+    )
+
+    return True
+
+# ============================================================
+# 1F.9 LIST FILES
+# ============================================================
+
+def list_workspace_files(
+    workspace_id: str
 ):
 
-    media_id = generate_id()
+    return [
+        file_record
+        for file_record
+        in FILES.values()
+        if file_record.workspace_id
+        == workspace_id
+    ]
 
-    filename = (
-        f"avatar_{media_id}.png"
-    )
+# ============================================================
+# 1F.10 GRANT PERMISSION
+# ============================================================
 
-    filepath = os.path.join(
-        IMAGE_DIR,
-        filename
-    )
-
-    with open(
-        filepath,
-        "wb"
-    ) as buffer:
-
-        shutil.copyfileobj(
-            file.file,
-            buffer
-        )
-
-    resize_image(
-        filepath,
-        512,
-        512
-    )
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT OR REPLACE
-        INTO profile_media
-        VALUES(?,?,?,?,?)
-        """,
-        (
-            media_id,
-            user_id,
-            filepath,
-            "",
-            now()
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True,
-        "avatar": filepath
-    }
-
-# =========================================================
-# UPLOAD BANNER
-# =========================================================
-
-@app.post(
-    "/api/profile/banner"
-)
-async def upload_banner(
+def grant_file_access(
+    file_id: str,
     user_id: str,
-    file: UploadFile = File(...)
+    can_read: bool = True,
+    can_write: bool = False
 ):
 
-    filename = (
-        f"banner_{generate_id()}.png"
-    )
-
-    filepath = os.path.join(
-        IMAGE_DIR,
-        filename
-    )
-
-    with open(
-        filepath,
-        "wb"
-    ) as buffer:
-
-        shutil.copyfileobj(
-            file.file,
-            buffer
-        )
-
-    resize_image(
-        filepath,
-        1600,
-        600
-    )
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        UPDATE profile_media
-        SET banner_path=?,
-            updated_at=?
-        WHERE user_id=?
-        """,
-        (
-            filepath,
-            now(),
-            user_id
+    permission = (
+        FilePermission(
+            file_id=file_id,
+            user_id=user_id,
+            can_read=can_read,
+            can_write=can_write
         )
     )
 
-    conn.commit()
-    conn.close()
+    FILE_PERMISSIONS[
+        f"{file_id}:{user_id}"
+    ] = permission
 
-    return {
-        "success": True,
-        "banner": filepath
-    }
+    return permission
 
-# =========================================================
-# GET PROFILE MEDIA
-# =========================================================
+# ============================================================
+# 1F.11 CHECK ACCESS
+# ============================================================
 
-@app.get(
-    "/api/profile/media/{user_id}"
-)
-def get_profile_media(
+def has_file_access(
+    file_id: str,
     user_id: str
 ):
 
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM profile_media
-        WHERE user_id=?
-        """,
-        (user_id,)
+    permission = (
+        FILE_PERMISSIONS.get(
+            f"{file_id}:{user_id}"
+        )
     )
 
-    row = cur.fetchone()
+    if not permission:
+        return False
 
-    conn.close()
+    return permission.can_read
+
+# ============================================================
+# 1F.12 FILE METADATA
+# ============================================================
+
+def file_metadata(
+    file_id: str
+):
+
+    file_record = (
+        get_file(file_id)
+    )
+
+    if not file_record:
+        return None
 
     return {
-        "success": True,
-        "media":
-            dict(row)
-            if row else None
+        "id":
+            file_record.id,
+        "filename":
+            file_record.filename,
+        "content_type":
+            file_record.content_type,
+        "size_bytes":
+            file_record.size_bytes,
+        "created_at":
+            file_record.created_at
     }
 
-# =========================================================
-# DELETE AVATAR
-# =========================================================
+# ============================================================
+# 1F.13 FILE SEARCH
+# ============================================================
+
+def search_files(
+    workspace_id: str,
+    query: str
+):
+
+    results = []
+
+    for file_record in (
+        list_workspace_files(
+            workspace_id
+        )
+    ):
+        if (
+            query.lower()
+            in file_record.filename
+            .lower()
+        ):
+            results.append(
+                file_record
+            )
+
+    return results
+
+# ============================================================
+# 1F.14 FILE INFO ENDPOINT
+# ============================================================
+
+@app.get("/files/{file_id}")
+async def file_info_api(
+    file_id: str
+):
+
+    return file_metadata(
+        file_id
+    )
+
+# ============================================================
+# 1F.15 FILE LIST ENDPOINT
+# ============================================================
+
+@app.get(
+    "/workspaces/{workspace_id}/files"
+)
+async def file_list_api(
+    workspace_id: str
+):
+
+    return {
+        "files":
+            list_workspace_files(
+                workspace_id
+            )
+    }
+
+# ============================================================
+# 1F.16 FILE DELETE ENDPOINT
+# ============================================================
 
 @app.delete(
-    "/api/profile/avatar/{user_id}"
+    "/files/{file_id}"
 )
-def delete_avatar(
-    user_id: str
+async def delete_file_api(
+    file_id: str
 ):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        UPDATE profile_media
-        SET avatar_path=''
-        WHERE user_id=?
-        """,
-        (user_id,)
-    )
-
-    conn.commit()
-    conn.close()
 
     return {
-        "success": True
-    }
-
-# =========================================================
-# PART 3B COMPLETE
-# NEXT:
-# PART 3C
-# IMAGE GENERATION +
-# OCR + FILE PREVIEWS +
-# MEDIA ANALYTICS
-# =========================================================
-# =========================================================
-# PART 3C
-# IMAGE GENERATION + OCR + FILE PREVIEWS
-# PASTE BELOW PART 3B
-# =========================================================
-
-import base64
-
-# =========================================================
-# OPTIONAL OCR
-# =========================================================
-
-try:
-
-    import pytesseract
-
-    OCR_ENABLED = True
-
-except:
-
-    OCR_ENABLED = False
-
-# =========================================================
-# MEDIA ANALYTICS TABLE
-# =========================================================
-
-def create_media_analytics_tables():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS media_analytics(
-        id TEXT PRIMARY KEY,
-        attachment_id TEXT,
-        views INTEGER DEFAULT 0,
-        downloads INTEGER DEFAULT 0,
-        created_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_media_analytics_tables()
-
-# =========================================================
-# OCR IMAGE
-# =========================================================
-
-@app.get(
-    "/api/media/ocr/{attachment_id}"
-)
-def image_ocr(
-    attachment_id: str
-):
-
-    if not OCR_ENABLED:
-
-        return {
-            "success": False,
-            "message":
-            "OCR not installed"
-        }
-
-    attachment = get_attachment(
-        attachment_id
-    )
-
-    if not attachment:
-        return {
-            "success": False
-        }
-
-    try:
-
-        image = Image.open(
-            attachment["file_path"]
-        )
-
-        text = (
-            pytesseract.image_to_string(
-                image
+        "success":
+            delete_file(
+                file_id
             )
-        )
+    }
 
-        return {
-            "success": True,
-            "text": text
-        }
-
-    except Exception as e:
-
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-# =========================================================
-# IMAGE PREVIEW
-# =========================================================
+# ============================================================
+# 1F.17 FILE SEARCH ENDPOINT
+# ============================================================
 
 @app.get(
-    "/api/media/preview/{attachment_id}"
+    "/workspaces/{workspace_id}/files/search"
 )
-def media_preview(
-    attachment_id: str
+async def search_files_api(
+    workspace_id: str,
+    query: str
 ):
 
-    attachment = get_attachment(
-        attachment_id
-    )
-
-    if not attachment:
-        return {
-            "success": False
-        }
-
-    try:
-
-        with open(
-            attachment["file_path"],
-            "rb"
-        ) as f:
-
-            encoded = (
-                base64.b64encode(
-                    f.read()
-                ).decode()
+    return {
+        "results":
+            search_files(
+                workspace_id,
+                query
             )
-
-        return {
-            "success": True,
-            "filename":
-                attachment["filename"],
-            "preview":
-                encoded
-        }
-
-    except Exception as e:
-
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-# =========================================================
-# TRACK VIEW
-# =========================================================
-
-@app.post(
-    "/api/media/view/{attachment_id}"
-)
-def track_media_view(
-    attachment_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM media_analytics
-        WHERE attachment_id=?
-        """,
-        (attachment_id,)
-    )
-
-    row = cur.fetchone()
-
-    if row:
-
-        cur.execute(
-            """
-            UPDATE media_analytics
-            SET views=views+1
-            WHERE attachment_id=?
-            """,
-            (attachment_id,)
-        )
-
-    else:
-
-        cur.execute(
-            """
-            INSERT INTO media_analytics
-            VALUES(?,?,?,?,?)
-            """,
-            (
-                generate_id(),
-                attachment_id,
-                1,
-                0,
-                now()
-            )
-        )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
     }
 
-# =========================================================
-# TRACK DOWNLOAD
-# =========================================================
+# ============================================================
+# 1F.18 STORAGE HEALTH CHECK
+# ============================================================
 
-@app.post(
-    "/api/media/download/{attachment_id}"
-)
-def track_download(
-    attachment_id: str
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        UPDATE media_analytics
-        SET downloads=downloads+1
-        WHERE attachment_id=?
-        """,
-        (attachment_id,)
-    )
-
-    conn.commit()
-    conn.close()
+@app.get("/storage/health")
+async def storage_health():
 
     return {
-        "success": True
+        "status": "healthy",
+        "storage_root":
+            STORAGE_ROOT
     }
 
-# =========================================================
-# MEDIA STATS
-# =========================================================
+# ============================================================
+# 1F.19 STORAGE STATS
+# ============================================================
 
-@app.get(
-    "/api/media/stats/{attachment_id}"
-)
-def media_stats(
-    attachment_id: str
-):
+def storage_stats():
 
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM media_analytics
-        WHERE attachment_id=?
-        """,
-        (attachment_id,)
+    total_files = len(
+        FILES
     )
 
-    row = cur.fetchone()
-
-    conn.close()
-
-    return {
-        "success": True,
-        "stats":
-            dict(row)
-            if row else {
-                "views": 0,
-                "downloads": 0
-            }
-    }
-
-# =========================================================
-# PART 3C COMPLETE
-# NEXT:
-# PART 3D
-# VIDEO SUPPORT +
-# AUDIO SUPPORT +
-# DOCUMENT PROCESSING
-# =========================================================
-# =========================================================
-# PART 3D
-# VIDEO SUPPORT + AUDIO SUPPORT +
-# DOCUMENT PROCESSING
-# PASTE BELOW PART 3C
-# =========================================================
-
-from fastapi.responses import FileResponse
-
-# =========================================================
-# MEDIA TABLES
-# =========================================================
-
-def create_document_tables():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS media_files(
-        id TEXT PRIMARY KEY,
-        attachment_id TEXT,
-        media_type TEXT,
-        duration REAL DEFAULT 0,
-        pages INTEGER DEFAULT 0,
-        metadata TEXT,
-        created_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_document_tables()
-
-# =========================================================
-# SUPPORTED TYPES
-# =========================================================
-
-VIDEO_TYPES = [
-    "video/mp4",
-    "video/webm",
-    "video/quicktime"
-]
-
-AUDIO_TYPES = [
-    "audio/mpeg",
-    "audio/wav",
-    "audio/ogg"
-]
-
-DOCUMENT_TYPES = [
-    "application/pdf",
-    "text/plain"
-]
-
-# =========================================================
-# REGISTER MEDIA FILE
-# =========================================================
-
-def register_media_file(
-    attachment_id,
-    media_type
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO media_files
-        VALUES(?,?,?,?,?,?,?)
-        """,
-        (
-            generate_id(),
-            attachment_id,
-            media_type,
-            0,
-            0,
-            "{}",
-            now()
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-# =========================================================
-# ANALYZE FILE TYPE
-# =========================================================
-
-@app.post(
-    "/api/media/analyze/{attachment_id}"
-)
-def analyze_media(
-    attachment_id: str
-):
-
-    attachment = get_attachment(
-        attachment_id
-    )
-
-    if not attachment:
-        return {
-            "success": False
-        }
-
-    file_type = (
-        attachment["file_type"]
-    )
-
-    if file_type in VIDEO_TYPES:
-
-        media_type = "video"
-
-    elif file_type in AUDIO_TYPES:
-
-        media_type = "audio"
-
-    elif file_type in DOCUMENT_TYPES:
-
-        media_type = "document"
-
-    else:
-
-        media_type = "unknown"
-
-    register_media_file(
-        attachment_id,
-        media_type
+    total_size = sum(
+        file.size_bytes
+        for file in
+        FILES.values()
     )
 
     return {
-        "success": True,
-        "media_type":
-            media_type
+        "total_files":
+            total_files,
+        "total_size":
+            total_size
     }
 
-# =========================================================
-# STREAM MEDIA
-# =========================================================
-
-@app.get(
-    "/api/media/stream/{attachment_id}"
-)
-def stream_media(
-    attachment_id: str
-):
-
-    attachment = get_attachment(
-        attachment_id
-    )
-
-    if not attachment:
-        return {
-            "success": False
-        }
-
-    return FileResponse(
-        attachment["file_path"]
-    )
-
-# =========================================================
-# DOCUMENT TEXT EXTRACTION
-# =========================================================
-
-@app.get(
-    "/api/document/text/{attachment_id}"
-)
-def document_text(
-    attachment_id: str
-):
-
-    attachment = get_attachment(
-        attachment_id
-    )
-
-    if not attachment:
-        return {
-            "success": False
-        }
-
-    try:
-
-        if (
-            attachment["file_type"]
-            == "text/plain"
-        ):
-
-            with open(
-                attachment["file_path"],
-                "r",
-                encoding="utf-8"
-            ) as f:
-
-                text = f.read()
-
-            return {
-                "success": True,
-                "text": text
-            }
-
-        return {
-            "success": False,
-            "message":
-            "Unsupported document"
-        }
-
-    except Exception as e:
-
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-# =========================================================
-# DOCUMENT METADATA
-# =========================================================
-
-@app.get(
-    "/api/document/meta/{attachment_id}"
-)
-def document_metadata(
-    attachment_id: str
-):
-
-    attachment = get_attachment(
-        attachment_id
-    )
-
-    if not attachment:
-        return {
-            "success": False
-        }
-
-    return {
-        "success": True,
-        "filename":
-            attachment["filename"],
-        "type":
-            attachment["file_type"],
-        "size":
-            attachment["file_size"]
-    }
-
-# =========================================================
-# LIST MEDIA FILES
-# =========================================================
-
-@app.get("/api/media/list")
-def list_media():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM media_files
-        ORDER BY created_at DESC
-        """
-    )
-
-    rows = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "media": rows
-    }
-
-# =========================================================
-# PART 3D COMPLETE
-# NEXT:
-# PART 3E
-# PDF PROCESSING +
-# TRANSCRIPTIONS +
-# THUMBNAILS +
-# MEDIA SEARCH
-# =========================================================
-# =========================================================
-# PART 3D
-# VIDEO SUPPORT + AUDIO SUPPORT +
-# DOCUMENT PROCESSING
-# PASTE BELOW PART 3C
-# =========================================================
-
-from fastapi.responses import FileResponse
-
-# =========================================================
-# MEDIA TABLES
-# =========================================================
-
-def create_document_tables():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS media_files(
-        id TEXT PRIMARY KEY,
-        attachment_id TEXT,
-        media_type TEXT,
-        duration REAL DEFAULT 0,
-        pages INTEGER DEFAULT 0,
-        metadata TEXT,
-        created_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_document_tables()
-
-# =========================================================
-# SUPPORTED TYPES
-# =========================================================
-
-VIDEO_TYPES = [
-    "video/mp4",
-    "video/webm",
-    "video/quicktime"
-]
-
-AUDIO_TYPES = [
-    "audio/mpeg",
-    "audio/wav",
-    "audio/ogg"
-]
-
-DOCUMENT_TYPES = [
-    "application/pdf",
-    "text/plain"
-]
-
-# =========================================================
-# REGISTER MEDIA FILE
-# =========================================================
-
-def register_media_file(
-    attachment_id,
-    media_type
-):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        INSERT INTO media_files
-        VALUES(?,?,?,?,?,?,?)
-        """,
-        (
-            generate_id(),
-            attachment_id,
-            media_type,
-            0,
-            0,
-            "{}",
-            now()
-        )
-    )
-
-    conn.commit()
-    conn.close()
-
-# =========================================================
-# ANALYZE FILE TYPE
-# =========================================================
-
-@app.post(
-    "/api/media/analyze/{attachment_id}"
-)
-def analyze_media(
-    attachment_id: str
-):
-
-    attachment = get_attachment(
-        attachment_id
-    )
-
-    if not attachment:
-        return {
-            "success": False
-        }
-
-    file_type = (
-        attachment["file_type"]
-    )
-
-    if file_type in VIDEO_TYPES:
-
-        media_type = "video"
-
-    elif file_type in AUDIO_TYPES:
-
-        media_type = "audio"
-
-    elif file_type in DOCUMENT_TYPES:
-
-        media_type = "document"
-
-    else:
-
-        media_type = "unknown"
-
-    register_media_file(
-        attachment_id,
-        media_type
-    )
-
-    return {
-        "success": True,
-        "media_type":
-            media_type
-    }
-
-# =========================================================
-# STREAM MEDIA
-# =========================================================
-
-@app.get(
-    "/api/media/stream/{attachment_id}"
-)
-def stream_media(
-    attachment_id: str
-):
-
-    attachment = get_attachment(
-        attachment_id
-    )
-
-    if not attachment:
-        return {
-            "success": False
-        }
-
-    return FileResponse(
-        attachment["file_path"]
-    )
-
-# =========================================================
-# DOCUMENT TEXT EXTRACTION
-# =========================================================
-
-@app.get(
-    "/api/document/text/{attachment_id}"
-)
-def document_text(
-    attachment_id: str
-):
-
-    attachment = get_attachment(
-        attachment_id
-    )
-
-    if not attachment:
-        return {
-            "success": False
-        }
-
-    try:
-
-        if (
-            attachment["file_type"]
-            == "text/plain"
-        ):
-
-            with open(
-                attachment["file_path"],
-                "r",
-                encoding="utf-8"
-            ) as f:
-
-                text = f.read()
-
-            return {
-                "success": True,
-                "text": text
-            }
-
-        return {
-            "success": False,
-            "message":
-            "Unsupported document"
-        }
-
-    except Exception as e:
-
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-# =========================================================
-# DOCUMENT METADATA
-# =========================================================
-
-@app.get(
-    "/api/document/meta/{attachment_id}"
-)
-def document_metadata(
-    attachment_id: str
-):
-
-    attachment = get_attachment(
-        attachment_id
-    )
-
-    if not attachment:
-        return {
-            "success": False
-        }
-
-    return {
-        "success": True,
-        "filename":
-            attachment["filename"],
-        "type":
-            attachment["file_type"],
-        "size":
-            attachment["file_size"]
-    }
-
-# =========================================================
-# LIST MEDIA FILES
-# =========================================================
-
-@app.get("/api/media/list")
-def list_media():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT *
-        FROM media_files
-        ORDER BY created_at DESC
-        """
-    )
-
-    rows = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "media": rows
-    }
-
-# =========================================================
-# PART 3D COMPLETE
-# NEXT:
-# PART 3E
-# PDF PROCESSING +
-# TRANSCRIPTIONS +
-# THUMBNAILS +
-# MEDIA SEARCH
-# =========================================================
-# =========================================================
-# PART 3E
-# API KEYS + PROVIDER MANAGEMENT
-# PASTE BELOW PART 3D
-# =========================================================
-
-class SaveProviderKeyRequest(BaseModel):
-    user_id: str
-    provider: str
-    api_key: str
-
-def create_provider_tables():
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS provider_keys(
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        provider TEXT,
-        api_key TEXT,
-        created_at TEXT,
-        updated_at TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-create_provider_tables()
-
-@app.post("/api/providers/save-key")
-def save_provider_key(
-    data: SaveProviderKeyRequest
-):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    SELECT id
-    FROM provider_keys
-    WHERE user_id=?
-    AND provider=?
-    """, (
-        data.user_id,
-        data.provider
-    ))
-
-    existing = cur.fetchone()
-
-    if existing:
-        cur.execute("""
-        UPDATE provider_keys
-        SET api_key=?,
-            updated_at=?
-        WHERE id=?
-        """, (
-            data.api_key,
-            now(),
-            existing["id"]
-        ))
-    else:
-        cur.execute("""
-        INSERT INTO provider_keys
-        VALUES(?,?,?,?,?,?)
-        """, (
-            generate_id(),
-            data.user_id,
-            data.provider,
-            data.api_key,
-            now(),
-            now()
-        ))
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-@app.get("/api/providers/{user_id}")
-def list_provider_keys(
-    user_id: str
-):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    SELECT
-        provider,
-        created_at,
-        updated_at
-    FROM provider_keys
-    WHERE user_id=?
-    ORDER BY provider ASC
-    """, (user_id,))
-
-    rows = [
-        dict(row)
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
-
-    return {
-        "success": True,
-        "providers": rows
-    }
-
-@app.delete(
-    "/api/providers/delete/{user_id}/{provider}"
-)
-def delete_provider_key(
-    user_id: str,
-    provider: str
-):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    DELETE FROM provider_keys
-    WHERE user_id=?
-    AND provider=?
-    """, (
-        user_id,
-        provider
-    ))
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "success": True
-    }
-
-# =========================================================
-# PART 3E COMPLETE
-# NEXT:
-# PART 3F = MULTI-PROVIDER ROUTING +
-# FAILOVER + MODEL PRIORITIES
-# =========================================================
-from pydantic import BaseModel
-
-class ProviderConfig(BaseModel):
-    id: str
-    enabled: bool
-    priority: int
-    timeoutMs: int
-    models: list[str]
-
-export const PROVIDERS: ProviderConfig[] = [
-  {
-    id: "openai",
-    enabled: true,
-    priority: 1,
-    timeoutMs: 30000,
-    models: [
-      "gpt-5.5",
-      "gpt-5",
-      "gpt-4o"
-    ]
-  },
-  {
-    id: "anthropic",
-    enabled: true,
-    priority: 2,
-    timeoutMs: 30000,
-    models: [
-      "claude-opus",
-      "claude-sonnet"
-    ]
-  },
-  {
-    id: "google",
-    enabled: true,
-    priority: 3,
-    timeoutMs: 30000,
-    models: [
-      "gemini-pro",
-      "gemini-flash"
-    ]
-  }
-];
-export interface ProviderHealth {
-  status: "healthy" | "degraded" | "offline";
-  successCount: number;
-  failureCount: number;
-  lastSuccess?: number;
-  lastFailure?: number;
-}
-
-export const providerHealth =
-  new Map<string, ProviderHealth>();
-export function markSuccess(id: string) {
-  const existing =
-    providerHealth.get(id);
-
-  providerHealth.set(id, {
-    status: "healthy",
-    successCount:
-      (existing?.successCount ?? 0) + 1,
-    failureCount:
-      existing?.failureCount ?? 0,
-    lastSuccess: Date.now(),
-    lastFailure: existing?.lastFailure
-  });
-}
-
-export function markFailure(id: string) {
-  const existing =
-    providerHealth.get(id);
-
-  const failures =
-    (existing?.failureCount ?? 0) + 1;
-
-  providerHealth.set(id, {
-    status:
-      failures >= 5
-        ? "offline"
-        : "degraded",
-    successCount:
-      existing?.successCount ?? 0,
-    failureCount: failures,
-    lastSuccess: existing?.lastSuccess,
-    lastFailure: Date.now()
-  });
-}
-export async function routeRequest(
-  model?: string
-) {
-  const available =
-    PROVIDERS
-      .filter(p => p.enabled)
-      .sort(
-        (a, b) =>
-          a.priority - b.priority
-      );
-
-  if (!model) {
-    return available;
-  }
-
-  const match = available.find(
-    provider =>
-      provider.models.some(
-        m =>
-          model
-            .toLowerCase()
-            .includes(
-              m.toLowerCase()
-            )
-      )
-  );
-
-  return match
-    ? [match]
-    : available;
-}
-export async function withTimeout(
-  promise: Promise<any>,
-  timeoutMs: number
-) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(
-        () =>
-          reject(
-            new Error(
-              "Provider timeout"
-            )
-          ),
-        timeoutMs
-      )
-    )
-  ]);
-}
-export async function executeWithFailover(
-  providers,
-  requestFn
-) {
-  let lastError;
-
-  for (const provider of providers) {
-    try {
-      const result =
-        await withTimeout(
-          requestFn(provider),
-          provider.timeoutMs
-        );
-
-      markSuccess(provider.id);
-
-      return result;
-    } catch (error) {
-      markFailure(provider.id);
-
-      console.error(
-        `[FAILOVER] ${provider.id}`,
-        error
-      );
-
-      lastError = error;
-    }
-  }
-
-  throw lastError;
-}
-export function logProviderEvent(
-  provider: string,
-  event: string,
-  metadata?: Record<string, any>
-) {
-  console.log(
-    JSON.stringify({
-      timestamp:
-        new Date().toISOString(),
-      provider,
-      event,
-      metadata
-    })
-  );
-}
-export async function runInference(
-  model: string,
-  request: any
-) {
-  const providers =
-    await routeRequest(model);
-
-  return executeWithFailover(
-    providers,
-    async provider => {
-      logProviderEvent(
-        provider.id,
-        "request_started"
-      );
-
-      const response =
-        await providerClient(
-          provider.id
-        ).chat(request);
-
-      logProviderEvent(
-        provider.id,
-        "request_completed"
-      );
-
-      return response;
-    }
-  );
-}
-export interface UsageRecord {
-  userId: string;
-  workspaceId: string;
-  providerId: string;
-  model: string;
-
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-
-  estimatedCost: number;
-  createdAt: Date;
-}
-export async function recordUsage(
-  usage: UsageRecord
-) {
-  return db.usage.create({
-    data: usage
-  })
-export function estimateCost(
-  promptTokens: number,
-  completionTokens: number,
-  pricing: ModelPricing
-) {
-  return (
-    promptTokens *
-      pricing.inputPrice +
-    completionTokens *
-      pricing.outputPrice
-  );
-}
-export interface RequestPolicy {
-  maxRequestsPerMinute: number;
-  maxConcurrentRequests: number;
-}
-export async function checkLimits(
-  userId: string
-) {
-  const usage =
-    await getRecentUsage(userId);
-
-  if (usage > LIMITS.maxRequestsPerMinute) {
-    throw new Error(
-      "Rate limit exceeded"
-    );
-  }
-}
-export interface WorkspaceBudget {
-  workspaceId: string;
-  monthlyBudget: number;
-  currentSpend: number;
-}
-export interface ProviderBudget {
-  providerId: string;
-  monthlyLimit: number;
-  currentSpend: number;
-}
- Request flooding
- Token spikes
- Infinite retry loops
- Prompt spam
- Excessive concurrency
- Suspicious API usage
- Total requests
- Total tokens
- Cost per provider
- Cost per model
- Cost per workspace
- Daily usage trends
- Monthly usage trends
-export interface CacheEntry<T> {
-  key: string;
-  value: T;
-  createdAt: Date;
-  expiresAt: Date;
-}
-export async function getCachedResponse(
-  key: string
-) {
-  return cache.get(key);
-}
-
-export async function setCachedResponse(
-  key: string,
-  value: unknown,
-  ttl: number
-) {
-  return cache.set(
-    key,
-    value,
-    ttl
-  );
-}
-import crypto from "crypto";
-
-export function buildCacheKey(
-  model: string,
-  prompt: string
-) {
-  return crypto
-    .createHash("sha256")
-    .update(`${model}:${prompt}`)
-    .digest("hex");
-}
-import crypto from "crypto";
-
-export function buildCacheKey(
-  model: string,
-  prompt: string
-) {
-  return crypto
-    .createHash("sha256")
-    .update(`${model}:${prompt}`)
-    .digest("hex");
-}
-export async function executeRequest(
-  model: string,
-  prompt: string
-) {
-  const key =
-    buildCacheKey(
-      model,
-      prompt
-    );
-
-  const cached =
-    await getCachedResponse(key);
-
-  if (cached) {
-    return cached;
-  }
-
-  const result =
-    await runInference(
-      model,
-      prompt
-    );
-
-  await setCachedResponse(
-    key,
-    result,
-    3600
-  );
-
-  return result;
-}
- Model lists
- Pricing tables
- Provider health
- Routing rules
- Capabilities
-export async function invalidateCache(
-  key: string
-) {
-  await cache.delete(key);
-}
- Cache hits
- Cache misses
- Hit ratio
- Average latency
- Saved provider calls
- Saved cost
- Response caching
- Metadata caching
- Connection pooling
- Request deduplication
- Parallel provider checks
- Warm cache loading
-export interface LogEvent {
-  level:
-    | "info"
-    | "warn"
-    | "error";
-
-  service: string;
-  event: string;
-  timestamp: Date;
-
-  metadata?: Record<
-    string,
-    unknown
-  >;
-}
-export function logEvent(
-  event: LogEvent
-) {
-  console.log(
-    JSON.stringify(event)
-  );
-}
- Total requests
- Successful requests
- Failed requests
- Provider usage
- Model usage
- Average latency
- P95 latency
- P99 latency
-export interface ProviderMetrics {
-  providerId: string;
-
-  successRate: number;
-  errorRate: number;
-
-  avgLatency: number;
-  requests: number;
-}
-export function captureError(
-  error: Error,
-  context?: object
-) {
-  logEvent({
-    level: "error",
-    service: "gateway",
-    event: error.message,
-    metadata: context,
-    timestamp: new Date()
-  });
-}
- Provider outage
- High latency
- Increased error rate
- Failover activation
- Budget threshold reached
- Database connectivity issues
- System status
- Provider status
- Active requests
- Request volume
- Error rates
- Latency metrics
- Budget consumption Model changes
- Routing updates
- Provider additions
- Provider removals
- Permission changes
- Administrative actions
-export interface ProviderSecret {
-  providerId: string;
-  encryptedKey: string;
-  createdAt: Date;
-}
-export async function getProviderKey(
-  providerId: string
-) {
-  return secrets.get(
-    providerId
-  );
-}
-export interface AuthToken {
-  userId: string;
-  issuedAt: Date;
-  expiresAt: Date;
-}
-export type Role =
-  | "owner"
-  | "admin"
-  | "member"
-  | "service";
-export interface Permission {
-  resource: string;
-  action: string;
-}
-export interface ProviderPolicy {
-  providerId: string;
-  enabled: boolean;
-  allowedModels: string[];
-}
- Required fields
- Model existence
- Provider availability
- Input size limits
- Request schema
- API keys
- User credentials
- Internal tokens
- Sensitive configuration
- Audit records 
- Login events
- Failed authentication
- Permission changes
- Secret rotation
- Provider access attempts
- Administrative actions
- PostgreSQL
- Redis
- Object Storage
- Audit Storage
-export interface ProviderRecord {
-  id: string;
-  name: string;
-
-  enabled: boolean;
-
-  createdAt: Date;
-  updatedAt: Date;
-}
-export interface ModelRecord {
-  id: string;
-
-  providerId: string;
-  model: string;
-
-  enabled: boolean;
-}
-export interface RoutingConfig {
-  model: string;
-
-  providers: string[];
-
-  failoverEnabled: boolean;
-}
-export interface UsageRecord {
-  id: string;
-
-  providerId: string;
-  model: string;
-
-  promptTokens: number;
-  completionTokens: number;
-
-  cost: number;
-
-  createdAt: Date;
-}
-export interface AuditRecord {
-  id: string;
-
-  actor: string;
-  action: string;
-
-  timestamp: Date;
-}
- Cache entries
- Provider health
- Routing state
- Rate limits
- Active requests
-export interface Repository<T> {
-  create(data: T): Promise<T>;
-
-  update(
-    id: string,
-    data: Partial<T>
-  ): Promise<T>;
-
-  delete(
-    id: string
-  ): Promise<void>;
-
-  findById(
-    id: string
-  ): Promise<T | null>;
-}
-GET    /admin/providers
-POST   /admin/providers
-PATCH  /admin/providers/:id
-DELETE /admin/providers/:id
-GET    /admin/models
-POST   /admin/models
-PATCH  /admin/models/:id
-DELETE /admin/models/:id
-GET   /admin/routing
-PATCH /admin/routing
-{
-  model: "gpt-5",
-  providers: [
-    "openai",
-    "anthropic",
-    "google"
-  ]
-}
-GET /admin/health/providers
-GET /admin/health/system
-{
-  provider: "openai",
-  status: "healthy",
-  latency: 412
-}
-GET /admin/usage
-GET /admin/usage/providers
-GET /admin/usage/models
-GET /admin/audit
-{
-  actor: "admin",
-  action: "provider_disabled",
-  timestamp: Date.now()
-}
-POST /admin/cache/clear
-
-POST /admin/cache/rebuild
-export interface FeatureFlag {
-  key: string;
-
-  enabled: boolean;
-}
-export class RequestQueue {
-  private running = 0;
-  private queue: Array<() => Promise<void>> =
-    [];
-
-  constructor(
-    private maxConcurrent = 10
-  ) {}
-
-  async add(
-    task: () => Promise<void>
-  ) {
-    this.queue.push(task);
-    this.process();
-  }
-
-  private async process() {
-    if (
-      this.running >=
-        this.maxConcurrent ||
-      this.queue.length === 0
-    ) {
-      return;
-    }
-
-    const task =
-      this.queue.shift();
-
-    if (!task) return;
-
-    this.running++;
-
-    try {
-      await task();
-    } finally {
-      this.running--;
-      this.process();
-    }
-  }
-}
-export interface RetryPolicy {
-  maxAttempts: number;
-  initialDelayMs: number;
-  maxDelayMs: number;
-}
-export function calculateDelay(
-  attempt: number,
-  baseDelay: number
-) {
-  return (
-    baseDelay *
-    Math.pow(2, attempt)
-  );
-}
-export async function retry(
-  fn: () => Promise<any>,
-  policy: RetryPolicy
-) {
-  let attempt = 0;
-
-  while (
-    attempt <
-    policy.maxAttempts
-  ) {
-    try {
-      return await fn();
-    } catch (error) {
-      attempt++;
-
-      if (
-        attempt >=
-        policy.maxAttempts
-      ) {
-        throw error;
-      }
-
-      await new Promise(
-        resolve =>
-          setTimeout(
-            resolve,
-            calculateDelay(
-              attempt,
-              policy.initialDelayMs
-            )
-          )
-      );
-    }
-  }
-}
- Network timeout
- Temporary provider outage
- Rate-limit response
- Connection reset
- Gateway timeout
- Invalid request
- Authentication failure
- Permission denied
- Unsupported model
- Validation error
-export interface CircuitBreaker {
-  providerId: string;
-  failureCount: number;
-  open: boolean;
-}
- Retry count
- Recovery rate
- Provider failures
- Circuit breaker events
- Failover activations
- Provider adapters
- Routing engine
- Failover logic
- Retry engine
- Cache layer
- Budget controls
- Database connectivity
- Redis connectivity
- Provider APIs
- Secret retrieval
- End-to-end inference flow
- Provider outage handling
- Automatic failover
- Retry recovery
- Circuit breaker activation
- Concurrent requests
- Queue performance
- Latency under load
- Throughput limits
- Authentication
- Authorization
- Secret access
- Request validation
- Input sanitization
-GET /health
-
-{
-  status: "healthy",
-  database: "healthy",
-  cache: "healthy",
-  providers: "healthy"
-}
- Environment variables loaded
- Database migrations applied
- Redis connected
- Secrets accessible
- Providers reachable
- Monitoring enabled
- Alerts configured
- All tests passing
- No critical vulnerabilities
- Failover validated
- Monitoring active
- Audit logging enabled
- Backups configured
- Unit tests
- Integration tests
- Failover testing
- Load testing
- Security validation
- Health checks
- Deployment validation
- Production readiness checklist
- Unified inference endpoint
- Request validation
- Model abstraction
- Provider abstraction
- Streaming support
- Versioned APIs
- SSE streaming
- WebSocket support
- Token streaming
- Realtime events
- Connection management
- TypeScript SDK
- Python SDK
- Go SDK
- Java SDK
- Request helpers
- Authentication helpers
- API key creation
- Key rotation
- Key revocation
- Access scopes
- Rate limiting
- Developer authentication
- Request analytics
- Token analytics
- Cost analytics
- Provider analytics
- Error analytics
- Exportable reports
- API documentation
- SDK documentation
- Quick-start guides
- Code examples
- Changelog
- Developer dashboard
- Unified AI Gateway
- Streaming support
- Multi-language SDKs
- API key management
- Analytics platform
- Developer portal
- Documentation system
- External developer ecosystem
- Tenant isolation
- Workspace management
- Tenant quotas
- Tenant-level routing
- Tenant configuration
- Usage aggregation
- Cost attribution
- Department budgets
- Cost reports
- Invoice generation
- SSO
- SAML/OAuth
- Audit retention
- Compliance controls
- Data governance
- Horizontal scaling
- Multi-region deployment
- Load balancing
- Autoscaling
- Global traffic routing
- Backup strategy
- Recovery procedures
- Cross-region replication
- Failover testing
- Incident recovery
- Incident management
- On-call workflows
- Capacity planning
- SLA monitoring
- Reliability engineering
- Multi-tenant platform
- Enterprise governance
- Cost allocation system
- Global infrastructure
- Disaster recovery
- SRE operations framework
- Enterprise-grade scalability
- Production maturity
-
-
-
+# ============================================================
+# 1F.20 STORAGE STATS ENDPOINT
+# ============================================================
+
+@app.get("/storage/stats")
+async def storage_stats_api():
+
+    return storage_stats()
+
+# ============================================================
+# PART 1F DELIVERABLE
+#
+# File Storage
+# File Records
+# File Permissions
+# File Metadata
+# File Search
+# File Deletion
+# Workspace File Listing
+# Storage Statistics
+# Storage Health Checks
+# Attachment Foundation
+#
+# Ready For Script 2 Part 2A
+# ============================================================
