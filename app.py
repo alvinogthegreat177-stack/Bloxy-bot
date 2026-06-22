@@ -2340,9 +2340,9 @@ USERS = {}
 # REGISTER
 # =========================================================
 
-@app.route(
-    "/api/register",
-    methods=["POST"]
+@app.post(
+    "/api/register"
+   
 )
 def register_user():
 
@@ -2386,9 +2386,9 @@ def register_user():
 # LOGIN
 # =========================================================
 
-@app.route(
-    "/api/login",
-    methods=["POST"]
+@app.post(
+    "/api/login"
+   
 )
 def login_user():
 
@@ -2431,9 +2431,9 @@ def login_user():
 # LOGOUT
 # =========================================================
 
-@app.route(
-    "/api/logout",
-    methods=["POST"]
+@app.post(
+    "/api/logout"
+    
 )
 def logout_user():
 
@@ -2448,9 +2448,9 @@ def logout_user():
 # CURRENT USER
 # =========================================================
 
-@app.route(
-    "/api/me",
-    methods=["GET"]
+@app.post(
+    "/api/me"
+   
 )
 def current_user():
 
@@ -2476,9 +2476,9 @@ def current_user():
 # PROVIDER HEALTH
 # =========================================================
 
-@app.route(
-    "/api/providers",
-    methods=["GET"]
+@app.post(
+    "/api/providers"
+   
 )
 def provider_status():
 
@@ -2523,9 +2523,9 @@ USER_DRAFTS = {}
 # SAVE DRAFT
 # =========================================================
 
-@app.route(
-    "/api/drafts/save",
-    methods=["POST"]
+@app.post(
+    "/api/drafts/save"
+   
 )
 def save_draft():
 
@@ -2580,9 +2580,9 @@ def save_draft():
 # LOAD DRAFT
 # =========================================================
 
-@app.route(
-    "/api/drafts/load/<conversation_id>",
-    methods=["GET"]
+@app.post(
+    "/api/drafts/load/<conversation_id>"
+    
 )
 def load_draft(
     conversation_id
@@ -2626,9 +2626,9 @@ def load_draft(
 # DELETE DRAFT
 # =========================================================
 
-@app.route(
-    "/api/drafts/delete/<conversation_id>",
-    methods=["DELETE"]
+@app.post(
+    "/api/drafts/delete/<conversation_id>"
+    
 )
 def delete_draft(
     conversation_id
@@ -2664,9 +2664,9 @@ def delete_draft(
 # LIST USER DRAFTS
 # =========================================================
 
-@app.route(
-    "/api/drafts",
-    methods=["GET"]
+@app.post(
+    "/api/drafts"
+   
 )
 def list_drafts():
 
@@ -2696,9 +2696,9 @@ def list_drafts():
 # RECOVER LAST DRAFT
 # =========================================================
 
-@app.route(
-    "/api/drafts/recover",
-    methods=["GET"]
+@app.post(
+    "/api/drafts/recover"
+    
 )
 def recover_last_draft():
 
@@ -2855,9 +2855,9 @@ def allowed_file(
 # UPLOAD FILE
 # =========================================================
 
-@app.route(
-    "/api/files/upload",
-    methods=["POST"]
+@app.post(
+    "/api/files/upload"
+   
 )
 def upload_file():
 
@@ -2968,9 +2968,9 @@ def upload_file():
 # LIST FILES
 # =========================================================
 
-@app.route(
-    "/api/files",
-    methods=["GET"]
+@app.post(
+    "/api/files"
+    
 )
 def list_files():
 
@@ -2999,9 +2999,9 @@ def list_files():
 # FILE DETAILS
 # =========================================================
 
-@app.route(
-    "/api/files/<file_id>",
-    methods=["GET"]
+@app.post(
+    "/api/files/<file_id>"
+    
 )
 def get_file(
     file_id
@@ -3043,9 +3043,9 @@ def get_file(
 # DELETE FILE
 # =========================================================
 
-@app.route(
-    "/api/files/<file_id>",
-    methods=["DELETE"]
+@app.post(
+    "/api/files/<file_id>"
+   
 )
 def delete_file(
     file_id
@@ -3095,9 +3095,9 @@ def delete_file(
 # STORAGE STATS
 # =========================================================
 
-@app.route(
-    "/api/storage/stats",
-    methods=["GET"]
+@app.post(
+    "/api/storage/stats"
+    
 )
 def storage_stats():
 
@@ -3251,9 +3251,9 @@ def record_user_activity(
 # SYSTEM ANALYTICS
 # =========================================================
 
-@app.route(
-    "/api/analytics",
-    methods=["GET"]
+@app.post(
+    "/api/analytics"
+    
 )
 def analytics_dashboard():
 
@@ -3269,9 +3269,9 @@ def analytics_dashboard():
 # USER ANALYTICS
 # =========================================================
 
-@app.route(
-    "/api/analytics/user",
-    methods=["GET"]
+@app.post(
+    "/api/analytics/user"
+    
 )
 def user_analytics():
 
@@ -3302,9 +3302,9 @@ def user_analytics():
 # PROVIDER STATUS
 # =========================================================
 
-@app.route(
-    "/api/analytics/providers",
-    methods=["GET"]
+@app.post(
+    "/api/analytics/providers"
+   
 )
 def provider_analytics():
 
@@ -3322,9 +3322,9 @@ def provider_analytics():
 # PROVIDER HEALTH CHECK
 # =========================================================
 
-@app.route(
-    "/api/providers/health",
-    methods=["GET"]
+@app.post(
+    "/api/providers/health"
+    
 )
 def provider_health():
 
@@ -3356,9 +3356,9 @@ def provider_health():
 # COST SUMMARY
 # =========================================================
 
-@app.route(
-    "/api/analytics/costs",
-    methods=["GET"]
+@app.post(
+    "/api/analytics/costs"
+   
 )
 def cost_summary():
 
@@ -3386,9 +3386,9 @@ def cost_summary():
 # RESET ANALYTICS
 # =========================================================
 
-@app.route(
-    "/api/analytics/reset",
-    methods=["POST"]
+@app.post(
+    "/api/analytics/reset"
+    
 )
 def reset_analytics():
 
@@ -3452,9 +3452,9 @@ AUDIT_LOGS = []
 # CREATE TENANT
 # =========================================================
 
-@app.route(
-    "/api/tenants",
-    methods=["POST"]
+@app.post(
+    "/api/tenants"
+    
 )
 def create_tenant():
 
@@ -3496,9 +3496,9 @@ def create_tenant():
 # LIST TENANTS
 # =========================================================
 
-@app.route(
-    "/api/tenants",
-    methods=["GET"]
+@app.post(
+    "/api/tenants"
+    
 )
 def list_tenants():
 
@@ -3514,9 +3514,9 @@ def list_tenants():
 # AUDIT LOGS
 # =========================================================
 
-@app.route(
-    "/api/audit",
-    methods=["GET"]
+@app.post(
+    "/api/audit"
+    
 )
 def get_audit_logs():
 
@@ -3534,9 +3534,9 @@ def get_audit_logs():
 
 INVOICES = []
 
-@app.route(
-    "/api/invoices/generate",
-    methods=["POST"]
+@app.post(
+    "/api/invoices/generate"
+    
 )
 def generate_invoice():
 
@@ -3614,9 +3614,9 @@ def get_failover_provider(
 # ROUTER STATUS
 # =========================================================
 
-@app.route(
-    "/api/router/status",
-    methods=["GET"]
+@app.post(
+    "/api/router/status"
+    
 )
 def router_status():
 
@@ -3635,9 +3635,9 @@ def router_status():
 # COMPLIANCE STATUS
 # =========================================================
 
-@app.route(
-    "/api/compliance",
-    methods=["GET"]
+@app.post(
+    "/api/compliance"
+    
 )
 def compliance_status():
 
@@ -3680,10 +3680,11 @@ WIKIPEDIA_ENABLED = True
 
 DICTIONARY_ENABLED = True
 
-@app.route(
-    "/api/knowledge/providers",
-    methods=["GET"]
+@app.post(
+    "/api/knowledge/providers"
+
 )
+
 def knowledge_providers():
 
     return jsonify({
@@ -3748,9 +3749,9 @@ def knowledge_providers():
 # WIKIPEDIA SEARCH
 # =========================================================
 
-@app.route(
-    "/api/wikipedia/search",
-    methods=["GET"]
+@app.post(
+    "/api/wikipedia/search"
+   
 )
 def wikipedia_search():
 
@@ -3774,9 +3775,9 @@ def wikipedia_search():
 # DICTIONARY LOOKUP
 # =========================================================
 
-@app.route(
-    "/api/dictionary/lookup",
-    methods=["GET"]
+@app.post(
+    "/api/dictionary/lookup"
+   
 )
 def dictionary_lookup():
 
