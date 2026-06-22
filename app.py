@@ -18,28 +18,23 @@ import logging
 # ============================================================
 
 
-app = FastAPI()
+from fastapi.responses import HTMLResponse
 
-@app.get("/")
-async def root():
-    return {
-        "name": "AI Platform",
-        "version": "1.0.0",
-        "status": "running"
-    }
-
-class Settings(BaseModel):
-    app_name: str = "AI Platform"
-    version: str = "1.0.0"
-    environment: str = os.getenv(
-        "ENVIRONMENT",
-        "development"
-    )
-    debug: bool = (
-        os.getenv("DEBUG", "false").lower() == "true"
-    )
-
-settings = Settings()
+@app.get("/", response_class=HTMLResponse)
+async def home():
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>AI Platform</title>
+    </head>
+    <body>
+        <h1>Welcome to AI Platform</h1>
+        <p>Your AI app is running successfully.</p>
+        <button>Get Started</button>
+    </body>
+    </html>
+    """
 # ============================================================
 # 1A.2 SERVICE REGISTRY
 # ============================================================
