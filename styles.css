@@ -1,1 +1,1696 @@
+/* =========================================================
+SCRIPT 3
+PART 3A — GLOBAL STYLES & APPLICATION LAYOUT
+FILE: static/styles.css
+Paste at the TOP of styles.css
+========================================================= */
 
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+:root{
+
+    --background:#0f172a;
+    --sidebar:#111827;
+    --panel:#1e293b;
+    --panel-light:#334155;
+
+    --text:#f8fafc;
+    --text-muted:#94a3b8;
+
+    --primary:#10a37f;
+    --primary-hover:#0d8c6d;
+
+    --border:#374151;
+
+    --danger:#ef4444;
+    --warning:#f59e0b;
+    --success:#22c55e;
+
+    --radius:12px;
+
+    --sidebar-width:280px;
+
+    --transition:0.2s ease;
+}
+
+html,
+body{
+
+    width:100%;
+    height:100%;
+
+    background:var(--background);
+
+    color:var(--text);
+
+    font-family:
+        Inter,
+        Segoe UI,
+        Arial,
+        sans-serif;
+
+    overflow:hidden;
+}
+
+body{
+
+    display:flex;
+}
+
+#app{
+
+    width:100%;
+    height:100vh;
+
+    display:flex;
+
+    overflow:hidden;
+}
+
+/* =========================================================
+SIDEBAR
+========================================================= */
+
+#sidebar{
+
+    width:var(--sidebar-width);
+
+    background:var(--sidebar);
+
+    border-right:
+        1px solid
+        var(--border);
+
+    display:flex;
+
+    flex-direction:column;
+
+    overflow:hidden;
+}
+
+#sidebar-top{
+
+    padding:20px;
+
+    border-bottom:
+        1px solid
+        var(--border);
+}
+
+#newChatButton{
+
+    width:100%;
+
+    padding:12px;
+
+    border:none;
+
+    border-radius:
+        var(--radius);
+
+    background:
+        var(--primary);
+
+    color:white;
+
+    cursor:pointer;
+
+    transition:
+        var(--transition);
+}
+
+#newChatButton:hover{
+
+    background:
+        var(--primary-hover);
+}
+
+#workspaceSection{
+
+    padding:15px;
+}
+
+#workspaceSelector{
+
+    width:100%;
+
+    padding:10px;
+
+    background:
+        var(--panel);
+
+    color:
+        var(--text);
+
+    border:
+        1px solid
+        var(--border);
+
+    border-radius:
+        var(--radius);
+}
+
+#conversationContainer{
+
+    flex:1;
+
+    overflow-y:auto;
+
+    padding:15px;
+}
+
+#sidebarBottom{
+
+    padding:15px;
+
+    border-top:
+        1px solid
+        var(--border);
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:10px;
+}
+
+/* =========================================================
+MAIN CONTENT
+========================================================= */
+
+#mainContent{
+
+    flex:1;
+
+    display:flex;
+
+    flex-direction:column;
+
+    height:100vh;
+
+    overflow:hidden;
+}
+
+#chatHeader{
+
+    height:70px;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:space-between;
+
+    padding:0 24px;
+
+    background:
+        var(--panel);
+
+    border-bottom:
+        1px solid
+        var(--border);
+}
+
+#chatTitle{
+
+    font-size:20px;
+
+    font-weight:600;
+}
+
+#headerActions{
+
+    display:flex;
+
+    gap:10px;
+}
+
+#headerActions button{
+
+    padding:10px 14px;
+
+    border:none;
+
+    border-radius:
+        var(--radius);
+
+    background:
+        var(--panel-light);
+
+    color:
+        var(--text);
+
+    cursor:pointer;
+}
+
+/* =========================================================
+MESSAGE AREA
+========================================================= */
+
+#messageArea{
+
+    flex:1;
+
+    overflow-y:auto;
+
+    padding:24px;
+
+    background:
+        var(--background);
+}
+
+#emptyState{
+
+    text-align:center;
+
+    margin-top:100px;
+}
+
+#emptyState h1{
+
+    font-size:42px;
+
+    margin-bottom:12px;
+}
+
+#emptyState p{
+
+    color:
+        var(--text-muted);
+}
+
+/* =========================================================
+INPUT SECTION
+========================================================= */
+
+#inputSection{
+
+    padding:20px;
+
+    border-top:
+        1px solid
+        var(--border);
+
+    background:
+        var(--panel);
+}
+
+#attachments{
+
+    margin-bottom:12px;
+}
+
+#inputContainer{
+
+    display:flex;
+
+    gap:12px;
+}
+
+#promptInput{
+
+    flex:1;
+
+    min-height:80px;
+
+    resize:none;
+
+    padding:14px;
+
+    border-radius:
+        var(--radius);
+
+    border:
+        1px solid
+        var(--border);
+
+    background:
+        var(--background);
+
+    color:
+        var(--text);
+}
+
+#sendButton{
+
+    width:120px;
+
+    border:none;
+
+    border-radius:
+        var(--radius);
+
+    background:
+        var(--primary);
+
+    color:white;
+
+    cursor:pointer;
+}
+
+#modelContainer{
+
+    margin-top:12px;
+}
+
+#modelSelector{
+
+    width:220px;
+
+    padding:10px;
+
+    border-radius:
+        var(--radius);
+
+    background:
+        var(--background);
+
+    color:
+        var(--text);
+
+    border:
+        1px solid
+        var(--border);
+}
+
+/* =========================================================
+PART 3A DELIVERABLE
+
+Global Reset
+Theme Variables
+Dark Theme
+Sidebar Layout
+Main Layout
+Header Layout
+Input Layout
+Workspace Selector
+Message Area
+Application Foundation
+
+Ready For Part 3B
+========================================================= */
+/* =========================================================
+SCRIPT 3
+PART 3B — CHAT MESSAGES & CONVERSATION STYLING
+Paste directly BELOW Part 3A inside styles.css
+========================================================= */
+
+.message{
+
+    display:flex;
+
+    gap:16px;
+
+    margin-bottom:24px;
+
+    width:100%;
+}
+
+.assistant-message{
+
+    justify-content:flex-start;
+}
+
+.user-message{
+
+    justify-content:flex-end;
+}
+
+.system-message{
+
+    justify-content:center;
+}
+
+.message-avatar{
+
+    width:40px;
+
+    height:40px;
+
+    min-width:40px;
+
+    border-radius:50%;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    background:var(--primary);
+
+    color:white;
+
+    font-weight:700;
+}
+
+.user-message .message-avatar{
+
+    background:#3b82f6;
+}
+
+.system-message .message-avatar{
+
+    background:var(--warning);
+}
+
+.message-content{
+
+    max-width:80%;
+
+    background:var(--panel);
+
+    border:1px solid var(--border);
+
+    border-radius:var(--radius);
+
+    padding:16px;
+}
+
+.message-text{
+
+    line-height:1.7;
+
+    word-wrap:break-word;
+
+    white-space:pre-wrap;
+}
+
+.message-actions{
+
+    display:flex;
+
+    gap:10px;
+
+    margin-top:12px;
+}
+
+.message-actions button{
+
+    padding:8px 12px;
+
+    border:none;
+
+    border-radius:8px;
+
+    background:var(--panel-light);
+
+    color:var(--text);
+
+    cursor:pointer;
+}
+
+.message-actions button:hover{
+
+    opacity:0.9;
+}
+
+.user-message .message-content{
+
+    background:#1d4ed8;
+
+    border:none;
+
+    color:white;
+}
+
+.system-message .message-content{
+
+    background:#78350f;
+
+    border:none;
+
+    text-align:center;
+}
+
+/* =========================================================
+CONVERSATION LIST
+========================================================= */
+
+.conversation-item{
+
+    padding:12px;
+
+    border-radius:10px;
+
+    margin-bottom:8px;
+
+    cursor:pointer;
+
+    transition:var(--transition);
+
+    background:transparent;
+}
+
+.conversation-item:hover{
+
+    background:var(--panel);
+}
+
+.conversation-item.active{
+
+    background:var(--panel-light);
+}
+
+.conversation-title{
+
+    font-size:14px;
+
+    overflow:hidden;
+
+    text-overflow:ellipsis;
+
+    white-space:nowrap;
+}
+
+/* =========================================================
+TYPING INDICATOR
+========================================================= */
+
+#typingIndicator{
+
+    display:flex;
+
+    gap:6px;
+
+    padding:16px;
+
+    margin-bottom:20px;
+}
+
+#typingIndicator span{
+
+    width:10px;
+
+    height:10px;
+
+    border-radius:50%;
+
+    background:var(--text-muted);
+
+    animation:typingPulse 1.2s infinite;
+}
+
+#typingIndicator span:nth-child(2){
+
+    animation-delay:0.2s;
+}
+
+#typingIndicator span:nth-child(3){
+
+    animation-delay:0.4s;
+}
+
+@keyframes typingPulse{
+
+    0%{
+        opacity:0.3;
+        transform:scale(1);
+    }
+
+    50%{
+        opacity:1;
+        transform:scale(1.2);
+    }
+
+    100%{
+        opacity:0.3;
+        transform:scale(1);
+    }
+}
+
+/* =========================================================
+PROMPT SUGGESTIONS
+========================================================= */
+
+#promptSuggestions{
+
+    display:flex;
+
+    flex-wrap:wrap;
+
+    gap:12px;
+
+    justify-content:center;
+
+    margin-top:24px;
+}
+
+.suggestion{
+
+    padding:12px 16px;
+
+    border:none;
+
+    border-radius:var(--radius);
+
+    background:var(--panel);
+
+    color:var(--text);
+
+    cursor:pointer;
+}
+
+.suggestion:hover{
+
+    background:var(--panel-light);
+}
+
+/* =========================================================
+PART 3B DELIVERABLE
+
+Assistant Messages
+User Messages
+System Messages
+Conversation List
+Conversation Selection
+Message Actions
+Copy Button Styling
+Regenerate Button Styling
+Typing Animation
+Prompt Suggestions
+Chat Bubble Layout
+
+Ready For Part 3C
+========================================================= */
+/* =========================================================
+SCRIPT 3
+PART 3C — DASHBOARD, PANELS & ADMIN INTERFACE
+Paste directly BELOW Part 3B inside styles.css
+========================================================= */
+
+.panel-header{
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:space-between;
+
+    margin-bottom:20px;
+}
+
+.panel-header h2{
+
+    font-size:20px;
+
+    font-weight:600;
+}
+
+.panel-content{
+
+    background:var(--panel);
+
+    border:1px solid var(--border);
+
+    border-radius:var(--radius);
+
+    padding:20px;
+}
+
+/* =========================================================
+DASHBOARD
+========================================================= */
+
+#dashboardPanel{
+
+    padding:24px;
+}
+
+.stat-card{
+
+    background:var(--panel-light);
+
+    border-radius:var(--radius);
+
+    padding:20px;
+
+    margin-bottom:16px;
+}
+
+.stat-card h3{
+
+    color:var(--text-muted);
+
+    font-size:14px;
+
+    margin-bottom:10px;
+}
+
+.stat-card span{
+
+    font-size:28px;
+
+    font-weight:700;
+}
+
+/* =========================================================
+ANALYTICS
+========================================================= */
+
+.analytics-card{
+
+    background:var(--panel-light);
+
+    border-radius:var(--radius);
+
+    padding:20px;
+
+    margin-bottom:20px;
+}
+
+.analytics-card h3{
+
+    margin-bottom:15px;
+}
+
+#dailyRequestsChart,
+#dailyTokensChart,
+#dailyCostChart{
+
+    height:220px;
+
+    border-radius:10px;
+
+    background:rgba(255,255,255,0.03);
+}
+
+/* =========================================================
+TABLES
+========================================================= */
+
+table{
+
+    width:100%;
+
+    border-collapse:collapse;
+}
+
+th{
+
+    text-align:left;
+
+    padding:14px;
+
+    background:var(--panel-light);
+}
+
+td{
+
+    padding:14px;
+
+    border-top:1px solid var(--border);
+}
+
+tbody tr:hover{
+
+    background:rgba(255,255,255,0.03);
+}
+
+/* =========================================================
+PROVIDER STATUS
+========================================================= */
+
+.provider-row{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    padding:12px 0;
+
+    border-bottom:1px solid var(--border);
+}
+
+.provider-row:last-child{
+
+    border-bottom:none;
+}
+
+/* =========================================================
+HEALTH STATUS
+========================================================= */
+
+.health-item{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    padding:12px 0;
+
+    border-bottom:1px solid var(--border);
+}
+
+.health-item:last-child{
+
+    border-bottom:none;
+}
+
+/* =========================================================
+AUDIT LOGS
+========================================================= */
+
+#auditLogContainer{
+
+    max-height:400px;
+
+    overflow-y:auto;
+
+    border-radius:var(--radius);
+
+    background:var(--background);
+
+    padding:12px;
+}
+
+/* =========================================================
+ADMIN BUTTONS
+========================================================= */
+
+#adminPanel button{
+
+    margin-right:10px;
+
+    margin-bottom:10px;
+
+    padding:10px 14px;
+
+    border:none;
+
+    border-radius:10px;
+
+    background:var(--primary);
+
+    color:white;
+
+    cursor:pointer;
+}
+
+#adminPanel button:hover{
+
+    background:var(--primary-hover);
+}
+
+/* =========================================================
+PART 3C DELIVERABLE
+
+Dashboard Styling
+Statistics Cards
+Analytics Layout
+Provider Tables
+Model Tables
+Health Monitoring
+Audit Logs
+Admin Controls
+Provider Status
+System Status
+Analytics Charts
+
+Ready For Part 3D
+========================================================= */
+/* =========================================================
+SCRIPT 3
+PART 3D — AUTHENTICATION, SECURITY & BUDGET CONTROLS
+Paste directly BELOW Part 3C inside styles.css
+========================================================= */
+
+/* =========================================================
+AUTHENTICATION
+========================================================= */
+
+#authenticationPanel,
+#apiKeysPanel,
+#rolesPanel,
+#securityPanel,
+#budgetPanel,
+#rateLimitPanel{
+
+    padding:24px;
+}
+
+#authenticationPanel input,
+#budgetPanel input,
+#rateLimitPanel input{
+
+    width:100%;
+
+    padding:12px;
+
+    margin-bottom:12px;
+
+    border-radius:10px;
+
+    border:1px solid var(--border);
+
+    background:var(--background);
+
+    color:var(--text);
+}
+
+#authenticationPanel button,
+#budgetPanel button,
+#rateLimitPanel button{
+
+    padding:12px 18px;
+
+    border:none;
+
+    border-radius:10px;
+
+    background:var(--primary);
+
+    color:white;
+
+    cursor:pointer;
+}
+
+#authenticationPanel button:hover,
+#budgetPanel button:hover,
+#rateLimitPanel button:hover{
+
+    background:var(--primary-hover);
+}
+
+/* =========================================================
+API KEYS
+========================================================= */
+
+#apiKeyList{
+
+    margin-top:20px;
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:12px;
+}
+
+.api-key-card{
+
+    padding:16px;
+
+    border-radius:12px;
+
+    background:var(--panel-light);
+
+    border:1px solid var(--border);
+}
+
+#apiKeysPanel button{
+
+    margin-right:10px;
+
+    margin-bottom:10px;
+
+    padding:10px 14px;
+
+    border:none;
+
+    border-radius:10px;
+
+    background:var(--primary);
+
+    color:white;
+
+    cursor:pointer;
+}
+
+/* =========================================================
+ROLES & PERMISSIONS
+========================================================= */
+
+#rolesTable{
+
+    width:100%;
+}
+
+#rolesTable th{
+
+    background:var(--panel-light);
+}
+
+#rolesTable td{
+
+    background:var(--panel);
+}
+
+/* =========================================================
+SECURITY EVENTS
+========================================================= */
+
+#securityEvents{
+
+    max-height:400px;
+
+    overflow-y:auto;
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:10px;
+}
+
+.security-event{
+
+    padding:12px;
+
+    border-radius:10px;
+
+    background:var(--panel-light);
+
+    border-left:4px solid var(--warning);
+}
+
+.security-event.high{
+
+    border-left-color:var(--danger);
+}
+
+.security-event.low{
+
+    border-left-color:var(--success);
+}
+
+/* =========================================================
+BUDGET TRACKING
+========================================================= */
+
+#budgetUsage{
+
+    margin-top:20px;
+}
+
+.budget-bar{
+
+    width:100%;
+
+    height:16px;
+
+    border-radius:20px;
+
+    overflow:hidden;
+
+    background:var(--panel-light);
+}
+
+.budget-progress{
+
+    height:100%;
+
+    background:var(--success);
+
+    width:0%;
+}
+
+.budget-warning{
+
+    background:var(--warning);
+}
+
+.budget-danger{
+
+    background:var(--danger);
+}
+
+/* =========================================================
+RATE LIMITS
+========================================================= */
+
+.limit-card{
+
+    padding:16px;
+
+    margin-top:12px;
+
+    border-radius:12px;
+
+    background:var(--panel-light);
+}
+
+/* =========================================================
+STATUS BADGES
+========================================================= */
+
+.status-badge{
+
+    padding:6px 12px;
+
+    border-radius:20px;
+
+    font-size:12px;
+
+    font-weight:600;
+}
+
+.status-online{
+
+    background:rgba(34,197,94,0.15);
+
+    color:var(--success);
+}
+
+.status-warning{
+
+    background:rgba(245,158,11,0.15);
+
+    color:var(--warning);
+}
+
+.status-error{
+
+    background:rgba(239,68,68,0.15);
+
+    color:var(--danger);
+}
+
+/* =========================================================
+PART 3D DELIVERABLE
+
+Authentication Styling
+Login Forms
+API Key Management
+Role Management
+Permission Tables
+Security Events
+Budget Tracking
+Budget Progress Bars
+Rate Limit Controls
+Status Badges
+Security Dashboard
+
+Ready For Part 3E
+========================================================= */
+/* =========================================================
+SCRIPT 3
+PART 3E — ENTERPRISE, DEVELOPER PORTAL & INFRASTRUCTURE
+Paste directly BELOW Part 3D inside styles.css
+========================================================= */
+
+/* =========================================================
+TENANT MANAGEMENT
+========================================================= */
+
+#tenantPanel,
+#departmentBudgetPanel,
+#invoicePanel,
+#compliancePanel,
+#ssoPanel,
+#developerPanel,
+#infrastructurePanel,
+#productionPanel{
+
+    padding:24px;
+}
+
+#tenantList{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:12px;
+}
+
+.tenant-card{
+
+    padding:16px;
+
+    border-radius:12px;
+
+    background:var(--panel-light);
+
+    border:1px solid var(--border);
+}
+
+/* =========================================================
+INVOICES
+========================================================= */
+
+#invoiceList{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:12px;
+
+    margin-top:20px;
+}
+
+.invoice-card{
+
+    padding:16px;
+
+    border-radius:12px;
+
+    background:var(--panel-light);
+}
+
+/* =========================================================
+COMPLIANCE
+========================================================= */
+
+#complianceStatus{
+
+    padding:20px;
+
+    border-radius:12px;
+
+    background:var(--panel-light);
+}
+
+/* =========================================================
+SSO
+========================================================= */
+
+#configureSSOButton{
+
+    padding:12px 18px;
+
+    border:none;
+
+    border-radius:10px;
+
+    background:var(--primary);
+
+    color:white;
+
+    cursor:pointer;
+}
+
+/* =========================================================
+DEVELOPER PORTAL
+========================================================= */
+
+#developerPanel button{
+
+    margin:6px;
+
+    padding:12px 18px;
+
+    border:none;
+
+    border-radius:10px;
+
+    background:var(--panel-light);
+
+    color:var(--text);
+
+    cursor:pointer;
+}
+
+#developerPanel button:hover{
+
+    background:var(--primary);
+}
+
+/* =========================================================
+INFRASTRUCTURE
+========================================================= */
+
+#regionStatus,
+#failoverStatus,
+#backupStatus{
+
+    padding:16px;
+
+    margin-bottom:12px;
+
+    border-radius:12px;
+
+    background:var(--panel-light);
+}
+
+/* =========================================================
+PRODUCTION READINESS
+========================================================= */
+
+#readinessChecklist{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:10px;
+}
+
+.checklist-item{
+
+    padding:12px;
+
+    border-radius:10px;
+
+    background:var(--panel-light);
+}
+
+/* =========================================================
+RESPONSIVE DESIGN
+========================================================= */
+
+@media (max-width: 1024px){
+
+    #sidebar{
+
+        width:220px;
+    }
+
+    .message-content{
+
+        max-width:95%;
+    }
+}
+
+@media (max-width: 768px){
+
+    #sidebar{
+
+        display:none;
+    }
+
+    #chatHeader{
+
+        padding:12px;
+    }
+
+    #headerActions{
+
+        flex-wrap:wrap;
+    }
+}
+
+/* =========================================================
+PART 3E DELIVERABLE
+
+Tenant Management Styling
+Department Budgets
+Invoice Center
+Compliance Center
+SSO Controls
+Developer Portal
+Infrastructure Dashboard
+Backup Status
+Failover Status
+Production Readiness
+Responsive Layout
+
+Ready For Part 3F
+========================================================= */
+/* =========================================================
+SCRIPT 3
+PART 3F — ANIMATIONS, ACCESSIBILITY & FINAL UI POLISH
+Paste directly BELOW Part 3E inside styles.css
+========================================================= */
+
+/* =========================================================
+SCROLLBARS
+========================================================= */
+
+::-webkit-scrollbar{
+
+    width:10px;
+
+    height:10px;
+}
+
+::-webkit-scrollbar-track{
+
+    background:var(--background);
+}
+
+::-webkit-scrollbar-thumb{
+
+    background:var(--panel-light);
+
+    border-radius:20px;
+}
+
+::-webkit-scrollbar-thumb:hover{
+
+    background:#475569;
+}
+
+/* =========================================================
+FOCUS STATES
+========================================================= */
+
+button:focus,
+input:focus,
+textarea:focus,
+select:focus{
+
+    outline:none;
+
+    border-color:var(--primary);
+
+    box-shadow:
+        0 0 0 3px
+        rgba(16,163,127,0.2);
+}
+
+/* =========================================================
+LOADING STATES
+========================================================= */
+
+.loading-spinner{
+
+    width:32px;
+
+    height:32px;
+
+    border:4px solid
+        rgba(255,255,255,0.15);
+
+    border-top:4px solid
+        var(--primary);
+
+    border-radius:50%;
+
+    animation:
+        spin 1s linear infinite;
+}
+
+@keyframes spin{
+
+    from{
+        transform:rotate(0deg);
+    }
+
+    to{
+        transform:rotate(360deg);
+    }
+}
+
+/* =========================================================
+FADE ANIMATIONS
+========================================================= */
+
+.fade-in{
+
+    animation:
+        fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn{
+
+    from{
+
+        opacity:0;
+        transform:translateY(8px);
+    }
+
+    to{
+
+        opacity:1;
+        transform:translateY(0);
+    }
+}
+
+/* =========================================================
+SLIDE PANELS
+========================================================= */
+
+.slide-in{
+
+    animation:
+        slideIn 0.25s ease;
+}
+
+@keyframes slideIn{
+
+    from{
+
+        opacity:0;
+        transform:translateX(-20px);
+    }
+
+    to{
+
+        opacity:1;
+        transform:translateX(0);
+    }
+}
+
+/* =========================================================
+NOTIFICATIONS
+========================================================= */
+
+.notification{
+
+    position:fixed;
+
+    top:20px;
+
+    right:20px;
+
+    min-width:280px;
+
+    padding:16px;
+
+    border-radius:12px;
+
+    background:var(--panel);
+
+    border:1px solid var(--border);
+
+    z-index:9999;
+}
+
+.notification-success{
+
+    border-left:4px solid var(--success);
+}
+
+.notification-warning{
+
+    border-left:4px solid var(--warning);
+}
+
+.notification-error{
+
+    border-left:4px solid var(--danger);
+}
+
+/* =========================================================
+MODAL WINDOWS
+========================================================= */
+
+.modal-overlay{
+
+    position:fixed;
+
+    inset:0;
+
+    background:
+        rgba(0,0,0,0.65);
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    z-index:9998;
+}
+
+.modal{
+
+    width:700px;
+
+    max-width:95%;
+
+    border-radius:16px;
+
+    padding:24px;
+
+    background:var(--panel);
+
+    border:1px solid var(--border);
+}
+
+/* =========================================================
+UTILITY CLASSES
+========================================================= */
+
+.hidden{
+
+    display:none;
+}
+
+.flex{
+
+    display:flex;
+}
+
+.flex-column{
+
+    display:flex;
+
+    flex-direction:column;
+}
+
+.flex-center{
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+}
+
+.text-center{
+
+    text-align:center;
+}
+
+.w-full{
+
+    width:100%;
+}
+
+/* =========================================================
+PRINT SUPPORT
+========================================================= */
+
+@media print{
+
+    #sidebar,
+    #inputSection,
+    #headerActions{
+
+        display:none;
+    }
+
+    #mainContent{
+
+        width:100%;
+    }
+}
+
+/* =========================================================
+PART 3F DELIVERABLE
+
+Loading Spinner
+Fade Animations
+Slide Animations
+Notifications
+Modal Windows
+Focus States
+Accessibility Improvements
+Custom Scrollbars
+Utility Classes
+Print Support
+Final UI Polish
+
+SCRIPT 3 COMPLETE
+
+Ready For SCRIPT 4 PART 4A
+========================================================= */
