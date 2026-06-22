@@ -2252,13 +2252,7 @@ from flask import session, jsonify, request
 # USER SESSION CONFIGURATION
 # =========================================================
 
-from flask import session, jsonify, request
 
-app.config["SESSION_PERMANENT"] = True
-
-app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
-    days=30
-)
 
 # =========================================================
 # API PROVIDERS
