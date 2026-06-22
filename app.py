@@ -17,6 +17,11 @@ import logging
 # 1A.1 APPLICATION CONFIGURATION
 # ============================================================
 
+app = FastAPI()
+
+@app.get("/")
+async def root():
+return {
 class Settings(BaseModel):
     app_name: str = "AI Platform"
     version: str = "1.0.0"
@@ -29,7 +34,7 @@ class Settings(BaseModel):
         os.getenv("DEBUG", "false")
         .lower() == "true"
     )
-
+}
 settings = Settings()
 
 # ============================================================
