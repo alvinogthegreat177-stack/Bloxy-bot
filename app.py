@@ -4866,13 +4866,14 @@ def delete_provider_key(
 # PART 3F = MULTI-PROVIDER ROUTING +
 # FAILOVER + MODEL PRIORITIES
 # =========================================================
-export interface ProviderConfig {
-  id: string;
-  enabled: boolean;
-  priority: number;
-  timeoutMs: number;
-  models: string[];
-}
+from pydantic import BaseModel
+
+class ProviderConfig(BaseModel):
+    id: str
+    enabled: bool
+    priority: int
+    timeoutMs: int
+    models: list[str]
 
 export const PROVIDERS: ProviderConfig[] = [
   {
