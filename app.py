@@ -17,11 +17,17 @@ import logging
 # 1A.1 APPLICATION CONFIGURATION
 # ============================================================
 
+
 app = FastAPI()
 
 @app.get("/")
 async def root():
-return {
+    return {
+        "name": "AI Platform",
+        "version": "1.0.0",
+        "status": "running"
+    }
+
 class Settings(BaseModel):
     app_name: str = "AI Platform"
     version: str = "1.0.0"
@@ -29,14 +35,11 @@ class Settings(BaseModel):
         "ENVIRONMENT",
         "development"
     )
-
     debug: bool = (
-        os.getenv("DEBUG", "false")
-        .lower() == "true"
+        os.getenv("DEBUG", "false").lower() == "true"
     )
-}
-settings = Settings()
 
+settings = Settings()
 # ============================================================
 # 1A.2 SERVICE REGISTRY
 # ============================================================
