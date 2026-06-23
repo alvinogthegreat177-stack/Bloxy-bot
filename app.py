@@ -1,98 +1,103 @@
 # ============================================================
 # SCRIPT 1
-# PART 1A — CORE PLATFORM FOUNDATION
+# PART 1A — CORE PLATFORM FOUNDATION (V2)
 # ============================================================
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from typing import Dict, Any, Optional
-import os
+import logging
 import uuid
 import time
-import logging
+import os
 
 # ============================================================
-# 1A.1 APPLICATION CONFIGURATION
+# 1A.1 ENVIRONMENT CONFIGURATION
 # ============================================================
 
+APP_NAME = os.getenv("APP_NAME", "AI Platform")
+APP_VERSION = os.getenv("APP_VERSION", "2.0.0")
+APP_ENV = os.getenv("APP_ENV", "production")
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
-
-app = FastAPI()
-
-@app.get("/", response_class=HTMLResponse)
-async def home():
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>AI Platform</title>
-    </head>
-    <body>
-        <h1>Welcome to AI Platform</h1>
-        <p>Your AI app is running successfully.</p>
-        <button>Get Started</button>
-    </body>
-    </html>
-    """
 # ============================================================
-# 1A.2 SERVICE REGISTRY
+# 1A.2 SETTINGS MODEL
 # ============================================================
 
-class ServiceRegistry:
+class Settings(BaseModel):
+    app_name: str = APP_NAME
+    version: str = APP_VERSION
+    environment: str = APP_ENV
+
+settings = Settings()
+
+# ============================================================
+# 1A.3 LOGGING CONFIGURATION
+# ============================================================
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s"
+)
+
+logger = logging.getLogger("ai-platform")
+
+# ============================================================
+# 1A.4 SERVICE CONTAINER
+# ============================================================
+
+class ServiceContainer:
+
     def __init__(self):
-        self._services = {}
+        self.services: Dict[str, Any] = {}
 
     def register(
         self,
         name: str,
         service: Any
     ):
-        self._services[name] = service
+        self.services[name] = service
 
     def get(
         self,
         name: str
     ):
-        return self._services.get(name)
+        return self.services.get(name)
 
-    def all(self):
-        return self._services
+    def list_services(self):
+        return list(self.services.keys())
 
-
-services = ServiceRegistry()
+container = ServiceContainer()
 
 # ============================================================
-# 1A.3 EVENT BUS
+# 1A.5 EVENT SYSTEM
 # ============================================================
 
-class EventBus:
+class EventManager:
+
     def __init__(self):
         self.events = []
 
     def emit(
         self,
-        event_type: str,
+        event_name: str,
         payload: dict
     ):
-        self.events.append(
-            {
-                "event": event_type,
-                "payload": payload,
-                "timestamp": int(time.time())
-            }
-        )
+        self.events.append({
+            "event": event_name,
+            "payload": payload,
+            "timestamp": int(time.time())
+        })
 
-event_bus = EventBus()
+event_manager = EventManager()
 
 # ============================================================
-# 1A.4 HEALTH MANAGER
+# 1A.6 HEALTH SYSTEM
 # ============================================================
 
 class HealthManager:
+
     def __init__(self):
         self.status = "healthy"
 
@@ -102,20 +107,31 @@ class HealthManager:
 health_manager = HealthManager()
 
 # ============================================================
-# 1A.5 REQUEST CONTEXT
+# 1A.7 METRICS SYSTEM
+# ============================================================
+
+class Metrics:
+
+    requests_total = 0
+
+metrics = Metrics()
+
+# ============================================================
+# 1A.8 REQUEST CONTEXT
 # ============================================================
 
 class RequestContext(BaseModel):
     request_id: str
     timestamp: int
-    workspace_id: Optional[str] = None
     user_id: Optional[str] = None
+    workspace_id: Optional[str] = None
 
 # ============================================================
-# 1A.6 ERROR MODELS
+# 1A.9 ERROR FRAMEWORK
 # ============================================================
 
 class PlatformError(Exception):
+
     def __init__(
         self,
         code: str,
@@ -124,104 +140,51 @@ class PlatformError(Exception):
         self.code = code
         self.message = message
 
-class ValidationError(
-    PlatformError
-):
-    pass
-
-class AuthenticationError(
-    PlatformError
-):
-    pass
-
-class AuthorizationError(
-    PlatformError
-):
-    pass
-
 # ============================================================
-# 1A.7 LOGGING
-# ============================================================
-
-logging.basicConfig(
-    level=logging.INFO,
-    format=(
-        "%(asctime)s "
-        "%(levelname)s "
-        "%(message)s"
-    )
-)
-
-logger = logging.getLogger(
-    "ai-platform"
-)
-
-# ============================================================
-# 1A.8 LIFECYCLE MANAGEMENT
+# 1A.10 APPLICATION LIFECYCLE
 # ============================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
-    logger.info(
-        "Starting AI Platform"
-    )
+    logger.info("Platform Starting")
 
-    services.register(
-        "event_bus",
-        event_bus
-    )
-
-    services.register(
+    container.register(
         "health",
         health_manager
     )
 
-    event_bus.emit(
-        "application_started",
-        {
-            "version":
-            settings.version
-        }
+    container.register(
+        "events",
+        event_manager
+    )
+
+    event_manager.emit(
+        "startup",
+        {"version": settings.version}
     )
 
     yield
 
-    event_bus.emit(
-        "application_shutdown",
+    event_manager.emit(
+        "shutdown",
         {}
     )
 
-    logger.info(
-        "Shutting down AI Platform"
-    )
+    logger.info("Platform Shutdown")
 
 # ============================================================
-# 1A.9 APPLICATION INSTANCE
+# 1A.11 APPLICATION INSTANCE
 # ============================================================
-
-class Settings(BaseModel):
-    app_name: str = "AI Platform"
-    version: str = "1.0.0"
-    environment: str = "production"
-
-settings = Settings()
 
 app = FastAPI(
     title=settings.app_name,
-    version=settings.version
+    version=settings.version,
+    lifespan=lifespan
 )
 
-@app.get("/health")
-async def health():
-    return {
-        "status": health_manager.get_status(),
-        "version": settings.version,
-        "environment": settings.environment
-    }
-
 # ============================================================
-# 1A.10 REQUEST MIDDLEWARE
+# 1A.12 REQUEST MIDDLEWARE
 # ============================================================
 
 @app.middleware("http")
@@ -229,28 +192,26 @@ async def request_middleware(
     request: Request,
     call_next
 ):
-    request_id = str(
-        uuid.uuid4()
-    )
 
-    request.state.request_id = (
-        request_id
-    )
+    metrics.requests_total += 1
+
+    request_id = str(uuid.uuid4())
+
+    request.state.request_id = request_id
 
     start = time.time()
 
-    response = await call_next(
-        request
-    )
+    response = await call_next(request)
 
-    duration = (
-        time.time() - start
+    duration = round(
+        time.time() - start,
+        3
     )
 
     logger.info(
         f"{request.method} "
         f"{request.url.path} "
-        f"{duration:.3f}s"
+        f"{duration}s"
     )
 
     response.headers[
@@ -260,7 +221,7 @@ async def request_middleware(
     return response
 
 # ============================================================
-# 1A.11 GLOBAL ERROR HANDLER
+# 1A.13 GLOBAL ERROR HANDLER
 # ============================================================
 
 @app.exception_handler(
@@ -270,6 +231,7 @@ async def platform_error_handler(
     request: Request,
     exc: PlatformError
 ):
+
     return JSONResponse(
         status_code=400,
         content={
@@ -280,43 +242,78 @@ async def platform_error_handler(
     )
 
 # ============================================================
-# 1A.12 HEALTH ENDPOINT
+# 1A.14 ROOT ENDPOINT
+# ============================================================
+
+@app.get(
+    "/",
+    response_class=HTMLResponse
+)
+async def root():
+
+    return """
+    <html>
+    <head>
+        <title>AI Platform</title>
+    </head>
+    <body>
+        <h1>AI Platform Online</h1>
+        <p>Deployment Successful</p>
+    </body>
+    </html>
+    """
+
+# ============================================================
+# 1A.15 HEALTH ENDPOINT
 # ============================================================
 
 @app.get("/health")
 async def health():
 
     return {
-        "status":
-            health_manager
-            .get_status(),
-        "version":
-            settings.version,
-        "environment":
-            settings.environment
+        "status": health_manager.get_status(),
+        "version": settings.version,
+        "environment": settings.environment
     }
 
 # ============================================================
-# 1A.13 VERSION ENDPOINT
+# 1A.16 VERSION ENDPOINT
 # ============================================================
 
 @app.get("/version")
 async def version():
 
     return {
-        "app":
-            settings.app_name,
-        "version":
-            settings.version
+        "app": settings.app_name,
+        "version": settings.version
     }
 
 # ============================================================
-# 1A.14 ROOT ENDPOINT
+# 1A.17 METRICS ENDPOINT
 # ============================================================
 
+@app.get("/metrics")
+async def metrics_endpoint():
+
+    return {
+        "requests_total":
+            metrics.requests_total
+    }
 
 # ============================================================
-# 1A.15 SERVICE INSPECTION
+# 1A.18 EVENTS ENDPOINT
+# ============================================================
+
+@app.get("/system/events")
+async def system_events():
+
+    return {
+        "events":
+            event_manager.events[-50:]
+    }
+
+# ============================================================
+# 1A.19 SERVICES ENDPOINT
 # ============================================================
 
 @app.get("/system/services")
@@ -324,44 +321,36 @@ async def system_services():
 
     return {
         "services":
-            list(
-                services
-                .all()
-                .keys()
-            )
+            container.list_services()
     }
 
 # ============================================================
-# PART 1A DELIVERABLE
+# 1A.20 READINESS CHECK
 # ============================================================
-#
-#  FastAPI application
-#  Configuration system
-#  Service registry
-#  Event bus
-#  Health manager
-#  Request lifecycle
-#  Logging framework
-#  Error framework
-#  Startup/shutdown lifecycle
-#  Version management
-#  Middleware foundation
-#  Platform bootstrap
-#
-# Ready for PART 1B — AI Gateway
+
+@app.get("/ready")
+async def ready():
+
+    return {
+        "ready": True
+    }
+
+# ============================================================
+# END PART 1A
+# READY FOR PART 1B
 # ============================================================
 # ============================================================
 # SCRIPT 1
-# PART 1B — AI GATEWAY
-# Paste directly below Part 1A
+# PART 1B — AI GATEWAY FOUNDATION
 # ============================================================
 
-from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
+from typing import List, Dict, Any, Optional
+from datetime import datetime
 import time
 
 # ============================================================
-# 1B.1 REQUEST MODELS
+# 1B.1 CHAT MESSAGE MODEL
 # ============================================================
 
 class ChatMessage(BaseModel):
@@ -369,369 +358,219 @@ class ChatMessage(BaseModel):
     content: str
 
 
-class InferenceRequest(BaseModel):
+# ============================================================
+# 1B.2 CHAT REQUEST MODEL
+# ============================================================
+
+class ChatRequest(BaseModel):
     model: str
     messages: List[ChatMessage]
     temperature: float = 0.7
-    max_tokens: int = 4096
-    stream: bool = False
+    max_tokens: int = 2048
 
 
-class InferenceResponse(BaseModel):
+# ============================================================
+# 1B.3 CHAT RESPONSE MODEL
+# ============================================================
+
+class ChatResponse(BaseModel):
+    success: bool
     provider: str
     model: str
-    content: str
-    usage: Dict[str, Any]
-    latency_ms: int
+    response: str
+    timestamp: datetime
 
 
 # ============================================================
-# 1B.2 PROVIDER ABSTRACTION
+# 1B.4 PROVIDER BASE CLASS
 # ============================================================
 
-class BaseProvider:
-
+class AIProvider:
     provider_name = "base"
 
-    async def chat(
+    async def generate(
         self,
-        request: InferenceRequest
+        request: ChatRequest
     ):
         raise NotImplementedError
 
 
 # ============================================================
-# 1B.3 PROVIDER REGISTRY
+# 1B.5 OPENAI PROVIDER
 # ============================================================
 
-class ProviderRegistry:
-
-    def __init__(self):
-        self.providers = {}
-
-    def register(
-        self,
-        provider_id: str,
-        provider: BaseProvider
-    ):
-        self.providers[
-            provider_id
-        ] = provider
-
-    def get(
-        self,
-        provider_id: str
-    ):
-        return self.providers.get(
-            provider_id
-        )
-
-    def all(self):
-        return self.providers
-
-
-provider_registry = ProviderRegistry()
-
-# ============================================================
-# 1B.4 OPENAI ADAPTER PLACEHOLDER
-# ============================================================
-
-class OpenAIProvider(
-    BaseProvider
-):
-
+class OpenAIProvider(AIProvider):
     provider_name = "openai"
 
-    async def chat(
+    async def generate(
         self,
-        request: InferenceRequest
+        request: ChatRequest
     ):
-
-        return InferenceResponse(
-            provider="openai",
-            model=request.model,
-            content="OpenAI response placeholder",
-            usage={
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
-                "total_tokens": 0
-            },
-            latency_ms=0
-        )
+        return "OpenAI placeholder response"
 
 
 # ============================================================
-# 1B.5 ANTHROPIC ADAPTER PLACEHOLDER
+# 1B.6 GEMINI PROVIDER
 # ============================================================
 
-class AnthropicProvider(
-    BaseProvider
-):
+class GeminiProvider(AIProvider):
+    provider_name = "gemini"
 
-    provider_name = "anthropic"
-
-    async def chat(
+    async def generate(
         self,
-        request: InferenceRequest
+        request: ChatRequest
     ):
-
-        return InferenceResponse(
-            provider="anthropic",
-            model=request.model,
-            content="Anthropic response placeholder",
-            usage={
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
-                "total_tokens": 0
-            },
-            latency_ms=0
-        )
+        return "Gemini placeholder response"
 
 
 # ============================================================
-# 1B.6 GEMINI ADAPTER PLACEHOLDER
+# 1B.7 PROVIDER REGISTRY
 # ============================================================
 
-class GeminiProvider(
-    BaseProvider
-):
-
-    provider_name = "google"
-
-    async def chat(
-        self,
-        request: InferenceRequest
-    ):
-
-        return InferenceResponse(
-            provider="google",
-            model=request.model,
-            content="Gemini response placeholder",
-            usage={
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
-                "total_tokens": 0
-            },
-            latency_ms=0
-        )
-
-
-# ============================================================
-# 1B.7 PROVIDER REGISTRATION
-# ============================================================
-
-provider_registry.register(
-    "openai",
-    OpenAIProvider()
-)
-
-provider_registry.register(
-    "anthropic",
-    AnthropicProvider()
-)
-
-provider_registry.register(
-    "google",
-    GeminiProvider()
-)
-
-# ============================================================
-# 1B.8 MODEL ROUTING
-# ============================================================
-
-MODEL_ROUTING = {
-    "gpt": "openai",
-    "claude": "anthropic",
-    "gemini": "google"
+PROVIDERS = {
+    "openai": OpenAIProvider(),
+    "gemini": GeminiProvider()
 }
 
 
-def route_provider(
+# ============================================================
+# 1B.8 MODEL ROUTER
+# ============================================================
+
+def get_provider(
     model: str
 ):
+    model = model.lower()
 
-    model_lower = model.lower()
+    if "gemini" in model:
+        return PROVIDERS["gemini"]
 
-    for key, provider in (
-        MODEL_ROUTING.items()
-    ):
-        if key in model_lower:
-            return provider
-
-    return "openai"
+    return PROVIDERS["openai"]
 
 
 # ============================================================
-# 1B.9 CAPABILITY REGISTRY
+# 1B.9 REQUEST VALIDATION
 # ============================================================
 
-MODEL_CAPABILITIES = {
-    "chat": True,
-    "streaming": True,
-    "vision": True,
-    "reasoning": True,
-    "tools": True
-}
-
-# ============================================================
-# 1B.10 REQUEST VALIDATION
-# ============================================================
-
-def validate_request(
-    request: InferenceRequest
+def validate_chat_request(
+    request: ChatRequest
 ):
-
-    if not request.messages:
-        raise ValidationError(
-            "EMPTY_MESSAGES",
-            "Messages required"
-        )
-
     if not request.model:
         raise ValidationError(
             "MODEL_REQUIRED",
-            "Model required"
+            "Model is required"
         )
 
-# ============================================================
-# 1B.11 RESPONSE NORMALIZATION
-# ============================================================
-
-def normalize_response(
-    response: InferenceResponse
-):
-
-    return {
-        "provider":
-            response.provider,
-        "model":
-            response.model,
-        "content":
-            response.content,
-        "usage":
-            response.usage,
-        "latency_ms":
-            response.latency_ms
-    }
-
-# ============================================================
-# 1B.12 GATEWAY EXECUTION
-# ============================================================
-
-async def execute_inference(
-    request: InferenceRequest
-):
-
-    validate_request(
-        request
-    )
-
-    provider_id = (
-        route_provider(
-            request.model
-        )
-    )
-
-    provider = (
-        provider_registry.get(
-            provider_id
-        )
-    )
-
-    if not provider:
+    if not request.messages:
         raise ValidationError(
-            "PROVIDER_NOT_FOUND",
-            provider_id
+            "MESSAGES_REQUIRED",
+            "Messages are required"
         )
 
-    start = time.time()
 
-    result = await provider.chat(
+# ============================================================
+# 1B.10 INFERENCE ENGINE
+# ============================================================
+
+async def run_inference(
+    request: ChatRequest
+):
+    validate_chat_request(request)
+
+    provider = get_provider(
+        request.model
+    )
+
+    result = await provider.generate(
         request
     )
 
-    latency = int(
-        (
-            time.time()
-            - start
-        )
-        * 1000
+    return ChatResponse(
+        success=True,
+        provider=provider.provider_name,
+        model=request.model,
+        response=result,
+        timestamp=datetime.utcnow()
     )
 
-    result.latency_ms = (
-        latency
-    )
-
-    return normalize_response(
-        result
-    )
 
 # ============================================================
-# 1B.13 INFERENCE ENDPOINT
+# 1B.11 CHAT ENDPOINT
 # ============================================================
 
 @app.post("/v1/chat")
-async def chat_endpoint(
-    request: InferenceRequest
+async def chat(
+    request: ChatRequest
 ):
-
-    return await execute_inference(
+    return await run_inference(
         request
     )
 
+
 # ============================================================
-# 1B.14 PROVIDER LIST ENDPOINT
+# 1B.12 PROVIDERS ENDPOINT
 # ============================================================
 
 @app.get("/v1/providers")
-async def get_providers():
-
+async def providers():
     return {
-        "providers":
-            list(
-                provider_registry
-                .all()
-                .keys()
-            )
+        "providers": list(
+            PROVIDERS.keys()
+        )
+    }
+
+
+# ============================================================
+# 1B.13 MODELS ENDPOINT
+# ============================================================
+
+@app.get("/v1/models")
+async def models():
+    return {
+        "models": [
+            "gpt-5",
+            "gpt-4.1",
+            "gemini-2.5-pro"
+        ]
+    }
+
+
+# ============================================================
+# 1B.14 GATEWAY HEALTH
+# ============================================================
+
+@app.get("/v1/gateway/health")
+async def gateway_health():
+    return {
+        "status": "healthy",
+        "providers": len(PROVIDERS)
+    }
+
+
+# ============================================================
+# 1B.15 GATEWAY INFO
+# ============================================================
+
+@app.get("/v1/gateway/info")
+async def gateway_info():
+    return {
+        "gateway": "AI Gateway",
+        "version": "1.0.0"
     }
 
 # ============================================================
-# 1B.15 MODEL CAPABILITIES ENDPOINT
-# ============================================================
-
-@app.get("/v1/capabilities")
-async def capabilities():
-
-    return MODEL_CAPABILITIES
-
-# ============================================================
-# PART 1B DELIVERABLE
-#
-# Unified AI Gateway
-# Provider Registry
-# OpenAI Adapter Placeholder
-# Anthropic Adapter Placeholder
-# Gemini Adapter Placeholder
-# Model Routing
-# Request Validation
-# Response Normalization
-# Inference Execution
-# Provider Discovery Endpoint
-# Capabilities Endpoint
-#
+# PART 1B COMPLETE
 # Ready For Part 1C
 # ============================================================
 # ============================================================
 # SCRIPT 1
-# PART 1C — AUTHENTICATION & USER MANAGEMENT
-# Paste directly below Part 1B
+# PART 1C — USER AUTHENTICATION FOUNDATION
 # ============================================================
 
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
 from datetime import datetime, timedelta
-import secrets
 import hashlib
+import secrets
 
 # ============================================================
 # 1C.1 USER MODEL
@@ -742,8 +581,8 @@ class User(BaseModel):
     email: EmailStr
     username: str
     password_hash: str
-    active: bool = True
     created_at: datetime
+
 
 # ============================================================
 # 1C.2 SESSION MODEL
@@ -752,84 +591,63 @@ class User(BaseModel):
 class Session(BaseModel):
     token: str
     user_id: str
-    created_at: datetime
     expires_at: datetime
 
-# ============================================================
-# 1C.3 ROLE MODEL
-# ============================================================
-
-class UserRole(BaseModel):
-    user_id: str
-    role: str
 
 # ============================================================
-# 1C.4 IN-MEMORY STORAGE
+# 1C.3 STORAGE
 # ============================================================
 
 USERS = {}
 SESSIONS = {}
-USER_ROLES = {}
+
 
 # ============================================================
-# 1C.5 PASSWORD HASHING
+# 1C.4 REGISTER REQUEST
 # ============================================================
 
-def hash_password(
-    password: str
-) -> str:
-
-    return hashlib.sha256(
-        password.encode()
-    ).hexdigest()
-
-# ============================================================
-# 1C.6 PASSWORD VERIFICATION
-# ============================================================
-
-def verify_password(
-    password: str,
-    password_hash: str
-) -> bool:
-
-    return (
-        hash_password(password)
-        == password_hash
-    )
-
-# ============================================================
-# 1C.7 TOKEN GENERATION
-# ============================================================
-
-def generate_token():
-
-    return secrets.token_urlsafe(
-        64
-    )
-
-# ============================================================
-# 1C.8 REGISTER REQUEST
-# ============================================================
-
-class RegisterRequest(
-    BaseModel
-):
+class RegisterRequest(BaseModel):
     email: EmailStr
     username: str
     password: str
 
+
 # ============================================================
-# 1C.9 LOGIN REQUEST
+# 1C.5 LOGIN REQUEST
 # ============================================================
 
-class LoginRequest(
-    BaseModel
-):
+class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+
 # ============================================================
-# 1C.10 USER CREATION
+# 1C.6 PASSWORD HASHER
+# ============================================================
+
+def hash_password(
+    password: str
+):
+    return hashlib.sha256(
+        password.encode()
+    ).hexdigest()
+
+
+# ============================================================
+# 1C.7 USER LOOKUP
+# ============================================================
+
+def get_user_by_email(
+    email: str
+):
+    for user in USERS.values():
+        if user.email == email:
+            return user
+    return None
+
+
+# ============================================================
+# 1C.8 CREATE USER
 # ============================================================
 
 def create_user(
@@ -837,140 +655,52 @@ def create_user(
     username: str,
     password: str
 ):
-
-    user_id = generate_token()
-
     user = User(
-        id=user_id,
+        id=secrets.token_hex(16),
         email=email,
         username=username,
-        password_hash=
-            hash_password(password),
-        created_at=
-            datetime.utcnow()
+        password_hash=hash_password(password),
+        created_at=datetime.utcnow()
     )
 
-    USERS[user_id] = user
-
-    USER_ROLES[user_id] = "member"
-
+    USERS[user.id] = user
     return user
 
-# ============================================================
-# 1C.11 USER LOOKUP
-# ============================================================
-
-def get_user_by_email(
-    email: str
-):
-
-    for user in USERS.values():
-
-        if user.email == email:
-            return user
-
-    return None
 
 # ============================================================
-# 1C.12 SESSION CREATION
+# 1C.9 CREATE SESSION
 # ============================================================
 
 def create_session(
     user_id: str
 ):
-
-    token = generate_token()
+    token = secrets.token_urlsafe(48)
 
     session = Session(
         token=token,
         user_id=user_id,
-        created_at=
-            datetime.utcnow(),
-        expires_at=
-            datetime.utcnow()
-            + timedelta(days=30)
+        expires_at=datetime.utcnow()
+        + timedelta(days=30)
     )
 
     SESSIONS[token] = session
-
     return session
 
-# ============================================================
-# 1C.13 SESSION VALIDATION
-# ============================================================
-
-def validate_session(
-    token: str
-):
-
-    session = SESSIONS.get(
-        token
-    )
-
-    if not session:
-        return None
-
-    if (
-        session.expires_at
-        < datetime.utcnow()
-    ):
-        return None
-
-    return session
 
 # ============================================================
-# 1C.14 CURRENT USER
-# ============================================================
-
-def get_current_user(
-    token: str
-):
-
-    session = validate_session(
-        token
-    )
-
-    if not session:
-        return None
-
-    return USERS.get(
-        session.user_id
-    )
-
-# ============================================================
-# 1C.15 ROLE CHECK
-# ============================================================
-
-def has_role(
-    user_id: str,
-    role: str
-):
-
-    return (
-        USER_ROLES.get(user_id)
-        == role
-    )
-
-# ============================================================
-# 1C.16 REGISTER ENDPOINT
+# 1C.10 REGISTER ENDPOINT
 # ============================================================
 
 @app.post("/auth/register")
 async def register(
-    request:
-    RegisterRequest
+    request: RegisterRequest
 ):
-
-    existing = (
-        get_user_by_email(
-            request.email
-        )
-    )
-
-    if existing:
+    if get_user_by_email(
+        request.email
+    ):
         raise ValidationError(
             "EMAIL_EXISTS",
-            "Email already exists"
+            "Email already registered"
         )
 
     user = create_user(
@@ -980,38 +710,34 @@ async def register(
     )
 
     return {
-        "user_id": user.id,
-        "email": user.email,
-        "username":
-            user.username
+        "success": True,
+        "user_id": user.id
     }
 
+
 # ============================================================
-# 1C.17 LOGIN ENDPOINT
+# 1C.11 LOGIN ENDPOINT
 # ============================================================
 
 @app.post("/auth/login")
 async def login(
-    request:
-    LoginRequest
+    request: LoginRequest
 ):
-
     user = get_user_by_email(
         request.email
     )
 
     if not user:
         raise AuthenticationError(
-            "INVALID_LOGIN",
+            "LOGIN_FAILED",
             "Invalid credentials"
         )
 
-    if not verify_password(
-        request.password,
-        user.password_hash
+    if user.password_hash != hash_password(
+        request.password
     ):
         raise AuthenticationError(
-            "INVALID_LOGIN",
+            "LOGIN_FAILED",
             "Invalid credentials"
         )
 
@@ -1020,106 +746,85 @@ async def login(
     )
 
     return {
-        "token":
-            session.token,
-        "expires_at":
-            session.expires_at
+        "success": True,
+        "token": session.token
     }
 
+
 # ============================================================
-# 1C.18 PROFILE ENDPOINT
+# 1C.12 PROFILE ENDPOINT
 # ============================================================
 
 @app.get("/auth/profile")
 async def profile(
     token: str
 ):
+    session = SESSIONS.get(token)
 
-    user = get_current_user(
-        token
+    if not session:
+        return {"error": "Unauthorized"}
+
+    user = USERS.get(
+        session.user_id
     )
-
-    if not user:
-        raise AuthenticationError(
-            "UNAUTHORIZED",
-            "Login required"
-        )
 
     return {
         "id": user.id,
         "email": user.email,
-        "username":
-            user.username
+        "username": user.username
     }
 
+
 # ============================================================
-# 1C.19 LOGOUT ENDPOINT
+# 1C.13 LOGOUT ENDPOINT
 # ============================================================
 
 @app.post("/auth/logout")
 async def logout(
     token: str
 ):
-
-    if token in SESSIONS:
-        del SESSIONS[token]
+    SESSIONS.pop(
+        token,
+        None
+    )
 
     return {
         "success": True
     }
 
+
 # ============================================================
-# 1C.20 ROLE ENDPOINT
+# 1C.14 USER COUNT
 # ============================================================
 
-@app.get("/auth/role")
-async def role(
-    token: str
-):
-
-    user = get_current_user(
-        token
-    )
-
-    if not user:
-        raise AuthenticationError(
-            "UNAUTHORIZED",
-            "Login required"
-        )
-
+@app.get("/auth/stats")
+async def auth_stats():
     return {
-        "role":
-            USER_ROLES.get(
-                user.id
-            )
+        "users": len(USERS),
+        "sessions": len(SESSIONS)
+    }
+
+
+# ============================================================
+# 1C.15 AUTH HEALTH
+# ============================================================
+
+@app.get("/auth/health")
+async def auth_health():
+    return {
+        "status": "healthy"
     }
 
 # ============================================================
-# PART 1C DELIVERABLE
-#
-# User Model
-# Session Model
-# Role Model
-# Password Hashing
-# Password Verification
-# Session Management
-# Token Generation
-# User Registration
-# User Login
-# User Logout
-# Profile Endpoint
-# Role Endpoint
-#
+# PART 1C COMPLETE
 # Ready For Part 1D
 # ============================================================
 # ============================================================
 # SCRIPT 1
-# PART 1D — WORKSPACE MANAGEMENT
-# Paste directly below Part 1C
+# PART 1D — WORKSPACE FOUNDATION
 # ============================================================
 
 from pydantic import BaseModel
-from typing import Optional, List
 from datetime import datetime
 import uuid
 
@@ -1132,218 +837,135 @@ class Workspace(BaseModel):
     name: str
     owner_id: str
     created_at: datetime
-    active: bool = True
+
 
 # ============================================================
-# 1D.2 WORKSPACE MEMBER MODEL
-# ============================================================
-
-class WorkspaceMember(BaseModel):
-    workspace_id: str
-    user_id: str
-    role: str
-    joined_at: datetime
-
-# ============================================================
-# 1D.3 WORKSPACE SETTINGS MODEL
-# ============================================================
-
-class WorkspaceSettings(BaseModel):
-    workspace_id: str
-    default_model: str = "gpt-5"
-    allow_streaming: bool = True
-    allow_tools: bool = True
-
-# ============================================================
-# 1D.4 STORAGE
+# 1D.2 STORAGE
 # ============================================================
 
 WORKSPACES = {}
-WORKSPACE_MEMBERS = {}
-WORKSPACE_SETTINGS = {}
+
 
 # ============================================================
-# 1D.5 CREATE WORKSPACE REQUEST
+# 1D.3 CREATE REQUEST
 # ============================================================
 
-class CreateWorkspaceRequest(
-    BaseModel
-):
+class CreateWorkspaceRequest(BaseModel):
     name: str
     owner_id: str
 
-# ============================================================
-# 1D.6 UPDATE WORKSPACE REQUEST
-# ============================================================
-
-class UpdateWorkspaceRequest(
-    BaseModel
-):
-    name: Optional[str] = None
-    active: Optional[bool] = None
 
 # ============================================================
-# 1D.7 CREATE WORKSPACE
+# 1D.4 UPDATE REQUEST
+# ============================================================
+
+class UpdateWorkspaceRequest(BaseModel):
+    name: str
+
+
+# ============================================================
+# 1D.5 CREATE WORKSPACE
 # ============================================================
 
 def create_workspace(
     name: str,
     owner_id: str
 ):
-
-    workspace_id = str(
-        uuid.uuid4()
-    )
-
     workspace = Workspace(
-        id=workspace_id,
+        id=str(uuid.uuid4()),
         name=name,
         owner_id=owner_id,
-        created_at=
-            datetime.utcnow()
+        created_at=datetime.utcnow()
     )
 
     WORKSPACES[
-        workspace_id
+        workspace.id
     ] = workspace
-
-    WORKSPACE_MEMBERS[
-        workspace_id
-    ] = []
-
-    WORKSPACE_MEMBERS[
-        workspace_id
-    ].append(
-        WorkspaceMember(
-            workspace_id=
-                workspace_id,
-            user_id=owner_id,
-            role="owner",
-            joined_at=
-                datetime.utcnow()
-        )
-    )
-
-    WORKSPACE_SETTINGS[
-        workspace_id
-    ] = WorkspaceSettings(
-        workspace_id=
-            workspace_id
-    )
 
     return workspace
 
+
 # ============================================================
-# 1D.8 GET WORKSPACE
+# 1D.6 GET WORKSPACE
 # ============================================================
 
 def get_workspace(
     workspace_id: str
 ):
-
     return WORKSPACES.get(
         workspace_id
     )
 
+
 # ============================================================
-# 1D.9 ADD MEMBER
+# 1D.7 LIST WORKSPACES
 # ============================================================
 
-def add_member(
-    workspace_id: str,
-    user_id: str,
-    role: str = "member"
-):
-
-    member = WorkspaceMember(
-        workspace_id=
-            workspace_id,
-        user_id=user_id,
-        role=role,
-        joined_at=
-            datetime.utcnow()
+def list_workspaces():
+    return list(
+        WORKSPACES.values()
     )
 
-    WORKSPACE_MEMBERS[
-        workspace_id
-    ].append(member)
-
-    return member
 
 # ============================================================
-# 1D.10 REMOVE MEMBER
+# 1D.8 UPDATE WORKSPACE
 # ============================================================
 
-def remove_member(
+def update_workspace(
     workspace_id: str,
-    user_id: str
+    name: str
 ):
-
-    members = (
-        WORKSPACE_MEMBERS.get(
-            workspace_id,
-            []
-        )
+    workspace = get_workspace(
+        workspace_id
     )
 
-    WORKSPACE_MEMBERS[
-        workspace_id
-    ] = [
-        m
-        for m in members
-        if m.user_id != user_id
-    ]
+    if workspace:
+        workspace.name = name
+
+    return workspace
+
 
 # ============================================================
-# 1D.11 LIST MEMBERS
+# 1D.9 DELETE WORKSPACE
 # ============================================================
 
-def list_members(
+def delete_workspace(
     workspace_id: str
 ):
-
-    return (
-        WORKSPACE_MEMBERS.get(
-            workspace_id,
-            []
-        )
+    return WORKSPACES.pop(
+        workspace_id,
+        None
     )
 
-# ============================================================
-# 1D.12 UPDATE SETTINGS
-# ============================================================
-
-def update_workspace_settings(
-    workspace_id: str,
-    settings:
-    WorkspaceSettings
-):
-
-    WORKSPACE_SETTINGS[
-        workspace_id
-    ] = settings
 
 # ============================================================
-# 1D.13 CREATE WORKSPACE ENDPOINT
+# 1D.10 CREATE ENDPOINT
 # ============================================================
 
 @app.post("/workspaces")
 async def create_workspace_api(
-    request:
-    CreateWorkspaceRequest
+    request: CreateWorkspaceRequest
 ):
-
-    workspace = (
-        create_workspace(
-            request.name,
-            request.owner_id
-        )
+    return create_workspace(
+        request.name,
+        request.owner_id
     )
 
-    return workspace
 
 # ============================================================
-# 1D.14 GET WORKSPACE ENDPOINT
+# 1D.11 LIST ENDPOINT
+# ============================================================
+
+@app.get("/workspaces")
+async def list_workspaces_api():
+    return {
+        "workspaces":
+        list_workspaces()
+    }
+
+
+# ============================================================
+# 1D.12 GET ENDPOINT
 # ============================================================
 
 @app.get(
@@ -1352,158 +974,78 @@ async def create_workspace_api(
 async def get_workspace_api(
     workspace_id: str
 ):
-
-    workspace = (
-        get_workspace(
-            workspace_id
-        )
+    workspace = get_workspace(
+        workspace_id
     )
 
     if not workspace:
-        raise ValidationError(
-            "WORKSPACE_NOT_FOUND",
+        return {
+            "error":
             "Workspace not found"
-        )
+        }
 
     return workspace
 
-# ============================================================
-# 1D.15 LIST WORKSPACES ENDPOINT
-# ============================================================
-
-@app.get("/workspaces")
-async def list_workspaces():
-
-    return {
-        "workspaces":
-            list(
-                WORKSPACES.values()
-            )
-    }
 
 # ============================================================
-# 1D.16 ADD MEMBER ENDPOINT
-# ============================================================
-
-@app.post(
-    "/workspaces/{workspace_id}/members"
-)
-async def add_member_api(
-    workspace_id: str,
-    user_id: str,
-    role: str = "member"
-):
-
-    return add_member(
-        workspace_id,
-        user_id,
-        role
-    )
-
-# ============================================================
-# 1D.17 REMOVE MEMBER ENDPOINT
-# ============================================================
-
-@app.delete(
-    "/workspaces/{workspace_id}/members/{user_id}"
-)
-async def remove_member_api(
-    workspace_id: str,
-    user_id: str
-):
-
-    remove_member(
-        workspace_id,
-        user_id
-    )
-
-    return {
-        "success": True
-    }
-
-# ============================================================
-# 1D.18 LIST MEMBERS ENDPOINT
-# ============================================================
-
-@app.get(
-    "/workspaces/{workspace_id}/members"
-)
-async def list_members_api(
-    workspace_id: str
-):
-
-    return {
-        "members":
-            list_members(
-                workspace_id
-            )
-    }
-
-# ============================================================
-# 1D.19 SETTINGS ENDPOINT
-# ============================================================
-
-@app.get(
-    "/workspaces/{workspace_id}/settings"
-)
-async def workspace_settings_api(
-    workspace_id: str
-):
-
-    return (
-        WORKSPACE_SETTINGS.get(
-            workspace_id
-        )
-    )
-
-# ============================================================
-# 1D.20 UPDATE SETTINGS ENDPOINT
+# 1D.13 UPDATE ENDPOINT
 # ============================================================
 
 @app.put(
-    "/workspaces/{workspace_id}/settings"
+    "/workspaces/{workspace_id}"
 )
-async def update_settings_api(
+async def update_workspace_api(
     workspace_id: str,
-    settings:
-    WorkspaceSettings
+    request: UpdateWorkspaceRequest
 ):
-
-    update_workspace_settings(
+    return update_workspace(
         workspace_id,
-        settings
+        request.name
+    )
+
+
+# ============================================================
+# 1D.14 DELETE ENDPOINT
+# ============================================================
+
+@app.delete(
+    "/workspaces/{workspace_id}"
+)
+async def delete_workspace_api(
+    workspace_id: str
+):
+    delete_workspace(
+        workspace_id
     )
 
     return {
         "success": True
     }
 
+
 # ============================================================
-# PART 1D DELIVERABLE
-#
-# Workspace Model
-# Workspace Members
-# Workspace Settings
-# Workspace Creation
-# Workspace Retrieval
-# Workspace Listing
-# Member Management
-# Settings Management
-# Workspace APIs
-#
+# 1D.15 WORKSPACE STATS
+# ============================================================
+
+@app.get("/workspaces/stats")
+async def workspace_stats():
+    return {
+        "total_workspaces":
+        len(WORKSPACES)
+    }
+
+# ============================================================
+# PART 1D COMPLETE
 # Ready For Part 1E
 # ============================================================
 # ============================================================
-# ============================================================
-# ============================================================
 # SCRIPT 1
-# PART 1E — CONVERSATIONS & CHAT STORAGE
-# Paste directly below Part 1D
+# PART 1E — CONVERSATIONS & MESSAGES
 # ============================================================
 
 from pydantic import BaseModel
-from typing import Optional, List
 from datetime import datetime
+from typing import List
 import uuid
 
 # ============================================================
@@ -1512,11 +1054,10 @@ import uuid
 
 class Conversation(BaseModel):
     id: str
-    workspace_id: str
     title: str
-    created_by: str
+    workspace_id: str
     created_at: datetime
-    updated_at: datetime
+
 
 # ============================================================
 # 1E.2 MESSAGE MODEL
@@ -1529,112 +1070,74 @@ class Message(BaseModel):
     content: str
     created_at: datetime
 
-# ============================================================
-# 1E.3 ATTACHMENT MODEL
-# ============================================================
-
-class Attachment(BaseModel):
-    id: str
-    message_id: str
-    filename: str
-    content_type: str
-    created_at: datetime
 
 # ============================================================
-# 1E.4 STORAGE
+# 1E.3 STORAGE
 # ============================================================
 
 CONVERSATIONS = {}
 MESSAGES = {}
-ATTACHMENTS = {}
+
 
 # ============================================================
-# 1E.5 CREATE CONVERSATION REQUEST
+# 1E.4 CREATE CONVERSATION REQUEST
 # ============================================================
 
-class CreateConversationRequest(
-    BaseModel
-):
+class CreateConversationRequest(BaseModel):
     workspace_id: str
     title: str
-    created_by: str
+
 
 # ============================================================
-# 1E.6 CREATE MESSAGE REQUEST
+# 1E.5 CREATE MESSAGE REQUEST
 # ============================================================
 
-class CreateMessageRequest(
-    BaseModel
-):
+class CreateMessageRequest(BaseModel):
     conversation_id: str
     role: str
     content: str
 
+
 # ============================================================
-# 1E.7 CREATE CONVERSATION
+# 1E.6 CREATE CONVERSATION
 # ============================================================
 
 def create_conversation(
     workspace_id: str,
-    title: str,
-    created_by: str
+    title: str
 ):
-
-    conversation_id = str(
-        uuid.uuid4()
-    )
-
     conversation = Conversation(
-        id=conversation_id,
-        workspace_id=workspace_id,
+        id=str(uuid.uuid4()),
         title=title,
-        created_by=created_by,
-        created_at=
-            datetime.utcnow(),
-        updated_at=
-            datetime.utcnow()
+        workspace_id=workspace_id,
+        created_at=datetime.utcnow()
     )
 
     CONVERSATIONS[
-        conversation_id
+        conversation.id
     ] = conversation
 
     MESSAGES[
-        conversation_id
+        conversation.id
     ] = []
 
     return conversation
 
+
 # ============================================================
-# 1E.8 GET CONVERSATION
+# 1E.7 GET CONVERSATION
 # ============================================================
 
 def get_conversation(
     conversation_id: str
 ):
-
     return CONVERSATIONS.get(
         conversation_id
     )
 
-# ============================================================
-# 1E.9 LIST CONVERSATIONS
-# ============================================================
-
-def list_conversations(
-    workspace_id: str
-):
-
-    return [
-        conversation
-        for conversation in
-        CONVERSATIONS.values()
-        if conversation.workspace_id
-        == workspace_id
-    ]
 
 # ============================================================
-# 1E.10 ADD MESSAGE
+# 1E.8 ADD MESSAGE
 # ============================================================
 
 def add_message(
@@ -1642,55 +1145,41 @@ def add_message(
     role: str,
     content: str
 ):
-
     message = Message(
         id=str(uuid.uuid4()),
-        conversation_id=
-            conversation_id,
+        conversation_id=conversation_id,
         role=role,
         content=content,
-        created_at=
-            datetime.utcnow()
+        created_at=datetime.utcnow()
     )
 
     MESSAGES[
         conversation_id
     ].append(message)
 
-    conversation = (
-        CONVERSATIONS.get(
-            conversation_id
-        )
-    )
-
-    if conversation:
-        conversation.updated_at = (
-            datetime.utcnow()
-        )
-
     return message
 
+
 # ============================================================
-# 1E.11 GET MESSAGES
+# 1E.9 GET MESSAGES
 # ============================================================
 
 def get_messages(
     conversation_id: str
 ):
-
     return MESSAGES.get(
         conversation_id,
         []
     )
 
+
 # ============================================================
-# 1E.12 DELETE CONVERSATION
+# 1E.10 DELETE CONVERSATION
 # ============================================================
 
 def delete_conversation(
     conversation_id: str
 ):
-
     CONVERSATIONS.pop(
         conversation_id,
         None
@@ -1701,24 +1190,23 @@ def delete_conversation(
         None
     )
 
+
 # ============================================================
-# 1E.13 CREATE CONVERSATION ENDPOINT
+# 1E.11 CREATE ENDPOINT
 # ============================================================
 
 @app.post("/conversations")
 async def create_conversation_api(
-    request:
-    CreateConversationRequest
+    request: CreateConversationRequest
 ):
-
     return create_conversation(
         request.workspace_id,
-        request.title,
-        request.created_by
+        request.title
     )
 
+
 # ============================================================
-# 1E.14 GET CONVERSATION ENDPOINT
+# 1E.12 GET ENDPOINT
 # ============================================================
 
 @app.get(
@@ -1727,49 +1215,28 @@ async def create_conversation_api(
 async def get_conversation_api(
     conversation_id: str
 ):
-
     return get_conversation(
         conversation_id
     )
 
-# ============================================================
-# 1E.15 LIST CONVERSATIONS ENDPOINT
-# ============================================================
-
-@app.get(
-    "/workspaces/{workspace_id}/conversations"
-)
-async def list_conversations_api(
-    workspace_id: str
-):
-
-    return {
-        "conversations":
-            list_conversations(
-                workspace_id
-            )
-    }
 
 # ============================================================
-# 1E.16 ADD MESSAGE ENDPOINT
+# 1E.13 ADD MESSAGE ENDPOINT
 # ============================================================
 
-@app.post(
-    "/messages"
-)
+@app.post("/messages")
 async def add_message_api(
-    request:
-    CreateMessageRequest
+    request: CreateMessageRequest
 ):
-
     return add_message(
         request.conversation_id,
         request.role,
         request.content
     )
 
+
 # ============================================================
-# 1E.17 GET MESSAGES ENDPOINT
+# 1E.14 GET MESSAGES ENDPOINT
 # ============================================================
 
 @app.get(
@@ -1778,16 +1245,16 @@ async def add_message_api(
 async def get_messages_api(
     conversation_id: str
 ):
-
     return {
         "messages":
-            get_messages(
-                conversation_id
-            )
+        get_messages(
+            conversation_id
+        )
     }
 
+
 # ============================================================
-# 1E.18 DELETE CONVERSATION ENDPOINT
+# 1E.15 DELETE ENDPOINT
 # ============================================================
 
 @app.delete(
@@ -1796,7 +1263,6 @@ async def get_messages_api(
 async def delete_conversation_api(
     conversation_id: str
 ):
-
     delete_conversation(
         conversation_id
     )
@@ -1806,148 +1272,79 @@ async def delete_conversation_api(
     }
 
 # ============================================================
-# 1E.19 CHAT HISTORY SEARCH
-# ============================================================
-
-def search_messages(
-    conversation_id: str,
-    query: str
-):
-
-    results = []
-
-    for message in get_messages(
-        conversation_id
-    ):
-        if (
-            query.lower()
-            in message.content.lower()
-        ):
-            results.append(
-                message
-            )
-
-    return results
-
-# ============================================================
-# 1E.20 SEARCH ENDPOINT
-# ============================================================
-
-@app.get(
-    "/conversations/{conversation_id}/search"
-)
-async def search_messages_api(
-    conversation_id: str,
-    query: str
-):
-
-    return {
-        "results":
-            search_messages(
-                conversation_id,
-                query
-            )
-    }
-
-# ============================================================
-# PART 1E DELIVERABLE
-#
-# Conversation Model
-# Message Model
-# Attachment Model
-# Conversation Creation
-# Conversation Retrieval
-# Conversation Listing
-# Message Storage
-# Chat History
-# Search Functionality
-# Conversation APIs
-#
+# PART 1E COMPLETE
 # Ready For Part 1F
 # ============================================================
 # ============================================================
 # SCRIPT 1
-# PART 1F — FILES, ATTACHMENTS & STORAGE
-# Paste directly below Part 1E
+# PART 1F — FILE STORAGE FOUNDATION
 # ============================================================
 
 from pydantic import BaseModel
-from typing import Optional, List
 from datetime import datetime
 import uuid
 import os
 
 # ============================================================
-# 1F.1 FILE RECORD MODEL
+# 1F.1 FILE MODEL
 # ============================================================
 
 class FileRecord(BaseModel):
     id: str
     workspace_id: str
-    uploaded_by: str
     filename: str
     content_type: str
     size_bytes: int
-    path: str
     created_at: datetime
 
-# ============================================================
-# 1F.2 FILE PERMISSION MODEL
-# ============================================================
-
-class FilePermission(BaseModel):
-    file_id: str
-    user_id: str
-    can_read: bool = True
-    can_write: bool = False
 
 # ============================================================
-# 1F.3 STORAGE CONFIGURATION
+# 1F.2 STORAGE
+# ============================================================
+
+FILES = {}
+
+
+# ============================================================
+# 1F.3 STORAGE ROOT
 # ============================================================
 
 STORAGE_ROOT = "storage"
 
-# ============================================================
-# 1F.4 STORAGE TABLES
-# ============================================================
+os.makedirs(
+    STORAGE_ROOT,
+    exist_ok=True
+)
 
-FILES = {}
-FILE_PERMISSIONS = {}
-
-# ============================================================
-# 1F.5 STORAGE INITIALIZATION
-# ============================================================
-
-def initialize_storage():
-
-    os.makedirs(
-        STORAGE_ROOT,
-        exist_ok=True
-    )
 
 # ============================================================
-# 1F.6 CREATE FILE RECORD
+# 1F.4 CREATE FILE REQUEST
 # ============================================================
 
-def create_file_record(
+class CreateFileRequest(BaseModel):
+    workspace_id: str
+    filename: str
+    content_type: str
+    size_bytes: int
+
+
+# ============================================================
+# 1F.5 CREATE FILE
+# ============================================================
+
+def create_file(
     workspace_id: str,
-    uploaded_by: str,
     filename: str,
     content_type: str,
-    size_bytes: int,
-    path: str
+    size_bytes: int
 ):
-
     file_record = FileRecord(
         id=str(uuid.uuid4()),
         workspace_id=workspace_id,
-        uploaded_by=uploaded_by,
         filename=filename,
         content_type=content_type,
         size_bytes=size_bytes,
-        path=path,
-        created_at=
-            datetime.utcnow()
+        created_at=datetime.utcnow()
     )
 
     FILES[
@@ -1956,17 +1353,33 @@ def create_file_record(
 
     return file_record
 
+
 # ============================================================
-# 1F.7 GET FILE
+# 1F.6 GET FILE
 # ============================================================
 
 def get_file(
     file_id: str
 ):
-
     return FILES.get(
         file_id
     )
+
+
+# ============================================================
+# 1F.7 LIST FILES
+# ============================================================
+
+def list_files(
+    workspace_id: str
+):
+    return [
+        file
+        for file in FILES.values()
+        if file.workspace_id
+        == workspace_id
+    ]
+
 
 # ============================================================
 # 1F.8 DELETE FILE
@@ -1975,276 +1388,111 @@ def get_file(
 def delete_file(
     file_id: str
 ):
-
-    file_record = (
-        FILES.get(file_id)
-    )
-
-    if not file_record:
-        return False
-
-    if os.path.exists(
-        file_record.path
-    ):
-        os.remove(
-            file_record.path
-        )
-
-    FILES.pop(
+    return FILES.pop(
         file_id,
         None
     )
 
-    return True
 
 # ============================================================
-# 1F.9 LIST FILES
+# 1F.9 STORAGE STATS
 # ============================================================
 
-def list_workspace_files(
-    workspace_id: str
-):
-
-    return [
-        file_record
-        for file_record
-        in FILES.values()
-        if file_record.workspace_id
-        == workspace_id
-    ]
-
-# ============================================================
-# 1F.10 GRANT PERMISSION
-# ============================================================
-
-def grant_file_access(
-    file_id: str,
-    user_id: str,
-    can_read: bool = True,
-    can_write: bool = False
-):
-
-    permission = (
-        FilePermission(
-            file_id=file_id,
-            user_id=user_id,
-            can_read=can_read,
-            can_write=can_write
-        )
-    )
-
-    FILE_PERMISSIONS[
-        f"{file_id}:{user_id}"
-    ] = permission
-
-    return permission
-
-# ============================================================
-# 1F.11 CHECK ACCESS
-# ============================================================
-
-def has_file_access(
-    file_id: str,
-    user_id: str
-):
-
-    permission = (
-        FILE_PERMISSIONS.get(
-            f"{file_id}:{user_id}"
-        )
-    )
-
-    if not permission:
-        return False
-
-    return permission.can_read
-
-# ============================================================
-# 1F.12 FILE METADATA
-# ============================================================
-
-def file_metadata(
-    file_id: str
-):
-
-    file_record = (
-        get_file(file_id)
-    )
-
-    if not file_record:
-        return None
-
+def storage_stats():
     return {
-        "id":
-            file_record.id,
-        "filename":
-            file_record.filename,
-        "content_type":
-            file_record.content_type,
-        "size_bytes":
-            file_record.size_bytes,
-        "created_at":
-            file_record.created_at
+        "total_files":
+        len(FILES)
     }
 
+
 # ============================================================
-# 1F.13 FILE SEARCH
+# 1F.10 CREATE FILE ENDPOINT
 # ============================================================
 
-def search_files(
-    workspace_id: str,
-    query: str
+@app.post("/files")
+async def create_file_api(
+    request: CreateFileRequest
 ):
+    return create_file(
+        request.workspace_id,
+        request.filename,
+        request.content_type,
+        request.size_bytes
+    )
 
-    results = []
-
-    for file_record in (
-        list_workspace_files(
-            workspace_id
-        )
-    ):
-        if (
-            query.lower()
-            in file_record.filename
-            .lower()
-        ):
-            results.append(
-                file_record
-            )
-
-    return results
 
 # ============================================================
-# 1F.14 FILE INFO ENDPOINT
+# 1F.11 GET FILE ENDPOINT
 # ============================================================
 
 @app.get("/files/{file_id}")
-async def file_info_api(
+async def get_file_api(
     file_id: str
 ):
-
-    return file_metadata(
+    return get_file(
         file_id
     )
 
+
 # ============================================================
-# 1F.15 FILE LIST ENDPOINT
+# 1F.12 LIST FILES ENDPOINT
 # ============================================================
 
 @app.get(
     "/workspaces/{workspace_id}/files"
 )
-async def file_list_api(
+async def list_files_api(
     workspace_id: str
 ):
-
     return {
         "files":
-            list_workspace_files(
-                workspace_id
-            )
+        list_files(
+            workspace_id
+        )
     }
 
+
 # ============================================================
-# 1F.16 FILE DELETE ENDPOINT
+# 1F.13 DELETE FILE ENDPOINT
 # ============================================================
 
-@app.delete(
-    "/files/{file_id}"
-)
+@app.delete("/files/{file_id}")
 async def delete_file_api(
     file_id: str
 ):
+    delete_file(
+        file_id
+    )
 
     return {
-        "success":
-            delete_file(
-                file_id
-            )
+        "success": True
     }
 
-# ============================================================
-# 1F.17 FILE SEARCH ENDPOINT
-# ============================================================
-
-@app.get(
-    "/workspaces/{workspace_id}/files/search"
-)
-async def search_files_api(
-    workspace_id: str,
-    query: str
-):
-
-    return {
-        "results":
-            search_files(
-                workspace_id,
-                query
-            )
-    }
 
 # ============================================================
-# 1F.18 STORAGE HEALTH CHECK
+# 1F.14 STORAGE HEALTH
 # ============================================================
 
 @app.get("/storage/health")
 async def storage_health():
-
     return {
-        "status": "healthy",
-        "storage_root":
-            STORAGE_ROOT
+        "status": "healthy"
     }
 
-# ============================================================
-# 1F.19 STORAGE STATS
-# ============================================================
-
-def storage_stats():
-
-    total_files = len(
-        FILES
-    )
-
-    total_size = sum(
-        file.size_bytes
-        for file in
-        FILES.values()
-    )
-
-    return {
-        "total_files":
-            total_files,
-        "total_size":
-            total_size
-    }
 
 # ============================================================
-# 1F.20 STORAGE STATS ENDPOINT
+# 1F.15 STORAGE STATS ENDPOINT
 # ============================================================
 
 @app.get("/storage/stats")
 async def storage_stats_api():
-
     return storage_stats()
 
 # ============================================================
-# PART 1F DELIVERABLE
-#
-# File Storage
-# File Records
-# File Permissions
-# File Metadata
-# File Search
-# File Deletion
-# Workspace File Listing
-# Storage Statistics
-# Storage Health Checks
-# Attachment Foundation
-#
-# Ready For Script 5 Part 5A
+# PART 1F COMPLETE
+# Ready For Part 5A
 # ============================================================
-# =========================================================
+#  ============================================================
 # SCRIPT 5
 # PART 5A — AUTHENTICATION, SESSIONS & API PROVIDER SETUP
 # FastAPI Version
