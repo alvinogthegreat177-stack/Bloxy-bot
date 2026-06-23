@@ -203,6 +203,7 @@ async def lifespan(app: FastAPI):
 class Settings(BaseModel):
     app_name: str = "AI Platform"
     version: str = "1.0.0"
+    environment: str = "production"
 
 settings = Settings()
 
@@ -210,6 +211,14 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.version
 )
+
+@app.get("/health")
+async def health():
+    return {
+        "status": health_manager.get_status(),
+        "version": settings.version,
+        "environment": settings.environment
+    }
 
 # ============================================================
 # 1A.10 REQUEST MIDDLEWARE
@@ -305,17 +314,6 @@ async def version():
 # 1A.14 ROOT ENDPOINT
 # ============================================================
 
-@app.get("/")
-async def root():
-
-    return {
-        "name":
-            settings.app_name,
-        "version":
-            settings.version,
-        "status":
-            "running"
-    }
 
 # ============================================================
 # 1A.15 SERVICE INSPECTION
@@ -2257,8 +2255,8 @@ import os
 import uuid
 from datetime import datetime, timedelta
 
-from flask import session, jsonify, request
-
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, HTMLResponse
 # =========================================================
 # USER SESSION CONFIGURATION
 # =========================================================
