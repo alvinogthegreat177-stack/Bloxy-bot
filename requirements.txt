@@ -5,4 +5,4 @@ email-validator
 requests
 gunicorn
 werkzeug
-pydantic{email}
+
