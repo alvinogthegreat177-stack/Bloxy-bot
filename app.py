@@ -2262,8 +2262,7 @@ import os
 # API PROVIDERS
 # =========================================================
 
-
-   API_PROVIDERS = {
+API_PROVIDERS = { 
     "openai": os.getenv("OPENAI_API_KEY"),
     "groq": os.getenv("GROQ_API_KEY"),
     "openrouter": os.getenv("OPENROUTER_API_KEY"),
