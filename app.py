@@ -200,10 +200,15 @@ async def lifespan(app: FastAPI):
 # 1A.9 APPLICATION INSTANCE
 # ============================================================
 
+class Settings(BaseModel):
+    app_name: str = "AI Platform"
+    version: str = "1.0.0"
+
+settings = Settings()
+
 app = FastAPI(
     title=settings.app_name,
-    version=settings.version,
-    lifespan=lifespan
+    version=settings.version
 )
 
 # ============================================================
