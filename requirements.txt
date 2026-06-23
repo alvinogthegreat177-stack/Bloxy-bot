@@ -1,8 +1,8 @@
 fastapi
-Flask
-Werkzeug
-gunicorn
-requests
 uvicorn
+python-multipart
 email-validator
-pydantic[email]
+requests
+gunicorn
+werkzeug
+pydantic{email}
