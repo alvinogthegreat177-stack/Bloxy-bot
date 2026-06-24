@@ -1,921 +1,1086 @@
-<!-- =========================================================
-SCRIPT 2
-PART 2A — CHATGPT STYLE APPLICATION SHELL
-FILE: templates/index.html
-Paste at the top of index.html
-========================================================= -->
-
 <!DOCTYPE html>
+
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0">
+```
+<title>Nova AI</title>
 
-    <title>Unified AI Gateway</title>
+<meta name="description" content="Advanced AI Assistant powered by multiple AI, research, sports, finance, weather, movie and knowledge providers.">
 
-    <link
-        rel="stylesheet"
-        href="/static/styles.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+
+<link rel="stylesheet" href="styles.css">
+```
 
 </head>
 
 <body>
 
-    <div id="app">
+<div class="app-container">
 
-        <aside id="sidebar">
+```
+<!-- ========================= -->
+<!-- MOBILE OVERLAY -->
+<!-- ========================= -->
 
-            <div id="sidebar-top">
+<div id="mobileOverlay" class="mobile-overlay"></div>
 
-                <button id="newChatButton">
-                    New Chat
-                </button>
+<!-- ========================= -->
+<!-- SIDEBAR -->
+<!-- ========================= -->
 
-            </div>
+<aside id="sidebar" class="sidebar">
 
-            <div id="workspaceSection">
+    <!-- Logo -->
 
-                <select id="workspaceSelector">
+    <div class="logo-section">
 
-                    <option>
-                        Default Workspace
-                    </option>
-
-                </select>
-
-            </div>
-
-            <div id="conversationContainer">
-
-            </div>
-
-            <div id="sidebarBottom">
-
-                <button id="dashboardButton">
-                    Dashboard
-                </button>
-
-                <button id="settingsButton">
-                    Settings
-                </button>
-
-                <button id="profileButton">
-                    Profile
-                </button>
-
-            </div>
-
-        </aside>
-
-        <main id="mainContent">
-
-            <header id="chatHeader">
-
-                <div id="chatTitle">
-
-                    Unified AI Gateway
-
-                </div>
-
-                <div id="headerActions">
-
-                    <button id="shareButton">
-                        Share
-                    </button>
-
-                    <button id="exportButton">
-                        Export
-                    </button>
-
-                </div>
-
-            </header>
-
-            <section id="messageArea">
-
-            </section>
-
-            <section id="inputSection">
-
-                <div id="attachments">
-
-                    <input
-                        type="file"
-                        id="fileInput"
-                        multiple>
-
-                </div>
-
-                <div id="inputContainer">
-
-                    <textarea
-                        id="promptInput"
-                        placeholder="Message AI..."
-                    ></textarea>
-
-                    <button id="sendButton">
-                        Send
-                    </button>
-
-                </div>
-
-                <div id="modelContainer">
-
-                    <select id="modelSelector">
-
-                        <option>
-                            GPT-5
-                        </option>
-
-                        <option>
-                            Claude
-                        </option>
-
-                        <option>
-                            Gemini
-                        </option>
-
-                    </select>
-
-                </div>
-
-            </section>
-
-        </main>
-
-    </div>
-
-    <script src="/static/app.js"></script>
-
-</body>
-
-</html>
-
-<!-- =========================================================
-PART 2A DELIVERABLE
-
-Application Shell
-Sidebar
-Workspace Selector
-Conversation List
-Chat Header
-Message Area
-Prompt Input
-File Upload Area
-Model Selector
-Share Button
-Export Button
-Settings Button
-Dashboard Button
-Profile Button
-
-Ready For Part 2B
-========================================================= -->
-<!-- =========================================================
-SCRIPT 2
-PART 2B — CHAT MESSAGE COMPONENTS
-Paste directly BELOW Part 2A inside index.html
-========================================================= -->
-
-<!-- Assistant Message -->
-<template id="assistantMessageTemplate">
-
-    <div class="message assistant-message">
-
-        <div class="message-avatar">
-            AI
+        <div class="logo-icon">
+            <i class="fa-solid fa-sparkles"></i>
         </div>
 
-        <div class="message-content">
+        <div class="logo-text">
 
-            <div class="message-text">
-            </div>
+            <h2>Nova AI</h2>
 
-            <div class="message-actions">
-
-                <button class="copy-message">
-                    Copy
-                </button>
-
-                <button class="regenerate-message">
-                    Regenerate
-                </button>
-
-            </div>
+            <span>Multi-Intelligence Platform</span>
 
         </div>
 
     </div>
 
-</template>
+    <!-- New Chat -->
 
-<!-- User Message -->
-<template id="userMessageTemplate">
+    <button id="newChatBtn" class="new-chat-btn">
 
-    <div class="message user-message">
+        <i class="fa-solid fa-plus"></i>
 
-        <div class="message-avatar">
-            U
-        </div>
+        <span>New Chat</span>
 
-        <div class="message-content">
-
-            <div class="message-text">
-            </div>
-
-        </div>
-
-    </div>
-
-</template>
-
-<!-- System Message -->
-<template id="systemMessageTemplate">
-
-    <div class="message system-message">
-
-        <div class="message-content">
-
-            <div class="message-text">
-            </div>
-
-        </div>
-
-    </div>
-
-</template>
-
-<!-- Typing Indicator -->
-<div id="typingIndicator">
-
-    <span></span>
-    <span></span>
-    <span></span>
-
-</div>
-
-<!-- Empty Chat State -->
-<div id="emptyState">
-
-    <h1>
-        Unified AI Gateway
-    </h1>
-
-    <p>
-        Start a new conversation
-    </p>
-
-</div>
-
-<!-- Suggested Prompts -->
-<div id="promptSuggestions">
-
-    <button class="suggestion">
-        Explain a concept
     </button>
 
-    <button class="suggestion">
-        Write code
-    </button>
+    <!-- Search Chats -->
 
-    <button class="suggestion">
-        Analyze data
-    </button>
+    <div class="chat-search">
 
-    <button class="suggestion">
-        Create content
-    </button>
-
-</div>
-
-<!-- =========================================================
-PART 2B DELIVERABLE
-
-Assistant Messages
-User Messages
-System Messages
-Message Actions
-Copy Button
-Regenerate Button
-Typing Indicator
-Empty State
-Prompt Suggestions
-Message Templates
-
-Ready For Part 2C
-========================================================= -->
-<!-- =========================================================
-SCRIPT 2
-PART 2C — WORKSPACE, DASHBOARD & SETTINGS PANELS
-Paste directly BELOW Part 2B inside index.html
-========================================================= -->
-
-<!-- Workspace Panel -->
-
-<div id="workspacePanel">
-
-    <div class="panel-header">
-
-        <h2>
-            Workspace
-        </h2>
-
-    </div>
-
-    <div class="panel-content">
+        <i class="fa-solid fa-magnifying-glass"></i>
 
         <input
             type="text"
-            id="workspaceName"
-            placeholder="Workspace Name">
+            id="chatSearch"
+            placeholder="Search conversations..."
+        >
 
-        <button id="createWorkspaceButton">
-            Create Workspace
+    </div>
+
+    <!-- Navigation -->
+
+    <div class="nav-section">
+
+        <div class="nav-title">
+            Workspace
+        </div>
+
+        <button class="nav-btn active">
+
+            <i class="fa-solid fa-comments"></i>
+
+            <span>Chats</span>
+
+        </button>
+
+        <button class="nav-btn">
+
+            <i class="fa-solid fa-globe"></i>
+
+            <span>Research</span>
+
+        </button>
+
+        <button class="nav-btn">
+
+            <i class="fa-solid fa-code"></i>
+
+            <span>Coding</span>
+
+        </button>
+
+        <button class="nav-btn">
+
+            <i class="fa-solid fa-book"></i>
+
+            <span>Knowledge</span>
+
         </button>
 
     </div>
 
-</div>
+    <!-- Intelligence Modules -->
 
-<!-- Dashboard Panel -->
+    <div class="nav-section">
 
-<div id="dashboardPanel">
+        <div class="nav-title">
+            Intelligence
+        </div>
 
-    <div class="panel-header">
+        <button class="nav-btn">
 
-        <h2>
-            Dashboard
-        </h2>
+            <i class="fa-solid fa-newspaper"></i>
+
+            <span>News Center</span>
+
+        </button>
+
+        <button class="nav-btn">
+
+            <i class="fa-solid fa-chart-line"></i>
+
+            <span>Finance Hub</span>
+
+        </button>
+
+        <button class="nav-btn">
+
+            <i class="fa-solid fa-futbol"></i>
+
+            <span>Sports Hub</span>
+
+        </button>
+
+        <button class="nav-btn">
+
+            <i class="fa-solid fa-cloud-sun"></i>
+
+            <span>Weather</span>
+
+        </button>
+
+        <button class="nav-btn">
+
+            <i class="fa-solid fa-film"></i>
+
+            <span>Movies & TV</span>
+
+        </button>
 
     </div>
 
-    <div class="panel-content">
+    <!-- Chat History -->
 
-        <div class="stat-card">
+    <div class="nav-section">
 
-            <h3>
-                Total Requests
-            </h3>
-
-            <span id="totalRequests">
-                0
-            </span>
-
+        <div class="nav-title">
+            Recent Chats
         </div>
 
-        <div class="stat-card">
+        <div id="chatHistory" class="chat-history">
 
-            <h3>
-                Total Tokens
-            </h3>
+            <div class="history-item">
+                Welcome to Nova AI
+            </div>
 
-            <span id="totalTokens">
-                0
-            </span>
+            <div class="history-item">
+                Deep Research Session
+            </div>
 
-        </div>
-
-        <div class="stat-card">
-
-            <h3>
-                Total Cost
-            </h3>
-
-            <span id="totalCost">
-                $0.00
-            </span>
-
-        </div>
-
-        <div class="stat-card">
-
-            <h3>
-                Active Models
-            </h3>
-
-            <span id="activeModels">
-                0
-            </span>
+            <div class="history-item">
+                Sports Analysis
+            </div>
 
         </div>
 
     </div>
 
-</div>
+    <!-- User -->
 
-<!-- Settings Panel -->
+    <div class="user-panel">
 
-<div id="settingsPanel">
+        <div class="user-avatar">
+            A
+        </div>
 
-    <div class="panel-header">
+        <div class="user-details">
 
-        <h2>
-            Settings
-        </h2>
+            <div class="user-name">
+                Alvin
+            </div>
+
+            <div class="user-role">
+                Administrator
+            </div>
+
+        </div>
+
+        <button class="profile-btn">
+
+            <i class="fa-solid fa-gear"></i>
+
+        </button>
 
     </div>
 
-    <div class="panel-content">
+</aside>
 
-        <label>
+<!-- ========================= -->
+<!-- MAIN CONTENT -->
+<!-- ========================= -->
 
-            Theme
+<main class="main-content">
 
-            <select id="themeSelector">
+    <!-- Top Bar -->
 
-                <option>
-                    Dark
+    <header class="top-bar">
+
+        <!-- Mobile Menu -->
+
+        <button id="menuToggle"
+                class="mobile-menu-btn">
+
+            <i class="fa-solid fa-bars"></i>
+
+        </button>
+
+        <!-- Current Workspace -->
+
+        <div class="workspace-info">
+
+            <h3>Nova AI Assistant</h3>
+
+            <span>
+                Powered by 25 Knowledge Sources
+            </span>
+
+        </div>
+
+        <!-- Model Selector -->
+
+        <div class="model-area">
+
+            <select id="modelSelector">
+
+                <option value="auto">
+                    Auto Router
                 </option>
 
-                <option>
-                    Light
+                <option value="openai">
+                    OpenAI
+                </option>
+
+                <option value="groq">
+                    Groq
+                </option>
+
+                <option value="kimi">
+                    Kimi
+                </option>
+
+                <option value="openrouter">
+                    OpenRouter
                 </option>
 
             </select>
 
-        </label>
+        </div>
 
-        <label>
+        <!-- Top Actions -->
 
-            Default Model
+        <div class="top-actions">
+
+            <button id="providerStatusBtn"
+                    class="icon-btn">
+
+                <i class="fa-solid fa-server"></i>
+
+            </button>
+
+            <button id="settingsBtn"
+                    class="icon-btn">
+
+                <i class="fa-solid fa-sliders"></i>
+
+            </button>
+
+            <button id="themeBtn"
+                    class="icon-btn">
+
+                <i class="fa-solid fa-moon"></i>
+
+            </button>
+
+        </div>
+
+    </header>
+
+    <!-- PART 2 STARTS HERE -->
+
+    <section id="welcomeSection">
+```
+```
+        <div class="welcome-container">
+
+            <div class="hero-section">
+
+                <div class="hero-badge">
+                    <i class="fa-solid fa-bolt"></i>
+                    Multi-Provider Intelligence Engine
+                </div>
+
+                <h1 class="hero-title">
+                    Welcome to Nova AI
+                </h1>
+
+                <p class="hero-description">
+
+                    A next-generation AI assistant powered by
+                    OpenAI, Groq, Kimi, OpenRouter, Tavily,
+                    Exa, Firecrawl, Wikipedia, Wolfram Alpha,
+                    Finance APIs, Sports APIs, Weather APIs,
+                    News APIs and more.
+
+                </p>
+
+            </div>
+
+            <!-- QUICK ACTIONS -->
+
+            <div class="quick-actions">
+
+                <button class="quick-card">
+
+                    <i class="fa-solid fa-comments"></i>
+
+                    <h3>AI Chat</h3>
+
+                    <p>
+                        Ask anything
+                    </p>
+
+                </button>
+
+                <button class="quick-card">
+
+                    <i class="fa-solid fa-globe"></i>
+
+                    <h3>Web Search</h3>
+
+                    <p>
+                        Live internet results
+                    </p>
+
+                </button>
+
+                <button class="quick-card">
+
+                    <i class="fa-solid fa-microscope"></i>
+
+                    <h3>Deep Research</h3>
+
+                    <p>
+                        Multi-source investigation
+                    </p>
+
+                </button>
+
+                <button class="quick-card">
+
+                    <i class="fa-solid fa-code"></i>
+
+                    <h3>Code Assistant</h3>
+
+                    <p>
+                        Generate and debug code
+                    </p>
+
+                </button>
+
+            </div>
+
+            <!-- PROVIDERS -->
+
+            <div class="provider-section">
+
+                <h2 class="section-heading">
+                    Connected Intelligence Sources
+                </h2>
+
+                <div class="provider-grid">
+
+                    <div class="provider-card">
+
+                        <i class="fa-solid fa-robot"></i>
+
+                        <h3>AI Models</h3>
+
+                        <p>
+                            OpenAI • Groq • Kimi • OpenRouter
+                        </p>
+
+                    </div>
+
+                    <div class="provider-card">
+
+                        <i class="fa-solid fa-globe"></i>
+
+                        <h3>Research</h3>
+
+                        <p>
+                            Tavily • Exa • Firecrawl
+                        </p>
+
+                    </div>
+
+                    <div class="provider-card">
+
+                        <i class="fa-solid fa-book"></i>
+
+                        <h3>Knowledge</h3>
+
+                        <p>
+                            Wikipedia • Dictionary • Wolfram
+                        </p>
+
+                    </div>
+
+                    <div class="provider-card">
+
+                        <i class="fa-solid fa-newspaper"></i>
+
+                        <h3>News</h3>
+
+                        <p>
+                            Guardian • NewsAPI • GNews
+                        </p>
+
+                    </div>
+
+                    <div class="provider-card">
+
+                        <i class="fa-solid fa-chart-line"></i>
+
+                        <h3>Finance</h3>
+
+                        <p>
+                            Finnhub • AlphaVantage
+                        </p>
+
+                    </div>
+
+                    <div class="provider-card">
+
+                        <i class="fa-solid fa-futbol"></i>
+
+                        <h3>Sports</h3>
+
+                        <p>
+                            6 Sports Providers
+                        </p>
+
+                    </div>
+
+                    <div class="provider-card">
+
+                        <i class="fa-solid fa-cloud-sun"></i>
+
+                        <h3>Weather</h3>
+
+                        <p>
+                            OpenWeather
+                        </p>
+
+                    </div>
+
+                    <div class="provider-card">
+
+                        <i class="fa-solid fa-film"></i>
+
+                        <h3>Entertainment</h3>
+
+                        <p>
+                            TMDB Integration
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- FEATURES -->
+
+            <div class="capabilities-section">
+
+                <h2 class="section-heading">
+                    Capabilities
+                </h2>
+
+                <div class="capabilities-grid">
+
+                    <div class="capability-card">
+                        <i class="fa-solid fa-brain"></i>
+                        AI Reasoning
+                    </div>
+
+                    <div class="capability-card">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        Fact Checking
+                    </div>
+
+                    <div class="capability-card">
+                        <i class="fa-solid fa-link"></i>
+                        Source Citations
+                    </div>
+
+                    <div class="capability-card">
+                        <i class="fa-solid fa-chart-column"></i>
+                        Data Analysis
+                    </div>
+
+                    <div class="capability-card">
+                        <i class="fa-solid fa-code"></i>
+                        Programming
+                    </div>
+
+                    <div class="capability-card">
+                        <i class="fa-solid fa-file"></i>
+                        Document Analysis
+                    </div>
+
+                    <div class="capability-card">
+                        <i class="fa-solid fa-image"></i>
+                        Image Understanding
+                    </div>
+
+                    <div class="capability-card">
+                        <i class="fa-solid fa-language"></i>
+                        Translation
+                    </div>
+
+                    <div class="capability-card">
+                        <i class="fa-solid fa-bolt"></i>
+                        Live Intelligence
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+    <!-- CHAT AREA -->
+
+    <section id="chatSection"
+             class="chat-section">
+
+        <div id="chatContainer"
+             class="chat-container">
+
+            <!-- Messages will appear here -->
+
+        </div>
+
+        <!-- TYPING INDICATOR -->
+
+        <div id="typingIndicator"
+             class="typing-indicator hidden">
+
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+
+            <span>
+                Nova AI is thinking...
+            </span>
+
+        </div>
+
+    </section>
+
+    <!-- PART 3 STARTS HERE -->
+```
+```
+    <!-- INPUT AREA -->
+
+    <div class="input-wrapper">
+
+        <div class="input-container">
+
+            <div class="input-toolbar">
+
+                <button id="attachFileBtn"
+                        class="tool-icon-btn">
+
+                    <i class="fa-solid fa-paperclip"></i>
+
+                </button>
+
+                <button id="imageUploadBtn"
+                        class="tool-icon-btn">
+
+                    <i class="fa-solid fa-image"></i>
+
+                </button>
+
+                <button id="voiceBtn"
+                        class="tool-icon-btn">
+
+                    <i class="fa-solid fa-microphone"></i>
+
+                </button>
+
+                <button id="researchBtn"
+                        class="tool-icon-btn">
+
+                    <i class="fa-solid fa-microscope"></i>
+
+                </button>
+
+                <button id="webSearchBtn"
+                        class="tool-icon-btn">
+
+                    <i class="fa-solid fa-globe"></i>
+
+                </button>
+
+            </div>
+
+            <textarea
+                id="messageInput"
+                rows="1"
+                placeholder="Ask Nova AI anything..."
+            ></textarea>
+
+            <div class="input-actions">
+
+                <button id="stopBtn"
+                        class="stop-btn">
+
+                    <i class="fa-solid fa-stop"></i>
+
+                </button>
+
+                <button id="sendBtn"
+                        class="send-btn">
+
+                    <i class="fa-solid fa-paper-plane"></i>
+
+                </button>
+
+            </div>
+
+        </div>
+
+        <div class="input-footer">
+
+            Nova AI may occasionally make mistakes.
+            Verify important information.
+
+        </div>
+
+    </div>
+
+</main>
+```
+
+</div>
+
+<!-- FILE INPUTS -->
+
+<input type="file"
+    id="fileInput"
+    hidden>
+
+<input type="file"
+    id="imageInput"
+    accept="image/*"
+    hidden>
+
+<!-- SETTINGS MODAL -->
+
+<div id="settingsModal"
+     class="modal">
+
+```
+<div class="modal-content">
+
+    <div class="modal-header">
+
+        <h2>Settings</h2>
+
+        <button class="close-modal">
+            ✕
+        </button>
+
+    </div>
+
+    <div class="modal-body">
+
+        <div class="setting-item">
+
+            <label>
+                Theme
+            </label>
+
+            <select id="themeSelect">
+
+                <option>Dark</option>
+                <option>Light</option>
+                <option>System</option>
+
+            </select>
+
+        </div>
+
+        <div class="setting-item">
+
+            <label>
+                Default Model
+            </label>
 
             <select id="defaultModel">
 
-                <option>
-                    GPT-5
-                </option>
-
-                <option>
-                    Claude
-                </option>
-
-                <option>
-                    Gemini
-                </option>
+                <option>Auto Router</option>
+                <option>OpenAI</option>
+                <option>Groq</option>
+                <option>Kimi</option>
+                <option>OpenRouter</option>
 
             </select>
 
-        </label>
-
-        <label>
-
-            Streaming
-
-            <input
-                type="checkbox"
-                id="streamingEnabled"
-                checked>
-
-        </label>
-
-    </div>
-
-</div>
-
-<!-- Provider Management -->
-
-<div id="providerPanel">
-
-    <div class="panel-header">
-
-        <h2>
-            Providers
-        </h2>
-
-    </div>
-
-    <div class="panel-content">
-
-        <div class="provider-row">
-
-            <span>OpenAI</span>
-
-            <span id="openaiStatus">
-                Online
-            </span>
-
-        </div>
-
-        <div class="provider-row">
-
-            <span>Anthropic</span>
-
-            <span id="anthropicStatus">
-                Online
-            </span>
-
-        </div>
-
-        <div class="provider-row">
-
-            <span>Google</span>
-
-            <span id="googleStatus">
-                Online
-            </span>
-
         </div>
 
     </div>
 
 </div>
-
-<!-- =========================================================
-PART 2C DELIVERABLE
-
-Workspace Panel
-Workspace Creation
-Dashboard Panel
-Usage Statistics
-Token Statistics
-Cost Statistics
-Model Statistics
-Settings Panel
-Theme Selection
-Default Model Selection
-Streaming Toggle
-Provider Panel
-Provider Status Display
-
-Ready For Part 2D
-========================================================= -->
-<!-- =========================================================
-SCRIPT 2
-PART 2D — ANALYTICS, ADMIN & MONITORING PANELS
-Paste directly BELOW Part 2C inside index.html
-========================================================= -->
-
-<!-- Analytics Panel -->
-
-<div id="analyticsPanel">
-
-    <div class="panel-header">
-
-        <h2>
-            Analytics
-        </h2>
-
-    </div>
-
-    <div class="panel-content">
-
-        <div class="analytics-card">
-
-            <h3>
-                Daily Requests
-            </h3>
-
-            <div id="dailyRequestsChart">
-            </div>
-
-        </div>
-
-        <div class="analytics-card">
-
-            <h3>
-                Daily Tokens
-            </h3>
-
-            <div id="dailyTokensChart">
-            </div>
-
-        </div>
-
-        <div class="analytics-card">
-
-            <h3>
-                Daily Cost
-            </h3>
-
-            <div id="dailyCostChart">
-            </div>
-
-        </div>
-
-    </div>
+```
 
 </div>
 
-<!-- Provider Analytics -->
+<!-- LOGIN MODAL -->
 
-<div id="providerAnalyticsPanel">
+<div id="authModal"
+     class="modal">
 
-    <div class="panel-header">
+```
+<div class="modal-content">
 
-        <h2>
-            Provider Analytics
-        </h2>
+    <div class="modal-header">
 
-    </div>
+        <h2>Account</h2>
 
-    <div class="panel-content">
-
-        <table id="providerAnalyticsTable">
-
-            <thead>
-
-                <tr>
-
-                    <th>
-                        Provider
-                    </th>
-
-                    <th>
-                        Requests
-                    </th>
-
-                    <th>
-                        Latency
-                    </th>
-
-                    <th>
-                        Errors
-                    </th>
-
-                    <th>
-                        Cost
-                    </th>
-
-                </tr>
-
-            </thead>
-
-            <tbody>
-
-            </tbody>
-
-        </table>
-
-    </div>
-
-</div>
-
-<!-- Model Analytics -->
-
-<div id="modelAnalyticsPanel">
-
-    <div class="panel-header">
-
-        <h2>
-            Model Analytics
-        </h2>
-
-    </div>
-
-    <div class="panel-content">
-
-        <table id="modelAnalyticsTable">
-
-            <thead>
-
-                <tr>
-
-                    <th>
-                        Model
-                    </th>
-
-                    <th>
-                        Requests
-                    </th>
-
-                    <th>
-                        Tokens
-                    </th>
-
-                    <th>
-                        Cost
-                    </th>
-
-                </tr>
-
-            </thead>
-
-            <tbody>
-
-            </tbody>
-
-        </table>
-
-    </div>
-
-</div>
-
-<!-- Admin Panel -->
-
-<div id="adminPanel">
-
-    <div class="panel-header">
-
-        <h2>
-            Administration
-        </h2>
-
-    </div>
-
-    <div class="panel-content">
-
-        <button id="clearCacheButton">
-            Clear Cache
-        </button>
-
-        <button id="rebuildCacheButton">
-            Rebuild Cache
-        </button>
-
-        <button id="reloadProvidersButton">
-            Reload Providers
-        </button>
-
-        <button id="refreshModelsButton">
-            Refresh Models
+        <button class="close-modal">
+            ✕
         </button>
 
     </div>
 
-</div>
+    <div class="modal-body">
 
-<!-- Health Monitoring -->
+        <input type="email"
+               placeholder="Email">
 
-<div id="healthPanel">
+        <input type="password"
+               placeholder="Password">
 
-    <div class="panel-header">
-
-        <h2>
-            System Health
-        </h2>
-
-    </div>
-
-    <div class="panel-content">
-
-        <div class="health-item">
-
-            <span>
-                Database
-            </span>
-
-            <span id="databaseHealth">
-                Healthy
-            </span>
-
-        </div>
-
-        <div class="health-item">
-
-            <span>
-                Redis
-            </span>
-
-            <span id="redisHealth">
-                Healthy
-            </span>
-
-        </div>
-
-        <div class="health-item">
-
-            <span>
-                AI Providers
-            </span>
-
-            <span id="providerHealth">
-                Healthy
-            </span>
-
-        </div>
-
-        <div class="health-item">
-
-            <span>
-                Storage
-            </span>
-
-            <span id="storageHealth">
-                Healthy
-            </span>
-
-        </div>
-
-    </div>
-
-</div>
-
-<!-- Audit Log Panel -->
-
-<div id="auditPanel">
-
-    <div class="panel-header">
-
-        <h2>
-            Audit Logs
-        </h2>
-
-    </div>
-
-    <div class="panel-content">
-
-        <div id="auditLogContainer">
-
-        </div>
-
-    </div>
-
-</div>
-
-<!-- =========================================================
-PART 2D DELIVERABLE
-
-Analytics Dashboard
-Provider Analytics
-Model Analytics
-Cost Analytics
-Usage Analytics
-Health Monitoring
-Admin Controls
-Cache Controls
-Provider Controls
-Audit Logs
-Database Health
-Redis Health
-Storage Health
-System Monitoring
-
-Ready For Part 2E
-========================================================= -->
-<!-- =========================================================
-SCRIPT 2
-PART 2E — SECURITY, AUTHENTICATION & API MANAGEMENT
-Paste directly BELOW Part 2D inside index.html
-========================================================= -->
-
-<!-- Authentication Panel -->
-
-<div id="authenticationPanel">
-
-    <div class="panel-header">
-
-        <h2>
-            Authentication
-        </h2>
-
-    </div>
-
-    <div class="panel-content">
-
-        <input
-            type="email"
-            id="loginEmail"
-            placeholder="Email">
-
-        <input
-            type="password"
-            id="loginPassword"
-            placeholder="Password">
-
-        <button id="loginButton">
+        <button class="primary-btn">
             Login
         </button>
 
-        <button id="logoutButton">
-            Logout
+        <button class="secondary-btn">
+            Register
         </button>
 
     </div>
 
 </div>
+```
 
-<!-- API Keys Panel -->
+</div>
 
-<div id="apiKeysPanel">
+<!-- PROVIDER STATUS MODAL -->
 
-    <div class="panel-header">
+<div id="providerModal"
+     class="modal">
 
-        <h2>
-            API Keys
-        </h2>
+```
+<div class="modal-content large-modal">
+
+    <div class="modal-header">
+
+        <h2>Provider Status</h2>
+
+        <button class="close-modal">
+            ✕
+        </button>
 
     </div>
 
-    <div class="panel-content">
+    <div class="modal-body">
 
-        <button id="createApiKeyButton">
-            Create API Key
+        <div class="provider-status-grid">
+
+            <div class="provider-status-card">
+                <span class="status-online"></span>
+                OpenAI
+            </div>
+
+            <div class="provider-status-card">
+                <span class="status-online"></span>
+                Groq
+            </div>
+
+            <div class="provider-status-card">
+                <span class="status-online"></span>
+                Kimi
+            </div>
+
+            <div class="provider-status-card">
+                <span class="status-online"></span>
+                OpenRouter
+            </div>
+
+            <div class="provider-status-card">
+                <span class="status-online"></span>
+                Tavily
+            </div>
+
+            <div class="provider-status-card">
+                <span class="status-online"></span>
+                Exa
+            </div>
+
+            <div class="provider-status-card">
+                <span class="status-online"></span>
+                Firecrawl
+            </div>
+
+            <div class="provider-status-card">
+                <span class="status-online"></span>
+                Wikipedia
+            </div>
+
+            <div class="provider-status-card">
+                <span class="status-online"></span>
+                Dictionary API
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+```
+
+</div>
+
+<!-- ADMIN DASHBOARD -->
+
+<div id="adminModal"
+     class="modal">
+
+```
+<div class="modal-content large-modal">
+
+    <div class="modal-header">
+
+        <h2>Admin Dashboard</h2>
+
+        <button class="close-modal">
+            ✕
         </button>
 
-        <button id="rotateApiKeyButton">
-            Rotate API Key
+    </div>
+
+    <div class="modal-body">
+
+        <div class="admin-grid">
+
+            <div class="admin-card">
+
+                <h3>Total Users</h3>
+
+                <span id="totalUsers">
+                    0
+                </span>
+
+            </div>
+
+            <div class="admin-card">
+
+                <h3>Total Chats</h3>
+
+                <span id="totalChats">
+                    0
+                </span>
+
+            </div>
+
+            <div class="admin-card">
+
+                <h3>API Health</h3>
+
+                <span id="apiHealth">
+                    Healthy
+                </span>
+
+            </div>
+
+            <div class="admin-card">
+
+                <h3>System Status</h3>
+
+                <span id="systemStatus">
+                    Online
+                </span>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+```
+
+</div>
+
+<!-- TOAST NOTIFICATIONS -->
+
+<div id="toastContainer"
+     class="toast-container">
+
+</div>
+
+<!-- LOADING SCREEN -->
+
+<div id="loadingScreen"
+     class="loading-screen">
+
+```
+<div class="loading-content">
+
+    <div class="loading-logo">
+
+        <i class="fa-solid fa-sparkles"></i>
+
+    </div>
+
+    <h1>Nova AI</h1>
+
+    <div class="loading-bar">
+
+        <div id="loadingProgress"
+             class="loading-progress">
+
+        </div>
+
+    </div>
+
+    <span id="loadingText">
+        Initializing Intelligence Systems...
+    </span>
+
+</div>
+```
+
+</div>
+
+<script src="app.js"></script>
+
+</body>
+</html>
+<!-- ================================================= -->
+<!-- SEARCH RESULTS PANEL -->
+<!-- ================================================= -->
+
+<div id="searchResultsPanel"
+     class="floating-panel hidden">
+
+    <div class="panel-header">
+
+        <h2>Search Results</h2>
+
+        <button class="close-panel">
+            ✕
         </button>
 
-        <button id="revokeApiKeyButton">
-            Revoke API Key
+    </div>
+
+    <div id="searchResultsContent">
+
+    </div>
+
+</div>
+
+<!-- ================================================= -->
+<!-- CITATIONS PANEL -->
+<!-- ================================================= -->
+
+<div id="citationsPanel"
+     class="floating-panel hidden">
+
+    <div class="panel-header">
+
+        <h2>Sources & Citations</h2>
+
+        <button class="close-panel">
+            ✕
         </button>
 
-        <div id="apiKeyList">
+    </div>
+
+    <div id="citationContent">
+
+    </div>
+
+</div>
+
+<!-- ================================================= -->
+<!-- REASONING PANEL -->
+<!-- ================================================= -->
+
+<div id="reasoningPanel"
+     class="floating-panel hidden">
+
+    <div class="panel-header">
+
+        <h2>AI Reasoning</h2>
+
+        <button class="close-panel">
+            ✕
+        </button>
+
+    </div>
+
+    <div class="reasoning-content">
+
+        <div class="reasoning-card">
+
+            <h3>Sources Used</h3>
+
+            <ul id="sourceList">
+
+            </ul>
+
+        </div>
+
+        <div class="reasoning-card">
+
+            <h3>Confidence</h3>
+
+            <span id="confidenceScore">
+                --
+            </span>
 
         </div>
 
@@ -923,59 +1088,89 @@ Paste directly BELOW Part 2D inside index.html
 
 </div>
 
-<!-- Roles Panel -->
+<!-- ================================================= -->
+<!-- RESEARCH WORKSPACE -->
+<!-- ================================================= -->
 
-<div id="rolesPanel">
+<section id="researchWorkspace"
+         class="workspace hidden">
 
-    <div class="panel-header">
+    <div class="workspace-header">
 
-        <h2>
-            Roles & Permissions
-        </h2>
+        <h1>Deep Research Workspace</h1>
 
-    </div>
-
-    <div class="panel-content">
-
-        <table id="rolesTable">
-
-            <thead>
-
-                <tr>
-
-                    <th>User</th>
-                    <th>Role</th>
-                    <th>Status</th>
-
-                </tr>
-
-            </thead>
-
-            <tbody>
-
-            </tbody>
-
-        </table>
+        <p>
+            Multi-source analysis using all available
+            research providers.
+        </p>
 
     </div>
 
-</div>
-
-<!-- Security Events -->
-
-<div id="securityPanel">
-
-    <div class="panel-header">
-
-        <h2>
-            Security Events
-        </h2>
+    <div id="researchResults">
 
     </div>
 
-    <div class="panel-content">
+</section>
 
-        <div id="securityEvents">
+<!-- ================================================= -->
+<!-- IMAGE WORKSPACE -->
+<!-- ================================================= -->
+
+<section id="imageWorkspace"
+         class="workspace hidden">
+
+    <div class="workspace-header">
+
+        <h1>Image Workspace</h1>
+
+        <p>
+            Future image analysis and image generation.
+        </p>
+
+    </div>
+
+    <div id="imageWorkspaceContent">
+
+    </div>
+
+</section>
+
+<!-- ================================================= -->
+<!-- EXPORT CHAT MODAL -->
+<!-- ================================================= -->
+
+<div id="exportModal"
+     class="modal">
+
+    <div class="modal-content">
+
+        <div class="modal-header">
+
+            <h2>Export Conversation</h2>
+
+            <button class="close-modal">
+                ✕
+            </button>
+
+        </div>
+
+        <div class="modal-body">
+
+            <button class="export-btn">
+                Export TXT
+            </button>
+
+            <button class="export-btn">
+                Export PDF
+            </button>
+
+            <button class="export-btn">
+                Export Markdown
+            </button>
+
+            <button class="export-btn">
+                Export JSON
+            </button>
 
         </div>
 
@@ -983,30 +1178,38 @@ Paste directly BELOW Part 2D inside index.html
 
 </div>
 
-<!-- Budget Controls -->
+<!-- ================================================= -->
+<!-- PROFILE MODAL -->
+<!-- ================================================= -->
 
-<div id="budgetPanel">
+<div id="profileModal"
+     class="modal">
 
-    <div class="panel-header">
+    <div class="modal-content">
 
-        <h2>
-            Budget Controls
-        </h2>
+        <div class="modal-header">
 
-    </div>
+            <h2>User Profile</h2>
 
-    <div class="panel-content">
+            <button class="close-modal">
+                ✕
+            </button>
 
-        <input
-            type="number"
-            id="monthlyBudget"
-            placeholder="Monthly Budget">
+        </div>
 
-        <button id="saveBudgetButton">
-            Save Budget
-        </button>
+        <div class="modal-body">
 
-        <div id="budgetUsage">
+            <div class="profile-card">
+
+                <div class="profile-avatar">
+                    A
+                </div>
+
+                <h3>Alvin</h3>
+
+                <p>Administrator</p>
+
+            </div>
 
         </div>
 
@@ -1014,83 +1217,27 @@ Paste directly BELOW Part 2D inside index.html
 
 </div>
 
-<!-- Rate Limits -->
+<!-- ================================================= -->
+<!-- MEMORY MANAGER -->
+<!-- ================================================= -->
 
-<div id="rateLimitPanel">
+<div id="memoryModal"
+     class="modal">
 
-    <div class="panel-header">
+    <div class="modal-content large-modal">
 
-        <h2>
-            Rate Limits
-        </h2>
+        <div class="modal-header">
 
-    </div>
+            <h2>Memory Manager</h2>
 
-    <div class="panel-content">
+            <button class="close-modal">
+                ✕
+            </button>
 
-        <input
-            type="number"
-            id="requestsPerMinute"
-            placeholder="Requests Per Minute">
+        </div>
 
-        <input
-            type="number"
-            id="maxConcurrency"
-            placeholder="Max Concurrent Requests">
-
-        <button id="saveLimitsButton">
-            Save Limits
-        </button>
-
-    </div>
-
-</div>
-
-<!-- =========================================================
-PART 2E DELIVERABLE
-
-Authentication UI
-Login Controls
-Logout Controls
-API Key Management
-Key Rotation
-Key Revocation
-Role Management
-Permission Management
-Security Monitoring
-Security Events
-Budget Controls
-Cost Controls
-Rate Limiting Controls
-Concurrency Controls
-
-Ready For Part 2F
-========================================================= -->
-<!-- =========================================================
-SCRIPT 2
-PART 2F — ENTERPRISE, MULTI-TENANT & DEVELOPER PORTAL
-Paste directly BELOW Part 2E inside index.html
-========================================================= -->
-
-<!-- Tenant Management -->
-
-<div id="tenantPanel">
-
-    <div class="panel-header">
-
-        <h2>
-            Tenant Management
-        </h2>
-
-    </div>
-
-    <div class="panel-content">
-
-        <button id="createTenantButton">
-            Create Tenant
-        </button>
-
-        <div id="tenantList">
+        <div id="memoryList"
+             class="modal-body">
 
         </div>
 
@@ -1098,21 +1245,27 @@ Paste directly BELOW Part 2E inside index.html
 
 </div>
 
-<!-- Department Budgets -->
+<!-- ================================================= -->
+<!-- PROVIDER DIAGNOSTICS -->
+<!-- ================================================= -->
 
-<div id="departmentBudgetPanel">
+<div id="diagnosticsModal"
+     class="modal">
 
-    <div class="panel-header">
+    <div class="modal-content extra-large-modal">
 
-        <h2>
-            Department Budgets
-        </h2>
+        <div class="modal-header">
 
-    </div>
+            <h2>Provider Diagnostics</h2>
 
-    <div class="panel-content">
+            <button class="close-modal">
+                ✕
+            </button>
 
-        <div id="departmentBudgetTable">
+        </div>
+
+        <div id="providerDiagnostics"
+             class="modal-body">
 
         </div>
 
@@ -1120,188 +1273,221 @@ Paste directly BELOW Part 2E inside index.html
 
 </div>
 
-<!-- Invoice Center -->
+<!-- ================================================= -->
+<!-- COMMAND PALETTE -->
+<!-- ================================================= -->
 
-<div id="invoicePanel">
+<div id="commandPalette"
+     class="command-palette hidden">
 
-    <div class="panel-header">
+    <input type="text"
+           placeholder="Type a command...">
 
-        <h2>
-            Invoices
-        </h2>
+    <div id="commandResults">
 
-    </div>
+        <div class="command-item">
+            New Chat
+        </div>
 
-    <div class="panel-content">
+        <div class="command-item">
+            Deep Research
+        </div>
 
-        <button id="generateInvoiceButton">
-            Generate Invoice
-        </button>
+        <div class="command-item">
+            Search Chats
+        </div>
 
-        <div id="invoiceList">
-
+        <div class="command-item">
+            Settings
         </div>
 
     </div>
 
 </div>
 
-<!-- Compliance Center -->
+<!-- ================================================= -->
+<!-- NOTIFICATION CENTER -->
+<!-- ================================================= -->
 
-<div id="compliancePanel">
+<div id="notificationCenter"
+     class="notification-center hidden">
 
     <div class="panel-header">
 
-        <h2>
-            Compliance
-        </h2>
+        <h2>Notifications</h2>
 
     </div>
 
-    <div class="panel-content">
-
-        <div id="complianceStatus">
-
-        </div>
+    <div id="notificationList">
 
     </div>
 
 </div>
 
-<!-- SSO Configuration -->
+<!-- ================================================= -->
+<!-- QUICK ACTION BUTTON -->
+<!-- ================================================= -->
 
-<div id="ssoPanel">
+<div id="quickAccessFab"
+     class="quick-fab">
 
-    <div class="panel-header">
+    <button>
 
-        <h2>
-            SSO / SAML / OAuth
-        </h2>
+        <i class="fa-solid fa-bolt"></i>
 
-    </div>
+    </button>
 
-    <div class="panel-content">
+</div>
 
-        <button id="configureSSOButton">
-            Configure SSO
-        </button>
+<!-- ================================================= -->
+<!-- GLOBAL LOADING OVERLAY -->
+<!-- ================================================= -->
+
+<div id="globalLoadingOverlay"
+     class="global-loading hidden">
+
+    <div class="loader-card">
+
+        <div class="loader-spinner"></div>
+
+        <span>
+            Processing...
+        </span>
 
     </div>
 
 </div>
 
-<!-- Developer Portal -->
+<script src="app.js"></script>
 
-<div id="developerPanel">
+</body>
+</html>
+<!-- ================================================= -->
+<!-- PWA + SEO + FUTURE FEATURES -->
+<!-- ================================================= -->
 
-    <div class="panel-header">
+<link rel="manifest" href="manifest.json">
 
-        <h2>
-            Developer Portal
-        </h2>
+<meta name="theme-color"
+      content="#ff7b00">
 
-    </div>
+<meta property="og:title"
+      content="Nova AI">
 
-    <div class="panel-content">
+<meta property="og:description"
+      content="Multi-provider AI platform powered by AI, research, finance, sports, weather, movies, knowledge and web intelligence.">
 
-        <button id="apiDocsButton">
-            API Documentation
-        </button>
+<meta property="og:type"
+      content="website">
 
-        <button id="sdkDocsButton">
-            SDK Documentation
-        </button>
+<meta property="og:image"
+      content="logo.png">
 
-        <button id="examplesButton">
-            Code Examples
-        </button>
+<meta name="twitter:card"
+      content="summary_large_image">
 
-        <button id="changelogButton">
-            Changelog
-        </button>
+<meta name="twitter:title"
+      content="Nova AI">
 
-    </div>
+<meta name="twitter:description"
+      content="Advanced AI Assistant with 25 integrated intelligence sources.">
+
+<link rel="icon"
+      href="favicon.ico">
+
+<script>
+
+window.APP_CONFIG = {
+
+    appName: "Nova AI",
+
+    version: "1.0.0",
+
+    ownerEmails: [
+
+        "alvinogthegreat177@gmail.com",
+
+        "alvinogthegreat177@outlook.com"
+
+    ],
+
+    features: {
+
+        chat: true,
+
+        memory: true,
+
+        webSearch: true,
+
+        deepResearch: true,
+
+        citations: true,
+
+        notifications: true,
+
+        diagnostics: true,
+
+        exportChats: true,
+
+        profileSystem: true,
+
+        financeHub: true,
+
+        sportsHub: true,
+
+        weatherHub: true,
+
+        moviesHub: true,
+
+        wolframHub: true,
+
+        wikipedia: true,
+
+        dictionary: true,
+
+        commandPalette: true,
+
+        voiceInput: true,
+
+        fileUploads: true,
+
+        imageUploads: true
+
+    }
+
+};
+
+</script>
+
+<!-- ================================================= -->
+<!-- FUTURE FEATURE CONTAINERS -->
+<!-- ================================================= -->
+
+<div id="voiceWorkspace"
+     class="workspace hidden">
 
 </div>
 
-<!-- Global Infrastructure -->
-
-<div id="infrastructurePanel">
-
-    <div class="panel-header">
-
-        <h2>
-            Infrastructure
-        </h2>
-
-    </div>
-
-    <div class="panel-content">
-
-        <div id="regionStatus">
-
-        </div>
-
-        <div id="failoverStatus">
-
-        </div>
-
-        <div id="backupStatus">
-
-        </div>
-
-    </div>
+<div id="agentsWorkspace"
+     class="workspace hidden">
 
 </div>
 
-<!-- Production Readiness -->
-
-<div id="productionPanel">
-
-    <div class="panel-header">
-
-        <h2>
-            Production Readiness
-        </h2>
-
-    </div>
-
-    <div class="panel-content">
-
-        <div id="readinessChecklist">
-
-        </div>
-
-    </div>
+<div id="teamWorkspace"
+     class="workspace hidden">
 
 </div>
 
-<!-- =========================================================
-PART 2F DELIVERABLE
+<div id="sharedChatsWorkspace"
+     class="workspace hidden">
 
-Tenant Isolation
-Workspace Management
-Department Budgets
-Cost Attribution
-Invoice Generation
-Compliance Controls
-Audit Retention
-SSO
-SAML
-OAuth
-Developer Portal
-API Documentation
-SDK Documentation
-Code Examples
-Changelog
-Global Infrastructure
-Multi Region Deployment
-Disaster Recovery
-Backup Management
-Failover Monitoring
-Production Readiness
+</div>
 
-SCRIPT 2 COMPLETE
-Ready For SCRIPT 3 PART 3A
-========================================================= -->
+<div id="futureToolsWorkspace"
+     class="workspace hidden">
 
+</div>
+
+<!-- ================================================= -->
+<!-- END OF NOVA AI HTML -->
+<!-- ================================================= -->
