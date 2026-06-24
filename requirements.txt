@@ -4,5 +4,64 @@ sqlalchemy
 pydantic
 pydantic-settings
 python-dotenv
+app
+requests
+# Core Backend
+fastapi
+uvicorn[standard]
+
+# Data Models
+pydantic
+pydantic-settings
+
+# HTTP Requests
 httpx
 requests
+
+# Environment Variables
+python-dotenv
+
+# Authentication & Security
+passlib[bcrypt]
+bcrypt
+python-jose[cryptography]
+
+# File Uploads
+python-multipart
+
+# Async Support
+aiofiles
+
+# Date & Time
+python-dateutil
+
+# Wikipedia
+wikipedia-api
+
+# News / Research Parsing
+beautifulsoup4
+lxml
+
+# Logging & Monitoring
+loguru
+
+# Optional Database (future)
+sqlalchemy
+
+# Optional Production Server
+gunicorn
+
+# JSON Utilities
+orjson
+
+# Retry Logic
+tenacity
+
+# Weather / Finance / APIs
+cachetools
+
+# OpenAI
+openai
+
+# Extra Utilities
+typing-extensions
