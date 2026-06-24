@@ -23,6 +23,69 @@ class TimestampMixin:
 
 
 class SystemInfo(Base, TimestampMixin):
+from sqlalchemy import Boolean
+from sqlalchemy import Text
+
+
+class AIProvider(Base, TimestampMixin):
+    __tablename__ = "ai_providers"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    name = Column(
+        String(100),
+        nullable=False,
+        unique=True,
+    )
+
+    enabled = Column(
+        Boolean,
+        default=True,
+        nullable=False,
+    )
+
+    base_url = Column(
+        String(500),
+        nullable=False,
+    )
+
+    description = Column(
+        Text,
+        nullable=True,
+    )
+
+
+class AIRequestLog(Base, TimestampMixin):
+    __tablename__ = "ai_request_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    provider = Column(
+        String(100),
+        nullable=False,
+    )
+
+    model = Column(
+        String(255),
+        nullable=True,
+    )
+
+    prompt = Column(
+        Text,
+        nullable=False,
+    )
+
+    response = Column(
+        Text,
+        nullable=True,
+    )
+
+    success = Column(
+        Boolean,
+        default=True,
+        nullable=False,
+    )
+    
     __tablename__ = "system_info"
 
     id = Column(Integer, primary_key=True, index=True)
