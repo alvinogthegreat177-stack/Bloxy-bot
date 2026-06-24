@@ -94,9 +94,11 @@ async def health():
         "status": "healthy",
         "service": settings.APP_NAME,
     }
-    @app.get("/ai/providers/health")
+
+
+@app.get("/ai/providers/health")
 async def provider_health():
-    results = {}
+    return {}
 
     async with httpx.AsyncClient(timeout=10.0) as client:
 
