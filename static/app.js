@@ -3,25 +3,14 @@
 /* ================================================= */
 
 const AppState = {
-
-```
-chats: [],
-
-currentChatId: null,
-
-currentModel: "auto",
-
-theme: localStorage.getItem("nova_theme") || "dark",
-
-user: null,
-
-providers: {},
-
-memories: [],
-
-notifications: []
-```
-
+    chats: [],
+    currentChatId: null,
+    currentModel: "auto",
+    theme: localStorage.getItem("nova_theme") || "dark",
+    user: null,
+    providers: {},
+    memories: [],
+    notifications: []
 };
 
 /* ================================================= */
