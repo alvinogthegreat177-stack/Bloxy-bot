@@ -1702,8 +1702,6 @@ If uncertain, say so.
 
 Never invent facts.
 
-"""
-
 Always provide accurate, helpful responses.
 
 """
