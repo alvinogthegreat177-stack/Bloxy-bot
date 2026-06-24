@@ -1,5 +1,5 @@
 # =================================================
-# NOVA AI - APP.PY PART 1
+# BLOXY-BOT AI - APP.PY PART 1
 # IMPORTS + CONFIGURATION + ENVIRONMENT
 # =================================================
 
