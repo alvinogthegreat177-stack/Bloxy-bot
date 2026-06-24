@@ -36,7 +36,6 @@ from fastapi.templating import Jinja2Templates
 
 app = FastAPI()
 
-
 app.mount(
     "/static",
     StaticFiles(directory="static"),
@@ -46,6 +45,13 @@ app.mount(
 templates = Jinja2Templates(
     directory="templates"
 )
+
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request}
+    )
 
 # =================================================
 # LOAD ENVIRONMENT
@@ -312,7 +318,7 @@ app = FastAPI(
     version=APP_VERSION,
 
     description=
-    "Nova AI Multi-Provider Intelligence Platform"
+    "Bloxy-bot AI Multi-Provider Intelligence Platform"
 
 )
 
