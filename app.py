@@ -4,6 +4,10 @@
 # =================================================
 
 import os
+
+print("Current directory:", os.getcwd())
+print("Files:", os.listdir("."))
+
 import json
 import uuid
 import time
