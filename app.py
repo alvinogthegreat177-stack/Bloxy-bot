@@ -30,6 +30,18 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+app.mount(
+    "/static",
+    StaticFiles(directory="static"),
+    name="static"
+)
+
+templates = Jinja2Templates(
+    directory="templates"
+)
 
 # =================================================
 # LOAD ENVIRONMENT
