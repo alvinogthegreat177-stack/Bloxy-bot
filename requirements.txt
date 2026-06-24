@@ -5,6 +5,8 @@ pydantic
 pydantic-settings
 python-dotenv
 app
+static
+jinja2
 requests
 # Core Backend
 fastapi
