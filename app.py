@@ -433,41 +433,7 @@ async def shutdown_event():
 
         await http_client.aclose()
 
-# =================================================
-# ROOT
-# =================================================
 
-@app.get(
-    "/",
-    response_class=HTMLResponse
-)
-async def root():
-
-    try:
-
-        if os.path.exists(
-            "index.html"
-        ):
-
-            with open(
-                "index.html",
-                "r",
-                encoding="utf-8"
-            ) as f:
-
-                return HTMLResponse(
-                    f.read()
-                )
-
-        return HTMLResponse(
-            "<h1>Nova AI Online</h1>"
-        )
-
-    except Exception as e:
-
-        return HTMLResponse(
-            str(e)
-        )
 
 # =================================================
 # HEALTH
