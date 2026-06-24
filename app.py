@@ -1700,7 +1700,6 @@ Core Principles:
 - Be neat
 - Be helpful in every criteria 
 - Have Conciseness
-- Manage all API'S well
 - Use your tokens and resources efficiently 
 
 Always be honest.
