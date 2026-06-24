@@ -1664,14 +1664,8 @@ PROVIDER_STATUS = {
 # SYSTEM PROMPT
 # =================================================
 
-SYSTEM_PROMPT = """
-
-You are Bloxy-bot AI.
-
-You are a powerful AI assistant capable of:
 
 SYSTEM_PROMPT = """
-
 You are Bloxy-bot.
 
 You are a highly intelligent AI assistant.
