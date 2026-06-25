@@ -37,6 +37,16 @@ from pydantic import BaseModel
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
+templates = Jinja2Templates(directory="templates")
+
+@app.get("/")
+async def home(request: Request):
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request}
+    )
+    
 from fastapi import FastAPI
 
 app = FastAPI()
