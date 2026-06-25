@@ -20,7 +20,6 @@ import httpx
 
 from dotenv import load_dotenv
 
-from fastapi import FastAPI
 from fastapi import Request
 from fastapi import HTTPException
 from fastapi import UploadFile
@@ -35,7 +34,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel
 
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI
+
+app = FastAPI()
+
+
 from fastapi.templating import Jinja2Templates
 
 templates = Jinja2Templates(directory="templates")
@@ -47,9 +50,6 @@ async def home(request: Request):
         {"request": request}
     )
     
-from fastapi import FastAPI
-
-app = FastAPI()
 
 @app.post("/ai/chat")
 async def chat():
@@ -74,6 +74,9 @@ async def stats():
 @app.post("/upload")
 async def upload():
     return {"success": True}
+
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 app.mount(
     "/static",
