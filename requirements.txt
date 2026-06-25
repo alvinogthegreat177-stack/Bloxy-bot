@@ -1,14 +1,12 @@
 fastapi
-uvicorn
-sqlalchemy
-httpx
-pydantic
-pydantic-settings
-python-dotenv
-app
-static
+uvicorn[standard]
 jinja2
+python-dotenv
+httpx
 requests
+python-multipart
+aiofiles
+...
 # Core Backend
 fastapi
 uvicorn[standard]
