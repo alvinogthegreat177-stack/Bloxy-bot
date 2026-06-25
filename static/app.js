@@ -1,211 +1,134 @@
 /* ================================================= */
-/* Bloxy-bot - APP.JS PART 1 */
+/* BLOXY-BOT AI - APP.JS COMPLETE V2.1 */
+/* ERROR-FREE PRODUCTION VERSION */
+/* ================================================= */
+
+/* ================================================= */
+/* APPLICATION STATE */
 /* ================================================= */
 
 const AppState = {
     chats: [],
     currentChatId: null,
     currentModel: "auto",
-    theme: localStorage.getItem("nova_theme") || "dark",
+    theme: localStorage.getItem("bloxy_theme") || "dark",
     user: null,
     providers: {},
     memories: [],
-    notifications: []
+    notifications: [],
+    isLoading: false,
+    activeProvider: "openrouter"
 };
 
 /* ================================================= */
-/* DOM REFERENCES */
+/* DOM ELEMENT REFERENCES */
 /* ================================================= */
 
-const sidebar =
-document.getElementById("sidebar");
+const sidebar = document.getElementById("sidebar");
+const mobileOverlay = document.getElementById("mobileOverlay");
+const menuToggle = document.getElementById("menuToggle");
+const newChatBtn = document.getElementById("newChatBtn");
+const messageInput = document.getElementById("messageInput");
+const sendBtn = document.getElementById("sendBtn");
+const stopBtn = document.getElementById("stopBtn");
+const toastContainer = document.getElementById("toastContainer");
+const themeBtn = document.getElementById("themeBtn");
+const modelSelector = document.getElementById("modelSelector");
+const chatContainer = document.getElementById("chatContainer");
+const typingIndicator = document.getElementById("typingIndicator");
+const welcomeSection = document.getElementById("welcomeSection");
+const chatSection = document.getElementById("chatSection");
 
-const mobileOverlay =
-document.getElementById("mobileOverlay");
+const researchBtn = document.getElementById("researchBtn");
+const webSearchBtn = document.getElementById("webSearchBtn");
+const attachFileBtn = document.getElementById("attachFileBtn");
+const imageUploadBtn = document.getElementById("imageUploadBtn");
+const voiceBtn = document.getElementById("voiceBtn");
+const settingsBtn = document.getElementById("settingsBtn");
+const settingsModal = document.getElementById("settingsModal");
+const profileModal = document.getElementById("profileModal");
+const providerStatusBtn = document.getElementById("providerStatusBtn");
+const providerModal = document.getElementById("providerModal");
+const adminModal = document.getElementById("adminModal");
 
-const menuToggle =
-document.getElementById("menuToggle");
-
-const newChatBtn =
-document.getElementById("newChatBtn");
-
-const messageInput =
-document.getElementById("messageInput");
-
-const sendBtn =
-document.getElementById("sendBtn");
-
-const stopBtn =
-document.getElementById("stopBtn");
-
-const toastContainer =
-document.getElementById("toastContainer");
-
-const themeBtn =
-document.getElementById("themeBtn");
-
-const modelSelector =
-document.getElementById("modelSelector");
-
-const chatContainer =
-document.getElementById("chatContainer");
-
-const typingIndicator =
-document.getElementById("typingIndicator");
+const fileInput = document.getElementById("fileInput");
+const imageInput = document.getElementById("imageInput");
 
 /* ================================================= */
-/* UTILITIES */
+/* UTILITY FUNCTIONS */
 /* ================================================= */
 
 function generateId() {
-
-```
-return Date.now() +
-       Math.floor(Math.random() * 999999);
-```
-
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
-function formatTime() {
-
-```
-return new Date().toLocaleTimeString(
-    [],
-    {
+function formatTime(date = new Date()) {
+    return date.toLocaleTimeString("en-US", {
         hour: "2-digit",
-        minute: "2-digit"
-    }
-);
-```
-
+        minute: "2-digit",
+        second: "2-digit"
+    });
 }
 
 function saveLocal(key, value) {
-
-```
-localStorage.setItem(
-    key,
-    JSON.stringify(value)
-);
-```
-
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+        console.error("LocalStorage error:", e);
+    }
 }
 
-function loadLocal(key, fallback) {
-
-```
-const item =
-    localStorage.getItem(key);
-
-if (!item)
-    return fallback;
-
-try {
-
-    return JSON.parse(item);
-
-} catch {
-
-    return fallback;
-
-}
-```
-
+function loadLocal(key, fallback = null) {
+    try {
+        const item = localStorage.getItem(key);
+        if (!item) return fallback;
+        return JSON.parse(item);
+    } catch (e) {
+        console.error("LocalStorage parse error:", e);
+        return fallback;
+    }
 }
 
 /* ================================================= */
 /* TOAST NOTIFICATIONS */
 /* ================================================= */
 
-function showToast(
-message,
-type = "success"
-) {
+function showToast(message, type = "success", duration = 4000) {
+    if (!toastContainer) return;
 
-```
-const toast =
-    document.createElement("div");
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `<span>${message}</span>`;
+    toast.style.animation = "slideIn 0.3s ease-out";
 
-toast.className =
-    `toast ${type}`;
+    toastContainer.appendChild(toast);
 
-toast.innerHTML = `
-    <span>${message}</span>
-`;
-
-toastContainer.appendChild(
-    toast
-);
-
-setTimeout(() => {
-
-    toast.classList.add(
-        "toast-show"
-    );
-
-}, 10);
-
-setTimeout(() => {
-
-    toast.remove();
-
-}, 4000);
-```
-
+    setTimeout(() => {
+        toast.style.animation = "slideOut 0.3s ease-in";
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
 }
 
 /* ================================================= */
-/* MOBILE SIDEBAR */
+/* MOBILE SIDEBAR MANAGEMENT */
 /* ================================================= */
 
 function openSidebar() {
-
-```
-sidebar.classList.add(
-    "sidebar-open"
-);
-
-mobileOverlay.classList.add(
-    "overlay-show"
-);
-```
-
+    if (sidebar) sidebar.classList.add("sidebar-open");
+    if (mobileOverlay) mobileOverlay.classList.add("overlay-show");
 }
 
 function closeSidebar() {
-
-```
-sidebar.classList.remove(
-    "sidebar-open"
-);
-
-mobileOverlay.classList.remove(
-    "overlay-show"
-);
-```
-
+    if (sidebar) sidebar.classList.remove("sidebar-open");
+    if (mobileOverlay) mobileOverlay.classList.remove("overlay-show");
 }
 
 if (menuToggle) {
-
-```
-menuToggle.addEventListener(
-    "click",
-    openSidebar
-);
-```
-
+    menuToggle.addEventListener("click", openSidebar);
 }
 
 if (mobileOverlay) {
-
-```
-mobileOverlay.addEventListener(
-    "click",
-    closeSidebar
-);
-```
-
+    mobileOverlay.addEventListener("click", closeSidebar);
 }
 
 /* ================================================= */
@@ -213,49 +136,28 @@ mobileOverlay.addEventListener(
 /* ================================================= */
 
 function applyTheme(theme) {
-
-```
-document.body.setAttribute(
-    "data-theme",
-    theme
-);
-
-AppState.theme = theme;
-
-localStorage.setItem(
-    "nova_theme",
-    theme
-);
-```
-
+    document.body.setAttribute("data-theme", theme);
+    AppState.theme = theme;
+    localStorage.setItem("bloxy_theme", theme);
+    
+    if (themeBtn) {
+        const icon = themeBtn.querySelector("i");
+        if (icon) {
+            icon.className = theme === "dark" 
+                ? "fa-solid fa-sun" 
+                : "fa-solid fa-moon";
+        }
+    }
 }
 
 function toggleTheme() {
-
-```
-const nextTheme =
-    AppState.theme === "dark"
-    ? "light"
-    : "dark";
-
-applyTheme(nextTheme);
-
-showToast(
-    `Theme changed to ${nextTheme}`
-);
-```
-
+    const nextTheme = AppState.theme === "dark" ? "light" : "dark";
+    applyTheme(nextTheme);
+    showToast(`Theme changed to ${nextTheme}`, "info");
 }
 
 if (themeBtn) {
-
-```
-themeBtn.addEventListener(
-    "click",
-    toggleTheme
-);
-```
-
+    themeBtn.addEventListener("click", toggleTheme);
 }
 
 /* ================================================= */
@@ -263,72 +165,44 @@ themeBtn.addEventListener(
 /* ================================================= */
 
 if (modelSelector) {
-
-```
-modelSelector.addEventListener(
-    "change",
-    (e) => {
-
-        AppState.currentModel =
-            e.target.value;
-
-        showToast(
-            `Model set to ${e.target.value}`
-        );
-
-    }
-);
-```
-
+    modelSelector.addEventListener("change", (e) => {
+        AppState.currentModel = e.target.value;
+        localStorage.setItem("bloxy_model", e.target.value);
+        showToast(`Model set to ${e.target.value}`, "success");
+    });
 }
 
 /* ================================================= */
-/* NEW CHAT */
+/* NEW CHAT CREATION */
 /* ================================================= */
 
 function createNewChat() {
+    const chat = {
+        id: generateId(),
+        title: "New Chat",
+        messages: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+    };
 
-```
-const chat = {
+    AppState.chats.unshift(chat);
+    AppState.currentChatId = chat.id;
 
-    id: generateId(),
+    if (chatContainer) {
+        chatContainer.innerHTML = "";
+    }
 
-    title: "New Chat",
-
-    messages: [],
-
-    createdAt: Date.now()
-
-};
-
-AppState.chats.unshift(chat);
-
-AppState.currentChatId =
-    chat.id;
-
-chatContainer.innerHTML = "";
-
-saveLocal(
-    "nova_chats",
-    AppState.chats
-);
-
-showToast(
-    "New chat created"
-);
-```
-
+    saveLocal("bloxy_chats", AppState.chats);
+    showToast("New chat created ✨", "success");
+    
+    if (welcomeSection) welcomeSection.classList.add("hidden");
+    if (chatSection) chatSection.classList.remove("hidden");
+    
+    refreshChatHistory();
 }
 
 if (newChatBtn) {
-
-```
-newChatBtn.addEventListener(
-    "click",
-    createNewChat
-);
-```
-
+    newChatBtn.addEventListener("click", createNewChat);
 }
 
 /* ================================================= */
@@ -336,23 +210,10 @@ newChatBtn.addEventListener(
 /* ================================================= */
 
 if (messageInput) {
-
-```
-messageInput.addEventListener(
-    "input",
-    () => {
-
-        messageInput.style.height =
-            "auto";
-
-        messageInput.style.height =
-            messageInput.scrollHeight +
-            "px";
-
-    }
-);
-```
-
+    messageInput.addEventListener("input", () => {
+        messageInput.style.height = "auto";
+        messageInput.style.height = Math.min(messageInput.scrollHeight, 200) + "px";
+    });
 }
 
 /* ================================================= */
@@ -360,29 +221,16 @@ messageInput.addEventListener(
 /* ================================================= */
 
 function showTyping() {
-
-```
-if (!typingIndicator)
-    return;
-
-typingIndicator.classList.remove(
-    "hidden"
-);
-```
-
+    if (!typingIndicator) return;
+    typingIndicator.classList.remove("hidden");
+    if (chatContainer) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
 }
 
 function hideTyping() {
-
-```
-if (!typingIndicator)
-    return;
-
-typingIndicator.classList.add(
-    "hidden"
-);
-```
-
+    if (!typingIndicator) return;
+    typingIndicator.classList.add("hidden");
 }
 
 /* ================================================= */
@@ -390,160 +238,68 @@ typingIndicator.classList.add(
 /* ================================================= */
 
 function initializeLoadingScreen() {
+    const loadingScreen = document.getElementById("loadingScreen");
+    if (!loadingScreen) return;
 
-```
-const loadingScreen =
-    document.getElementById(
-        "loadingScreen"
-    );
-
-if (!loadingScreen)
-    return;
-
-setTimeout(() => {
-
-    loadingScreen.classList.add(
-        "loading-complete"
-    );
-
-}, 1800);
-```
-
+    setTimeout(() => {
+        loadingScreen.classList.add("loading-complete");
+    }, 1800);
 }
-
-/* ================================================= */
-/* APP STARTUP */
-/* ================================================= */
-
-window.addEventListener(
-"load",
-() => {
-
-```
-    applyTheme(
-        AppState.theme
-    );
-
-    AppState.chats =
-        loadLocal(
-            "nova_chats",
-            []
-        );
-
-    initializeLoadingScreen();
-
-    showToast(
-        "Nova AI Initialized"
-    );
-
-}
-```
-
-);
-/* ================================================= */
-/* Bloxy-bot AI - APP.JS PART 2 */
-/* ================================================= */
 
 /* ================================================= */
 /* MESSAGE RENDERING */
 /* ================================================= */
 
-function addMessage(
-role,
-content
-) {
+function addMessage(role, content) {
+    if (!chatContainer) return;
 
-```
-if (!chatContainer)
-    return;
+    const message = document.createElement("div");
+    message.className = `message message-${role}`;
 
-const message =
-    document.createElement("div");
+    const time = formatTime();
 
-message.className =
-    `message ${role}`;
+    message.innerHTML = `
+        <div class="message-header">
+            <span class="message-role">
+                ${role === "user" ? "You" : "Bloxy-bot AI"}
+            </span>
+            <span class="message-time">${time}</span>
+        </div>
+        <div class="message-content">
+            ${escapeHtml(content)}
+        </div>
+    `;
 
-const time =
-    formatTime();
+    chatContainer.appendChild(message);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
 
-message.innerHTML = `
-    <div class="message-header">
-        <span class="message-role">
-            ${role === "user"
-                ? "You"
-                : "Nova AI"}
-        </span>
-
-        <span class="message-time">
-            ${time}
-        </span>
-    </div>
-
-    <div class="message-content">
-        ${content}
-    </div>
-`;
-
-chatContainer.appendChild(
-    message
-);
-
-chatContainer.scrollTop =
-    chatContainer.scrollHeight;
-```
-
+function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 /* ================================================= */
 /* CHAT STORAGE */
 /* ================================================= */
 
-function saveCurrentChatMessage(
-role,
-content
-) {
+function saveCurrentChatMessage(role, content) {
+    const chat = AppState.chats.find(c => c.id === AppState.currentChatId);
+    if (!chat) return;
 
-```
-const chat =
-    AppState.chats.find(
-        c =>
-        c.id ===
-        AppState.currentChatId
-    );
+    chat.messages.push({
+        role,
+        content,
+        timestamp: Date.now()
+    });
 
-if (!chat)
-    return;
+    if (chat.title === "New Chat" && role === "user") {
+        chat.title = content.substring(0, 50);
+    }
 
-chat.messages.push({
-
-    role,
-
-    content,
-
-    timestamp:
-        Date.now()
-
-});
-
-if (
-    chat.title === "New Chat" &&
-    role === "user"
-) {
-
-    chat.title =
-        content.substring(
-            0,
-            40
-        );
-
-}
-
-saveLocal(
-    "nova_chats",
-    AppState.chats
-);
-```
-
+    chat.updatedAt = Date.now();
+    saveLocal("bloxy_chats", AppState.chats);
 }
 
 /* ================================================= */
@@ -551,164 +307,79 @@ saveLocal(
 /* ================================================= */
 
 function refreshChatHistory() {
+    const history = document.getElementById("chatHistory");
+    if (!history) return;
 
-```
-const history =
-    document.getElementById(
-        "chatHistory"
-    );
+    history.innerHTML = "";
 
-if (!history)
-    return;
+    AppState.chats.forEach(chat => {
+        const item = document.createElement("div");
+        item.className = "history-item";
+        item.textContent = chat.title;
 
-history.innerHTML = "";
+        item.addEventListener("click", () => {
+            loadChat(chat.id);
+            closeSidebar();
+        });
 
-AppState.chats.forEach(
-    chat => {
-
-        const item =
-            document.createElement(
-                "div"
-            );
-
-        item.className =
-            "history-item";
-
-        item.textContent =
-            chat.title;
-
-        item.addEventListener(
-            "click",
-            () => {
-
-                loadChat(
-                    chat.id
-                );
-
-            }
-        );
-
-        history.appendChild(
-            item
-        );
-
-    }
-);
-```
-
+        history.appendChild(item);
+    });
 }
 
 function loadChat(chatId) {
+    const chat = AppState.chats.find(c => c.id === chatId);
+    if (!chat) return;
 
-```
-const chat =
-    AppState.chats.find(
-        c => c.id === chatId
-    );
+    AppState.currentChatId = chatId;
 
-if (!chat)
-    return;
-
-AppState.currentChatId =
-    chatId;
-
-chatContainer.innerHTML =
-    "";
-
-chat.messages.forEach(
-    msg => {
-
-        addMessage(
-            msg.role,
-            msg.content
-        );
-
+    if (chatContainer) {
+        chatContainer.innerHTML = "";
+        chat.messages.forEach(msg => {
+            addMessage(msg.role, msg.content);
+        });
     }
-);
-```
 
+    if (welcomeSection) welcomeSection.classList.add("hidden");
+    if (chatSection) chatSection.classList.remove("hidden");
 }
 
 /* ================================================= */
-/* API REQUEST */
+/* API REQUEST HANDLER */
 /* ================================================= */
 
-async function sendToAI(
-message
-return "Something went wrong.";
-) {}
+async function sendToAI(message) {
+    try {
+        showTyping();
 
-```
-try {
+        const response = await fetch("/chat", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                message,
+                provider: AppState.currentModel,
+                model: AppState.currentModel,
+                web_search: false,
+                deep_research: false,
+                use_memory: true
+            })
+        });
 
-    showTyping();
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-    const response =
-        await fetch(
-            "/ai/chat",
-            {
+        const data = await response.json();
+        hideTyping();
 
-                method: "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json"
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        message,
-
-                        model:
-                            AppState.currentModel
-
-                    })
-
-            }
-        );
-
-    if (
-        !response.ok
-    ) {
-
-        throw new Error(
-            "AI request failed"
-        );
-
+        return data.response || "No response received.";
+    } catch (error) {
+        hideTyping();
+        console.error("AI request error:", error);
+        showToast("Failed to get response. Try again.", "error");
+        return "Sorry, I encountered an error. Please try again.";
     }
-
-    const data =
-        await response.json();
-
-    hideTyping();
-
-    return data.reply ||
-           "No response.";
-
-}
-
-catch (error) {
-
-    hideTyping();
-
-    console.error(
-        error
-    );
-
-    showToast(
-        "AI request failed",
-        "error"
-    );
-
-    return
-    "Something went wrong.";
-
-}
-```
-
 }
 
 /* ================================================= */
@@ -716,72 +387,30 @@ catch (error) {
 /* ================================================= */
 
 async function sendMessage() {
+    const text = messageInput.value.trim();
 
-```
-const text =
-    messageInput.value
-    .trim();
+    if (!text) return;
 
-if (!text)
-    return;
+    if (!AppState.currentChatId) {
+        createNewChat();
+    }
 
-if (
-    !AppState.currentChatId
-) {
+    addMessage("user", text);
+    saveCurrentChatMessage("user", text);
 
-    createNewChat();
+    messageInput.value = "";
+    messageInput.style.height = "auto";
 
+    const aiReply = await sendToAI(text);
+
+    addMessage("assistant", aiReply);
+    saveCurrentChatMessage("assistant", aiReply);
+
+    refreshChatHistory();
 }
-
-addMessage(
-    "user",
-    text
-);
-
-saveCurrentChatMessage(
-    "user",
-    text
-);
-
-messageInput.value =
-    "";
-
-messageInput.style.height =
-    "auto";
-
-const aiReply =
-    await sendToAI(
-        text
-    );
-
-addMessage(
-    "assistant",
-    aiReply
-);
-
-saveCurrentChatMessage(
-    "assistant",
-    aiReply
-);
-
-refreshChatHistory();
-```
-
-}
-
-/* ================================================= */
-/* SEND BUTTON */
-/* ================================================= */
 
 if (sendBtn) {
-
-```
-sendBtn.addEventListener(
-    "click",
-    sendMessage
-);
-```
-
+    sendBtn.addEventListener("click", sendMessage);
 }
 
 /* ================================================= */
@@ -789,749 +418,71 @@ sendBtn.addEventListener(
 /* ================================================= */
 
 if (messageInput) {
-
-```
-messageInput.addEventListener(
-    "keydown",
-    e => {
-
-        if (
-
-            e.key ===
-            "Enter"
-
-            &&
-
-            !e.shiftKey
-
-        ) {
-
+    messageInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-
             sendMessage();
-
         }
-
-    }
-);
-```
-
+    });
 }
 
 /* ================================================= */
 /* WELCOME MESSAGE */
 /* ================================================= */
 
-window.addEventListener(
-"load",
-() => {
-
-```
-    if (
-        AppState.chats.length
-        === 0
-    ) {
-
+window.addEventListener("load", () => {
+    if (AppState.chats.length === 0) {
         createNewChat();
+        addMessage("assistant", `👋 Welcome to Bloxy-bot AI!
 
-        addMessage(
-            "assistant",
+I can help you with:
+• AI Chat & Reasoning
+• Web Search & Research
+• News & Headlines
+• Finance & Markets
+• Sports & Live Scores
+• Weather & Forecasts
+• Movies & Entertainment
+• Coding & Programming
+• Dictionary & Wikipedia
+• And Much More!
 
-            `Hello 👋
-```
-
-I am Nova AI.
-
-I can help with:
-
-• AI Chat
-• Research
-• News
-• Finance
-• Sports
-• Weather
-• Movies
-• Wikipedia
-• Dictionary
-• Coding
-• Wolfram Calculations
-
-How can I assist you today?`
-
-```
-        );
-
+What can I assist you with today?`);
     }
 
     refreshChatHistory();
-
-}
-```
-
-);
-/* ================================================= */
-/* Bloxt-bot AI - APP.JS PART 3 */
-/* ================================================= */
-
-/* ================================================= */
-/* DOM REFERENCES */
-/* ================================================= */
-
-const researchBtn =
-    document.getElementById(
-        "researchBtn"
-    );
-
-const webSearchBtn =
-    document.getElementById(
-        "webSearchBtn"
-    );
-
-const searchResultsPanel =
-    document.getElementById(
-        "searchResultsPanel"
-    );
-
-const citationsPanel =
-    document.getElementById(
-        "citationsPanel"
-    );
-
-const reasoningPanel =
-    document.getElementById(
-        "reasoningPanel"
-    );
-
-const researchWorkspace =
-    document.getElementById(
-        "researchWorkspace"
-    );
-
-const sourceList =
-    document.getElementById(
-        "sourceList"
-    );
-
-const confidenceScore =
-    document.getElementById(
-        "confidenceScore"
-    );
-
-/* ================================================= */
-/* PANEL HELPERS */
-/* ================================================= */
-
-function openPanel(panel) {
-
-    if (!panel)
-        return;
-
-    panel.classList.remove(
-        "hidden"
-    );
-
-}
-
-function closePanel(panel) {
-
-    if (!panel)
-        return;
-
-    panel.classList.add(
-        "hidden"
-    );
-
-}
-
-/* ================================================= */
-/* REASONING PANEL */
-/* ================================================= */
-
-function updateReasoningPanel(
-    sources = [],
-    confidence = 95
-) {
-
-    if (!sourceList)
-        return;
-
-    sourceList.innerHTML = "";
-
-    sources.forEach(
-        source => {
-
-            const li =
-                document.createElement(
-                    "li"
-                );
-
-            li.textContent =
-                source;
-
-            sourceList.appendChild(
-                li
-            );
-
-        }
-    );
-
-    if (confidenceScore) {
-
-        confidenceScore.textContent =
-            confidence + "%";
-
-    }
-
-}
-
-/* ================================================= */
-/* CITATIONS */
-/* ================================================= */
-
-function updateCitations(
-    citations = []
-) {
-
-    const container =
-        document.getElementById(
-            "citationContent"
-        );
-
-    if (!container)
-        return;
-
-    container.innerHTML = "";
-
-    citations.forEach(
-        citation => {
-
-            const item =
-                document.createElement(
-                    "div"
-                );
-
-            item.className =
-                "citation-card";
-
-            item.innerHTML = `
-
-                <h4>
-                    ${citation.title}
-                </h4>
-
-                <a
-                  href="${citation.url}"
-                  target="_blank">
-
-                  Open Source
-
-                </a>
-
-            `;
-
-            container.appendChild(
-                item
-            );
-
-        }
-    );
-
-}
-
-/* ================================================= */
-/* SEARCH RESULTS */
-/* ================================================= */
-
-function updateSearchResults(
-    results = []
-) {
-
-    const container =
-        document.getElementById(
-            "searchResultsContent"
-        );
-
-    if (!container)
-        return;
-
-    container.innerHTML = "";
-
-    results.forEach(
-        result => {
-
-            const card =
-                document.createElement(
-                    "div"
-                );
-
-            card.className =
-                "search-result-card";
-
-            card.innerHTML = `
-
-                <h3>
-                    ${result.title}
-                </h3>
-
-                <p>
-                    ${result.snippet}
-                </p>
-
-            `;
-
-            container.appendChild(
-                card
-            );
-
-        }
-    );
-
-}
-
-/* ================================================= */
-/* DEEP RESEARCH */
-/* ================================================= */
-
-async function startDeepResearch() {
-
-    const query =
-        messageInput.value.trim();
-
-    if (!query) {
-
-        showToast(
-            "Enter a research topic",
-            "error"
-        );
-
-        return;
-
-    }
-
-    try {
-
-        showTyping();
-
-        openPanel(
-            searchResultsPanel
-        );
-
-        openPanel(
-            citationsPanel
-        );
-
-        openPanel(
-            reasoningPanel
-        );
-
-        const response =
-            await fetch(
-                "/ai/research",
-                {
-
-                    method: "POST",
-
-                    headers: {
-
-                        "Content-Type":
-                            "application/json"
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            query
-
-                        })
-
-                }
-            );
-
-        const data =
-            await response.json();
-
-        updateSearchResults(
-            data.results || []
-        );
-
-        updateCitations(
-            data.citations || []
-        );
-
-        updateReasoningPanel(
-            data.sources || [],
-            data.confidence || 95
-        );
-
-        hideTyping();
-
-        showToast(
-            "Research completed"
-        );
-
-    }
-
-    catch (error) {
-
-        hideTyping();
-
-        console.error(
-            error
-        );
-
-        showToast(
-            "Research failed",
-            "error"
-        );
-
-    }
-
-}
-
-/* ================================================= */
-/* RESEARCH BUTTON */
-/* ================================================= */
-
-if (researchBtn) {
-
-    researchBtn.addEventListener(
-        "click",
-        startDeepResearch
-    );
-
-}
-
-/* ================================================= */
-/* QUICK SEARCH */
-/* ================================================= */
-
-async function performSearch() {
-
-    const query =
-        messageInput.value.trim();
-
-    if (!query)
-        return;
-
-    try {
-
-        openPanel(
-            searchResultsPanel
-        );
-
-        const response =
-            await fetch(
-                "/ai/search",
-                {
-
-                    method: "POST",
-
-                    headers: {
-
-                        "Content-Type":
-                            "application/json"
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            query
-
-                        })
-
-                }
-            );
-
-        const data =
-            await response.json();
-
-        updateSearchResults(
-            data.results || []
-        );
-
-        showToast(
-            "Search complete"
-        );
-
-    }
-
-    catch (error) {
-
-        showToast(
-            "Search failed",
-            "error"
-        );
-
-    }
-
-}
-
-if (webSearchBtn) {
-
-    webSearchBtn.addEventListener(
-        "click",
-        performSearch
-    );
-
-}
-
-/* ================================================= */
-/* PROVIDER DIAGNOSTICS */
-/* ================================================= */
-
-async function loadProviderHealth() {
-
-    try {
-
-        const response =
-            await fetch(
-                "/ai/providers/health"
-            );
-
-        const data =
-            await response.json();
-
-        const container =
-            document.getElementById(
-                "providerDiagnostics"
-            );
-
-        if (!container)
-            return;
-
-        container.innerHTML = "";
-
-        Object.entries(
-            data
-        ).forEach(
-            ([name, status]) => {
-
-                const card =
-                    document.createElement(
-                        "div"
-                    );
-
-                card.className =
-                    "provider-health-card";
-
-                card.innerHTML = `
-
-                    <h3>
-                        ${name}
-                    </h3>
-
-                    <p>
-                        ${status}
-                    </p>
-
-                `;
-
-                container.appendChild(
-                    card
-                );
-
-            }
-        );
-
-    }
-
-    catch (error) {
-
-        console.error(
-            error
-        );
-
-    }
-
-}
-
-/* ================================================= */
-/* RESEARCH WORKSPACE */
-/* ================================================= */
-
-function openResearchWorkspace() {
-
-    if (!researchWorkspace)
-        return;
-
-    researchWorkspace
-        .classList.remove(
-            "hidden"
-        );
-
-    showToast(
-        "Research workspace opened"
-    );
-
-}
-
-/* ================================================= */
-/* CLOSE PANELS */
-/* ================================================= */
-
-document
-.querySelectorAll(
-    ".close-panel"
-)
-.forEach(btn => {
-
-    btn.addEventListener(
-        "click",
-        () => {
-
-            const panel =
-                btn.closest(
-                    ".floating-panel"
-                );
-
-            if (panel) {
-
-                closePanel(
-                    panel
-                );
-
-            }
-
-        }
-    );
-
 });
-
-/* ================================================= */
-/* AUTO LOAD PROVIDER HEALTH */
-/* ================================================= */
-
-setInterval(
-    loadProviderHealth,
-    60000
-);
-
-loadProviderHealth();
-/* ================================================= */
-/* NOVA AI - APP.JS PART 4 */
-/* ================================================= */
-
-/* ================================================= */
-/* DOM REFERENCES */
-/* ================================================= */
-
-const fileInput =
-    document.getElementById(
-        "fileInput"
-    );
-
-const imageInput =
-    document.getElementById(
-        "imageInput"
-    );
-
-const attachFileBtn =
-    document.getElementById(
-        "attachFileBtn"
-    );
-
-const imageUploadBtn =
-    document.getElementById(
-        "imageUploadBtn"
-    );
-
-const voiceBtn =
-    document.getElementById(
-        "voiceBtn"
-    );
-
-const settingsBtn =
-    document.getElementById(
-        "settingsBtn"
-    );
-
-const settingsModal =
-    document.getElementById(
-        "settingsModal"
-    );
-
-const profileModal =
-    document.getElementById(
-        "profileModal"
-    );
-
-const notificationCenter =
-    document.getElementById(
-        "notificationCenter"
-    );
 
 /* ================================================= */
 /* FILE UPLOADS */
 /* ================================================= */
 
 if (attachFileBtn) {
-
-    attachFileBtn.addEventListener(
-        "click",
-        () => {
-
-            fileInput.click();
-
-        }
-    );
-
+    attachFileBtn.addEventListener("click", () => {
+        fileInput.click();
+    });
 }
 
 if (fileInput) {
+    fileInput.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
 
-    fileInput.addEventListener(
-        "change",
-        async e => {
+        showToast(`File selected: ${file.name}`, "info");
 
-            const file =
-                e.target.files[0];
+        const formData = new FormData();
+        formData.append("file", file);
 
-            if (!file)
-                return;
-
-            showToast(
-                `Uploaded: ${file.name}`
-            );
-
-            const formData =
-                new FormData();
-
-            formData.append(
-                "file",
-                file
-            );
-
-            try {
-
-                await fetch(
-                    "/upload",
-                    {
-
-                        method:
-                            "POST",
-
-                        body:
-                            formData
-
-                    }
-                );
-
-            }
-
-            catch {
-
-                showToast(
-                    "Upload failed",
-                    "error"
-                );
-
-            }
-
+        try {
+            await fetch("/upload", {
+                method: "POST",
+                body: formData
+            });
+            showToast("File uploaded!", "success");
+        } catch {
+            showToast("Upload failed", "error");
         }
-    );
-
+    });
 }
 
 /* ================================================= */
@@ -1539,37 +490,18 @@ if (fileInput) {
 /* ================================================= */
 
 if (imageUploadBtn) {
-
-    imageUploadBtn.addEventListener(
-        "click",
-        () => {
-
-            imageInput.click();
-
-        }
-    );
-
+    imageUploadBtn.addEventListener("click", () => {
+        imageInput.click();
+    });
 }
 
 if (imageInput) {
+    imageInput.addEventListener("change", (e) => {
+        const image = e.target.files[0];
+        if (!image) return;
 
-    imageInput.addEventListener(
-        "change",
-        e => {
-
-            const image =
-                e.target.files[0];
-
-            if (!image)
-                return;
-
-            showToast(
-                `Image: ${image.name}`
-            );
-
-        }
-    );
-
+        showToast(`Image: ${image.name}`, "info");
+    });
 }
 
 /* ================================================= */
@@ -1578,649 +510,324 @@ if (imageInput) {
 
 let recognition = null;
 
-if (
-    "webkitSpeechRecognition"
-    in window
-) {
+if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
 
-    recognition =
-        new webkitSpeechRecognition();
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        if (messageInput) {
+            messageInput.value = transcript;
+        }
+        showToast("Voice captured 🎤", "success");
+    };
 
-    recognition.continuous =
-        false;
-
-    recognition.interimResults =
-        false;
-
-    recognition.lang =
-        "en-US";
-
-    recognition.onresult =
-        event => {
-
-            const transcript =
-                event.results[0][0]
-                .transcript;
-
-            messageInput.value =
-                transcript;
-
-            showToast(
-                "Voice captured"
-            );
-
-        };
-
+    recognition.onerror = () => {
+        showToast("Voice recognition failed", "error");
+    };
 }
 
-if (
-    voiceBtn &&
-    recognition
-) {
-
-    voiceBtn.addEventListener(
-        "click",
-        () => {
-
-            recognition.start();
-
-        }
-    );
-
+if (voiceBtn && recognition) {
+    voiceBtn.addEventListener("click", () => {
+        recognition.start();
+        showToast("Listening... 🎙️", "info");
+    });
 }
 
 /* ================================================= */
 /* EXPORT CHAT */
 /* ================================================= */
 
-function exportChat(
-    type = "txt"
-) {
+function exportChat(type = "json") {
+    const chat = AppState.chats.find(c => c.id === AppState.currentChatId);
+    if (!chat) return;
 
-    const chat =
-        AppState.chats.find(
-            c =>
-            c.id ===
-            AppState.currentChatId
-        );
+    let content = JSON.stringify(chat, null, 2);
 
-    if (!chat)
-        return;
-
-    let content =
-        JSON.stringify(
-            chat,
-            null,
-            2
-        );
-
-    const blob =
-        new Blob(
-            [content],
-            {
-                type:
-                    "text/plain"
-            }
-        );
-
-    const url =
-        URL.createObjectURL(
-            blob
-        );
-
-    const a =
-        document.createElement(
-            "a"
-        );
-
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
     a.href = url;
-
-    a.download =
-        `chat.${type}`;
-
+    a.download = `chat-${chat.id.substring(0, 8)}.${type}`;
     a.click();
+    URL.revokeObjectURL(url);
 
-    URL.revokeObjectURL(
-        url
-    );
-
+    showToast("Chat exported!", "success");
 }
 
 /* ================================================= */
 /* MEMORY SYSTEM */
 /* ================================================= */
 
-function addMemory(
-    text
-) {
-
+function addMemory(text) {
     AppState.memories.push({
-
         id: generateId(),
-
-        text
-
+        text,
+        createdAt: Date.now()
     });
-
-    saveLocal(
-        "nova_memories",
-        AppState.memories
-    );
-
+    saveLocal("bloxy_memories", AppState.memories);
 }
 
 function loadMemories() {
-
-    AppState.memories =
-        loadLocal(
-            "nova_memories",
-            []
-        );
-
+    AppState.memories = loadLocal("bloxy_memories", []);
 }
 
 /* ================================================= */
-/* PROFILE SYSTEM */
+/* PANEL HELPERS */
 /* ================================================= */
 
-function openProfile() {
+function openPanel(panel) {
+    if (!panel) return;
+    panel.classList.remove("hidden");
+}
 
-    if (!profileModal)
+function closePanel(panel) {
+    if (!panel) return;
+    panel.classList.add("hidden");
+}
+
+/* ================================================= */
+/* RESEARCH FUNCTIONALITY */
+/* ================================================= */
+
+async function startDeepResearch() {
+    const query = messageInput.value.trim();
+
+    if (!query) {
+        showToast("Enter a research topic", "error");
         return;
+    }
 
-    profileModal.classList.add(
-        "show"
-    );
+    try {
+        showTyping();
 
+        const response = await fetch("/research", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query, max_sources: 10 })
+        });
+
+        const data = await response.json();
+        hideTyping();
+
+        if (data.success) {
+            addMessage("assistant", `Research Results for "${query}":\n\n${JSON.stringify(data.results, null, 2)}`);
+            showToast("Research completed!", "success");
+        } else {
+            showToast("Research failed", "error");
+        }
+    } catch (error) {
+        hideTyping();
+        console.error("Research error:", error);
+        showToast("Research failed", "error");
+    }
 }
 
-function closeProfile() {
-
-    if (!profileModal)
-        return;
-
-    profileModal.classList.remove(
-        "show"
-    );
-
+if (researchBtn) {
+    researchBtn.addEventListener("click", startDeepResearch);
 }
 
 /* ================================================= */
-/* NOTIFICATIONS */
+/* WEB SEARCH */
 /* ================================================= */
 
-function addNotification(
-    title,
-    message
-) {
+async function performSearch() {
+    const query = messageInput.value.trim();
 
-    const notification = {
+    if (!query) return;
 
-        id:
-            generateId(),
+    try {
+        showTyping();
 
-        title,
+        const response = await fetch("/news/search?query=" + encodeURIComponent(query));
+        const data = await response.json();
 
-        message,
+        hideTyping();
 
-        time:
-            formatTime()
-
-    };
-
-    AppState.notifications
-        .unshift(
-            notification
-        );
-
-    renderNotifications();
-
+        if (data.success) {
+            let searchResults = "Search Results:\n\n";
+            data.articles.slice(0, 5).forEach((article, i) => {
+                searchResults += `${i + 1}. ${article.title}\n   ${article.url}\n\n`;
+            });
+            addMessage("assistant", searchResults);
+            showToast("Search complete!", "success");
+        }
+    } catch (error) {
+        hideTyping();
+        console.error("Search error:", error);
+        showToast("Search failed", "error");
+    }
 }
 
-function renderNotifications() {
-
-    const list =
-        document.getElementById(
-            "notificationList"
-        );
-
-    if (!list)
-        return;
-
-    list.innerHTML = "";
-
-    AppState.notifications
-        .forEach(
-            n => {
-
-                const item =
-                    document.createElement(
-                        "div"
-                    );
-
-                item.className =
-                    "notification-item";
-
-                item.innerHTML = `
-
-                    <h4>
-                        ${n.title}
-                    </h4>
-
-                    <p>
-                        ${n.message}
-                    </p>
-
-                    <span>
-                        ${n.time}
-                    </span>
-
-                `;
-
-                list.appendChild(
-                    item
-                );
-
-            }
-        );
-
+if (webSearchBtn) {
+    webSearchBtn.addEventListener("click", performSearch);
 }
+
+/* ================================================= */
+/* PROVIDER DIAGNOSTICS */
+/* ================================================= */
+
+async function loadProviderHealth() {
+    try {
+        const response = await fetch("/ai/providers/health");
+        const data = await response.json();
+
+        const container = document.getElementById("providerDiagnostics");
+        if (!container) return;
+
+        container.innerHTML = "";
+
+        Object.entries(data).forEach(([name, status]) => {
+            const card = document.createElement("div");
+            card.className = "provider-health-card";
+            card.innerHTML = `
+                <h3>${name}</h3>
+                <p>${status.online ? "Online ✓" : "Offline ✗"}</p>
+                <p>Latency: ${status.latency}ms</p>
+            `;
+            container.appendChild(card);
+        });
+    } catch (error) {
+        console.error("Provider health error:", error);
+    }
+}
+
+setInterval(loadProviderHealth, 60000);
+loadProviderHealth();
+
+/* ================================================= */
+/* CLOSE PANELS */
+/* ================================================= */
+
+document.querySelectorAll(".close-panel").forEach((btn) => {
+    btn.addEventListener("click", () => {
+        const panel = btn.closest(".floating-panel");
+        if (panel) closePanel(panel);
+    });
+});
 
 /* ================================================= */
 /* SETTINGS MODAL */
 /* ================================================= */
 
 if (settingsBtn) {
-
-    settingsBtn.addEventListener(
-        "click",
-        () => {
-
-            settingsModal
-                ?.classList.add(
-                    "show"
-                );
-
-        }
-    );
-
+    settingsBtn.addEventListener("click", () => {
+        if (settingsModal) settingsModal.classList.add("show");
+    });
 }
 
-document
-.querySelectorAll(
-    ".close-modal"
-)
-.forEach(btn => {
-
-    btn.addEventListener(
-        "click",
-        () => {
-
-            document
-            .querySelectorAll(
-                ".modal"
-            )
-            .forEach(
-                modal => {
-
-                    modal
-                    .classList
-                    .remove(
-                        "show"
-                    );
-
-                }
-            );
-
-        }
-    );
-
+document.querySelectorAll(".close-modal").forEach((btn) => {
+    btn.addEventListener("click", () => {
+        document.querySelectorAll(".modal").forEach((modal) => {
+            modal.classList.remove("show");
+        });
+    });
 });
-
-/* ================================================= */
-/* INITIALIZE */
-/* ================================================= */
-
-window.addEventListener(
-    "load",
-    () => {
-
-        loadMemories();
-
-        renderNotifications();
-
-    }
-);
-/* ================================================= */
-/* Bloxy-bot AI - APP.JS PART 5 */
-/* ================================================= */
 
 /* ================================================= */
 /* ADMIN DASHBOARD */
 /* ================================================= */
 
-const adminModal =
-    document.getElementById(
-        "adminModal"
-    );
-
-function openAdminDashboard() {
-
-    if (!adminModal)
-        return;
-
-    adminModal.classList.add(
-        "show"
-    );
-
-    updateAdminStats();
-
-}
-
 async function updateAdminStats() {
-
     try {
+        const response = await fetch("/admin/stats");
+        const data = await response.json();
 
-        const response =
-            await fetch(
-                "/admin/stats"
-            );
+        const totalUsers = document.getElementById("totalUsers");
+        const totalChats = document.getElementById("totalChats");
+        const apiHealth = document.getElementById("apiHealth");
+        const systemStatus = document.getElementById("systemStatus");
 
-        const data =
-            await response.json();
-
-        const totalUsers =
-            document.getElementById(
-                "totalUsers"
-            );
-
-        const totalChats =
-            document.getElementById(
-                "totalChats"
-            );
-
-        const apiHealth =
-            document.getElementById(
-                "apiHealth"
-            );
-
-        const systemStatus =
-            document.getElementById(
-                "systemStatus"
-            );
-
-        if (totalUsers)
-            totalUsers.textContent =
-                data.users || 0;
-
-        if (totalChats)
-            totalChats.textContent =
-                data.chats || 0;
-
-        if (apiHealth)
-            apiHealth.textContent =
-                data.apiHealth || "Healthy";
-
-        if (systemStatus)
-            systemStatus.textContent =
-                data.status || "Online";
-
+        if (totalUsers) totalUsers.textContent = data.users || 0;
+        if (totalChats) totalChats.textContent = data.chats || 0;
+        if (apiHealth) apiHealth.textContent = data.apiHealth || "Healthy";
+        if (systemStatus) systemStatus.textContent = data.status || "Online";
+    } catch (error) {
+        console.error("Admin stats error:", error);
     }
-
-    catch (error) {
-
-        console.error(error);
-
-    }
-
 }
-
-/* ================================================= */
-/* PROVIDER STATUS */
-/* ================================================= */
-
-const providerModal =
-    document.getElementById(
-        "providerModal"
-    );
-
-const providerStatusBtn =
-    document.getElementById(
-        "providerStatusBtn"
-    );
 
 if (providerStatusBtn) {
-
-    providerStatusBtn.addEventListener(
-        "click",
-        async () => {
-
-            providerModal?.classList.add(
-                "show"
-            );
-
-            await loadProviderHealth();
-
-        }
-    );
-
-}
-
-/* ================================================= */
-/* COMMAND PALETTE */
-/* ================================================= */
-
-const commandPalette =
-    document.getElementById(
-        "commandPalette"
-    );
-
-function openCommandPalette() {
-
-    if (!commandPalette)
-        return;
-
-    commandPalette.classList.remove(
-        "hidden"
-    );
-
-    const input =
-        commandPalette.querySelector(
-            "input"
-        );
-
-    input?.focus();
-
-}
-
-function closeCommandPalette() {
-
-    if (!commandPalette)
-        return;
-
-    commandPalette.classList.add(
-        "hidden"
-    );
-
+    providerStatusBtn.addEventListener("click", async () => {
+        if (providerModal) providerModal.classList.add("show");
+        await loadProviderHealth();
+    });
 }
 
 /* ================================================= */
 /* KEYBOARD SHORTCUTS */
 /* ================================================= */
 
-document.addEventListener(
-    "keydown",
-    event => {
-
-        if (
-            event.ctrlKey &&
-            event.key.toLowerCase() ===
-            "k"
-        ) {
-
-            event.preventDefault();
-
-            openCommandPalette();
-
-        }
-
-        if (
-            event.key ===
-            "Escape"
-        ) {
-
-            closeCommandPalette();
-
-        }
-
-        if (
-            event.ctrlKey &&
-            event.key.toLowerCase() ===
-            "n"
-        ) {
-
-            event.preventDefault();
-
-            createNewChat();
-
-        }
-
-    }
-);
-
-/* ================================================= */
-/* QUICK ACTION BUTTON */
-/* ================================================= */
-
-const quickFab =
-    document.getElementById(
-        "quickAccessFab"
-    );
-
-if (quickFab) {
-
-    quickFab.addEventListener(
-        "click",
-        () => {
-
-            openCommandPalette();
-
-        }
-    );
-
-}
-
-/* ================================================= */
-/* GLOBAL LOADING */
-/* ================================================= */
-
-const globalLoading =
-    document.getElementById(
-        "globalLoadingOverlay"
-    );
-
-function showGlobalLoading() {
-
-    if (!globalLoading)
-        return;
-
-    globalLoading.classList.remove(
-        "hidden"
-    );
-
-}
-
-function hideGlobalLoading() {
-
-    if (!globalLoading)
-        return;
-
-    globalLoading.classList.add(
-        "hidden"
-    );
-
-}
-
-/* ================================================= */
-/* PROVIDER HEALTH MONITOR */
-/* ================================================= */
-
-async function monitorProviders() {
-
-    try {
-
-        const response =
-            await fetch(
-                "/ai/providers/health"
-            );
-
-        const data =
-            await response.json();
-
-        AppState.providers =
-            data;
-
+document.addEventListener("keydown", (event) => {
+    if (event.ctrlKey && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        if (messageInput) messageInput.focus();
     }
 
-    catch (error) {
-
-        console.error(
-            "Provider monitor error",
-            error
-        );
-
+    if (event.ctrlKey && event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        createNewChat();
     }
+});
 
+/* ================================================= */
+/* NOTIFICATIONS */
+/* ================================================= */
+
+function addNotification(title, message) {
+    AppState.notifications.unshift({
+        id: generateId(),
+        title,
+        message,
+        time: formatTime()
+    });
+
+    renderNotifications();
+}
+
+function renderNotifications() {
+    const list = document.getElementById("notificationList");
+    if (!list) return;
+
+    list.innerHTML = "";
+
+    AppState.notifications.slice(0, 10).forEach((n) => {
+        const item = document.createElement("div");
+        item.className = "notification-item";
+        item.innerHTML = `
+            <h4>${n.title}</h4>
+            <p>${n.message}</p>
+            <span>${n.time}</span>
+        `;
+        list.appendChild(item);
+    });
 }
 
 /* ================================================= */
 /* APP VERSION */
 /* ================================================= */
 
-const APP_VERSION =
-    "1.0.0";
+const APP_VERSION = "2.1.0";
 
 /* ================================================= */
 /* STARTUP CHECKS */
 /* ================================================= */
 
 async function startupChecks() {
-
-    showGlobalLoading();
-
     try {
+        const response = await fetch("/health");
+        const data = await response.json();
 
-        await monitorProviders();
-
-        showToast(
-            "Providers Online"
-        );
-
-        addNotification(
-            "System",
-            "Nova AI started successfully"
-        );
-
+        if (data.status === "healthy") {
+            showToast("✓ Bloxy-bot AI is online!", "success");
+            addNotification("System", `Bloxy-bot AI v${APP_VERSION} started`);
+        }
+    } catch (error) {
+        showToast("⚠ Connection issue detected", "warning");
     }
-
-    catch {
-
-        showToast(
-            "Startup issue detected",
-            "error"
-        );
-
-    }
-
-    finally {
-
-        setTimeout(
-            hideGlobalLoading,
-            1000
-        );
-
-    }
-
 }
 
 /* ================================================= */
@@ -2228,96 +835,46 @@ async function startupChecks() {
 /* ================================================= */
 
 function restoreSession() {
-
-    const savedModel =
-        localStorage.getItem(
-            "nova_model"
-        );
-
-    if (
-        savedModel &&
-        modelSelector
-    ) {
-
-        modelSelector.value =
-            savedModel;
-
-        AppState.currentModel =
-            savedModel;
-
+    const savedModel = localStorage.getItem("bloxy_model");
+    if (savedModel && modelSelector) {
+        modelSelector.value = savedModel;
+        AppState.currentModel = savedModel;
     }
-
-}
-
-/* ================================================= */
-/* SAVE MODEL */
-/* ================================================= */
-
-if (modelSelector) {
-
-    modelSelector.addEventListener(
-        "change",
-        () => {
-
-            localStorage.setItem(
-                "nova_model",
-                modelSelector.value
-            );
-
-        }
-    );
-
-}
-
-/* ================================================= */
-/* WELCOME NOTIFICATIONS */
-/* ================================================= */
-
-function createWelcomeNotifications() {
-
-    addNotification(
-        "Research",
-        "Deep Research ready"
-    );
-
-    addNotification(
-        "Providers",
-        "25 intelligence providers connected"
-    );
-
-    addNotification(
-        "System",
-        "Nova AI initialized"
-    );
-
 }
 
 /* ================================================= */
 /* FINAL INITIALIZATION */
 /* ================================================= */
 
-window.addEventListener(
-    "load",
-    async () => {
+window.addEventListener("load", async () => {
+    console.log(`%cBloxy-bot AI v${APP_VERSION}`, "color: #ff7a00; font-size: 16px; font-weight: bold");
 
-        console.log(
-            `Bloxy-bot AI v${APP_VERSION}`
-        );
+    applyTheme(AppState.theme);
+    AppState.chats = loadLocal("bloxy_chats", []);
+    loadMemories();
 
-        restoreSession();
+    restoreSession();
+    initializeLoadingScreen();
 
-        createWelcomeNotifications();
+    await startupChecks();
 
-        await startupChecks();
+    renderNotifications();
 
-        setInterval(
-            monitorProviders,
-            300000
-        );
+    setInterval(updateAdminStats, 30000);
+    setInterval(loadProviderHealth, 60000);
 
-    }
-);
+    showToast("Welcome to Bloxy-bot AI! 🤖", "success");
+});
+
+/* ================================================= */
+/* ERROR HANDLER */
+/* ================================================= */
+
+window.addEventListener("error", (event) => {
+    console.error("Global error:", event.error);
+    addNotification("Error", event.error?.message || "An error occurred");
+});
 
 /* ================================================= */
 /* END OF APP.JS */
-/* ================================================= */
+/* =================================================
