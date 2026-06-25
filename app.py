@@ -37,8 +37,33 @@ from pydantic import BaseModel
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI
 
 app = FastAPI()
+
+@app.post("/ai/chat")
+async def chat():
+    return {"reply": "Hello"}
+
+@app.post("/ai/search")
+async def search():
+    return {"results": []}
+
+@app.post("/ai/research")
+async def research():
+    return {"results": []}
+
+@app.get("/ai/providers/health")
+async def health():
+    return {"status": "ok"}
+
+@app.get("/admin/stats")
+async def stats():
+    return {"users": 0}
+
+@app.post("/upload")
+async def upload():
+    return {"success": True}
 
 app.mount(
     "/static",
