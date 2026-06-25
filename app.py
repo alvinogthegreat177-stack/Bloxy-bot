@@ -34,16 +34,16 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 app = FastAPI()
 
-
-from fastapi.templating import Jinja2Templates
-
 templates = Jinja2Templates(directory="templates")
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse(
         "index.html",
@@ -75,8 +75,6 @@ async def stats():
 async def upload():
     return {"success": True}
 
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 app.mount(
     "/static",
@@ -84,16 +82,6 @@ app.mount(
     name="static"
 )
 
-templates = Jinja2Templates(
-    directory="templates"
-)
-
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request}
-    )
 
 # =================================================
 # LOAD ENVIRONMENT
