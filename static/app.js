@@ -441,7 +441,7 @@ window.addEventListener(
 
 );
 /* ================================================= */
-/* NOVA AI - APP.JS PART 2 */
+/* Bloxy-bot AI - APP.JS PART 2 */
 /* ================================================= */
 
 /* ================================================= */
@@ -635,7 +635,8 @@ chat.messages.forEach(
 
 async function sendToAI(
 message
-) {
+return "Something went wrong.";
+) {}
 
 ```
 try {
@@ -869,7 +870,7 @@ How can I assist you today?`
 
 );
 /* ================================================= */
-/* NOVA AI - APP.JS PART 3 */
+/* Bloxt-bot AI - APP.JS PART 3 */
 /* ================================================= */
 
 /* ================================================= */
@@ -1891,7 +1892,7 @@ window.addEventListener(
     }
 );
 /* ================================================= */
-/* NOVA AI - APP.JS PART 5 */
+/* Bloxy-bot AI - APP.JS PART 5 */
 /* ================================================= */
 
 /* ================================================= */
@@ -2300,7 +2301,7 @@ window.addEventListener(
     async () => {
 
         console.log(
-            `Nova AI v${APP_VERSION}`
+            `Bloxy-bot AI v${APP_VERSION}`
         );
 
         restoreSession();
