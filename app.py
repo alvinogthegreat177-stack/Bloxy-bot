@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Biney Bot AI Production Engine", version="1.0.0")
 
-# Global Middleware exception catcher to show you the error in the browser
+# Exception handling middleware to safely intercept crashes
 @app.middleware("http")
 async def catch_exceptions_middleware(request: Request, call_next):
     try:
@@ -29,7 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ensure folders exist before mounting to prevent startup failures
+# Ensure folders exist cleanly on the server environment
 os.makedirs("static", exist_ok=True)
 os.makedirs("templates", exist_ok=True)
 
@@ -60,7 +60,7 @@ class ChatInboundRequest(BaseModel):
     chat_id: Optional[str] = None
     prompt: str
 
-# 23 API Engines Mocks Mapped Cleanly
+# 23 API Engines Mapped Cleanly
 class BineyBotEngine:
     @staticmethod
     def api_1_google_search(q: str): return {"source": "Google Core", "results": [f"Top search result for {q}"]}
@@ -112,7 +112,15 @@ class BineyBotEngine:
 @app.get("/", response_class=HTMLResponse)
 async def render_dashboard_interface(request: Request):
     chats_data = read_json_safe(CHATS_FILE)
-    return templates.TemplateResponse("index.html", {"request": request, "recent_chats": chats_data.get("conversations", [])})
+    
+    # Keyword arguments used explicitly to prevent unhashable dict types
+    return templates.TemplateResponse(
+        name="index.html",
+        context={
+            "request": request, 
+            "recent_chats": chats_data.get("conversations", [])
+        }
+    )
 
 @app.post("/api/chat/message", response_class=JSONResponse)
 async def post_message_to_session(payload: ChatInboundRequest):
