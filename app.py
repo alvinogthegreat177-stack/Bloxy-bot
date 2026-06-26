@@ -30,7 +30,7 @@ app.add_middleware(
 )
 
 # Ensure folders exist before mounting to prevent startup failures
-os.makedirs("static", exist_exist_ok=True)
+os.makedirs("static", exist_ok=True)
 os.makedirs("templates", exist_ok=True)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
