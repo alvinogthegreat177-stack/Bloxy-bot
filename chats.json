@@ -1,1 +1,21 @@
-{}
+{
+    "conversations": [
+        {
+            "chat_id": "session_default_1",
+            "title": "Smart assistance",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Hello Biney Bot!",
+                    "timestamp": "2026-06-26T14:30:00Z"
+                },
+                {
+                    "role": "assistant",
+                    "content": "Hello! How can I assist you today?",
+                    "timestamp": "2026-06-26T14:30:02Z"
+                }
+            ],
+            "updated_at": "2026-06-26T14:30:02Z"
+        }
+    ]
+}
