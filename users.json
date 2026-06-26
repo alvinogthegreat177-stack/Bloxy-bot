@@ -1,1 +1,9 @@
-{}
+{
+    "users": [
+        {
+            "user_id": "usr_01",
+            "username": "User Account",
+            "tier": "Premium Member"
+        }
+    ]
+}
