@@ -3,82 +3,160 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Chat Interface</title>
+    <title>Bloxy bot AI</title>
     <link rel="stylesheet" href="styles.css">
-    <!-- Icons (FontAwesome for the side icons) -->
+    <!-- Exact Icons from image -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+
     <div class="app-container">
-        <!-- Sidebar -->
+        <!-- ================= SIDEBAR ================= -->
         <aside class="sidebar">
-            <div class="sidebar-header">
-                <button class="new-chat-btn"><i class="fa-solid fa-plus"></i> New Chat</button>
+            <div class="logo-area">
+                <span class="app-title">Bloxy bot AI</span>
             </div>
+            
+            <div class="new-chat-wrapper">
+                <button class="new-chat-btn">
+                    <i class="fa-solid fa-plus"></i> New Chat
+                </button>
+            </div>
+
             <div class="sidebar-history">
-                <div class="history-item"><i class="fa-regular fa-clock"></i> Previous Chat 1</div>
-                <div class="history-item"><i class="fa-regular fa-clock"></i> Previous Chat 2</div>
+                <div class="history-item"><i class="fa-regular fa-clock"></i> <span>History</span></div>
+                <div class="history-item"><i class="fa-regular fa-clock"></i> <span>Previous Chat 1</span></div>
+                <div class="history-item"><i class="fa-regular fa-clock"></i> <span>Yesterday</span></div>
+                <div class="history-item"><i class="fa-regular fa-clock"></i> <span>Last Week</span></div>
             </div>
+            
             <div class="sidebar-footer">
-                <div class="profile-btn"><i class="fa-regular fa-user"></i> Profile</div>
+                <div class="profile-btn"><i class="fa-regular fa-user"></i> <span>Profile</span></div>
             </div>
         </aside>
 
-        <!-- Main Content -->
+        <!-- ================= MAIN CHAT AREA ================= -->
         <main class="main-content">
             <header class="chat-header">
-                <span>ChatGPT 4o mini</span>
-                <div class="header-icons">
+                <div class="header-left">
+                    <i class="fa-solid fa-bars sidebar-toggle"></i>
+                    <span class="model-name">ChatGPT 4o mini</span>
+                </div>
+                <div class="header-right">
                     <i class="fa-solid fa-rotate"></i>
                     <i class="fa-solid fa-ellipsis-vertical"></i>
                 </div>
             </header>
 
-            <div class="chat-area" id="chatArea">
-                <!-- AI Greeting Message -->
-                <div class="message ai-message">
-                    <div class="avatar"><i class="fa-solid fa-robot"></i></div>
-                    <div class="content">
-                        <h4>Riley bot</h4>
-                        <p>Hello! 👋</p>
-                        <p>How can I assist you today, buddy?</p>
-                        <p>You can ask me anything about:</p>
-                        <ul>
-                            <li><i class="fa-solid fa-circle" style="color: #10a37f; font-size: 8px;"></i> Current affairs</li>
-                            <li><i class="fa-solid fa-circle" style="color: #10a37f; font-size: 8px;"></i> Entertainment</li>
-                            <li><i class="fa-solid fa-circle" style="color: #10a37f; font-size: 8px;"></i> Science & technology</li>
-                            <li><i class="fa-solid fa-circle" style="color: #10a37f; font-size: 8px;"></i> Sports</li>
-                            <li><i class="fa-solid fa-circle" style="color: #10a37f; font-size: 8px;"></i> Health & lifestyle</li>
-                            <li><i class="fa-solid fa-circle" style="color: #10a37f; font-size: 8px;"></i> Education & learning</li>
-                        </ul>
-                        <p>I will do my best to provide you with accurate and helpful information.</p>
-                        <p><strong>Please feel free to ask.</strong></p>
+            <div class="chat-area-wrapper" id="chatAreaWrapper">
+                <div class="chat-area" id="chatArea">
+                    
+                    <!-- EXACT WELCOME MESSAGE FROM IMAGE -->
+                    <div class="message ai-message" id="welcomeMessage">
+                        <div class="avatar"><i class="fa-solid fa-robot"></i></div>
+                        <div class="content">
+                            <h4 class="bot-name">Bloxy bot</h4>
+                            <p class="greeting">Hello! 👋</p>
+                            <p class="sub-greeting">How can I assist you today, buddy?</p>
+                            <p class="list-header">You can ask me anything about:</p>
+                            <ul class="capabilities-list">
+                                <li><i class="fa-solid fa-circle" style="color: #F59E0B; font-size: 8px;"></i> Current affairs</li>
+                                <li><i class="fa-solid fa-circle" style="color: #F59E0B; font-size: 8px;"></i> Entertainment</li>
+                                <li><i class="fa-solid fa-circle" style="color: #F59E0B; font-size: 8px;"></i> Science & technology</li>
+                                <li><i class="fa-solid fa-circle" style="color: #F59E0B; font-size: 8px;"></i> Sports</li>
+                                <li><i class="fa-solid fa-circle" style="color: #F59E0B; font-size: 8px;"></i> Health & lifestyle</li>
+                                <li><i class="fa-solid fa-circle" style="color: #F59E0B; font-size: 8px;"></i> Education & learning</li>
+                                <li><i class="fa-solid fa-circle" style="color: #F59E0B; font-size: 8px;"></i> Web search</li>
+                            </ul>
+                            <p class="footer-note">I will do my best to provide you with accurate and helpful information.</p>
+                            <p class="footer-note-2"><strong>Please feel free to ask.</strong></p>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Messages go here -->
+                    <div id="messageContainer"></div>
+                </div>
+            </div>
+
+            <!-- ================= INPUT AREA ================= -->
+            <div class="input-section">
+                <div class="input-wrapper">
+                    <button class="attachment-btn"><i class="fa-solid fa-paperclip"></i></button>
+                    <input type="text" id="userInput" placeholder="Message Bloxy bot..." autocomplete="off">
+                    <button class="send-btn" id="sendBtn"><i class="fa-solid fa-arrow-up"></i></button>
+                </div>
+                <p class="disclaimer">Bloxy bot can make mistakes. Consider checking important information.</p>
+            </div>
+
+            <!-- ================= ACTION CARDS (EXACT 8 FROM IMAGE) ================= -->
+            <div class="action-cards-container">
+                <div class="action-cards">
+                    <!-- Row 1 -->
+                    <div class="card">
+                        <div class="card-icon" style="color: #F59E0B;"><i class="fa-solid fa-music"></i></div>
+                        <div class="card-text">
+                            <span class="card-title">Make a song</span>
+                            <span class="card-sub">about dinosaurs</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon" style="color: #F59E0B;"><i class="fa-solid fa-image"></i></div>
+                        <div class="card-text">
+                            <span class="card-title">Generate image</span>
+                            <span class="card-sub">of a futuristic city</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon" style="color: #F59E0B;"><i class="fa-solid fa-code"></i></div>
+                        <div class="card-text">
+                            <span class="card-title">Write code</span>
+                            <span class="card-sub">in Python</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon" style="color: #F59E0B;"><i class="fa-solid fa-file-lines"></i></div>
+                        <div class="card-text">
+                            <span class="card-title">Summarize text</span>
+                            <span class="card-sub">for a presentation</span>
+                        </div>
+                    </div>
+                    <!-- Row 2 -->
+                    <div class="card">
+                        <div class="card-icon" style="color: #3B82F6;"><i class="fa-solid fa-brain"></i></div>
+                        <div class="card-text">
+                            <span class="card-title">Analyze data</span>
+                            <span class="card-sub">from a spreadsheet</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon" style="color: #8B5CF6;"><i class="fa-solid fa-language"></i></div>
+                        <div class="card-text">
+                            <span class="card-title">Translate text</span>
+                            <span class="card-sub">to Spanish</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon" style="color: #EC4899;"><i class="fa-solid fa-comments"></i></div>
+                        <div class="card-text">
+                            <span class="card-title">Chat with me</span>
+                            <span class="card-sub">about philosophy</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon" style="color: #10B981;"><i class="fa-solid fa-laptop"></i></div>
+                        <div class="card-text">
+                            <span class="card-title">Teach me</span>
+                            <span class="card-sub">history of AI</span>
+                        </div>
                     </div>
                 </div>
-
-                <!-- Messages will be injected here by JS -->
-                <div id="messageContainer"></div>
             </div>
-
-            <!-- Input Area -->
-            <div class="input-area">
-                <div class="input-wrapper">
-                    <i class="fa-solid fa-paperclip attachment-icon"></i>
-                    <input type="text" id="userInput" placeholder="Message Riley bot..." autocomplete="off">
-                    <button id="sendBtn"><i class="fa-solid fa-arrow-up"></i></button>
-                </div>
-                <p class="disclaimer">Riley bot can make mistakes. Consider checking important information.</p>
-            </div>
-
-            <!-- Action Cards (At bottom, like the image) -->
-            <div class="action-cards">
-                <div class="card"><i class="fa-solid fa-music"></i> <span>Make a song</span></div>
-                <div class="card"><i class="fa-solid fa-image"></i> <span>Generate image</span></div>
-                <div class="card"><i class="fa-solid fa-laptop-code"></i> <span>Write code</span></div>
-                <div class="card"><i class="fa-solid fa-file-lines"></i> <span>Summarize text</span></div>
-            </div>
+            
         </main>
     </div>
+    
     <script src="app.js"></script>
 </body>
 </html>
