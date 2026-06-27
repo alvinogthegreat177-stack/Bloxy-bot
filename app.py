@@ -1705,11 +1705,12 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # =============================================================
 
 if __name__ == "__main__":
+    print("🚀 Starting Bloxy-bot in Debug Mode...")
     import uvicorn
+    # Force logging to DEBUG so we see everything
     uvicorn.run(
         "app:app",
         host="0.0.0.0",
-        port=int(os.getenv("PORT", 8000)),
-        reload=Config.ENVIRONMENT != "production",
-        log_level="info",
+        port=8000,
+        log_level="debug" # <--- CHANGE THIS TO DEBUG
     )
