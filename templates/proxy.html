@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bloxy Bot Direct Proxy</title>
+</head>
+<body>
+    <h2>Bloxy Bot AI Proxy</h2>
+    <p>Waiting for your UI to send a message...</p>
+    
+    <script>
+        // This acts as a browser-side bridge to handle the AI logic
+        // It reads the API key from your original HTML using localStorage
+        async function handleChat() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const message = urlParams.get('message');
+            const apiKey = localStorage.getItem('deepseek_key');
+
+            if(!apiKey) {
+                document.body.innerHTML = `<h2 style="color:red;">Error: No API Key found. Please set it in the main UI first.</h2>`;
+                return;
+            }
+
+            try {
+                const response = await fetch("https://api.deepseek.com/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: "deepseek-chat",
+                        messages: [{ role: "user", content: message }],
+                        stream: false
+                    })
+                });
+                const data = await response.json();
+                const aiReply = data.choices[0].message.content;
+                
+                // Send the result back to the main window
+                window.opener.postMessage({ type: 'AI_REPLY', content: aiReply }, '*');
+                document.body.innerHTML = `<h2>✅ Reply sent back to Bloxy Bot!</h2><p>${aiReply.substring(0, 100)}...</p>`;
+            } catch (error) {
+                window.opener.postMessage({ type: 'AI_ERROR', content: error.message }, '*');
+                document.body.innerHTML = `<h2 style="color:red;">Error: ${error.message}</h2>`;
+            }
+        }
+
+        window.onload = handleChat;
+    </script>
+</body>
+</html>
