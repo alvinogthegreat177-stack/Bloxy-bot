@@ -1,162 +1,1556 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bloxy bot AI</title>
-    <link rel="stylesheet" href="styles.css">
-    <!-- Exact Icons from image -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Bloxy-bot AI — Your intelligent AI assistant powered by leading language models." />
+  <meta name="theme-color" content="#0f0f0f" />
+  <meta name="robots" content="index, follow" />
+  <meta property="og:title" content="Bloxy-bot AI" />
+  <meta property="og:description" content="Chat with the most advanced AI models. Fast, intelligent, and always available." />
+  <meta property="og:type" content="website" />
+  <title>Bloxy-bot AI</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Markdown + Syntax Highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+
+  <!-- App Styles -->
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}" />
 </head>
 <body>
 
-    <div class="app-container">
-        <!-- ================= SIDEBAR ================= -->
-        <aside class="sidebar">
-            <div class="logo-area">
-                <span class="app-title">Bloxy bot AI</span>
-            </div>
-            
-            <div class="new-chat-wrapper">
-                <button class="new-chat-btn">
-                    <i class="fa-solid fa-plus"></i> New Chat
-                </button>
-            </div>
+<!-- ============================================================
+     MOBILE OVERLAY (sidebar backdrop)
+============================================================ -->
+<div id="sidebar-overlay" class="sidebar-overlay" aria-hidden="true"></div>
 
-            <div class="sidebar-history">
-                <div class="history-item"><i class="fa-regular fa-clock"></i> <span>History</span></div>
-                <div class="history-item"><i class="fa-regular fa-clock"></i> <span>Previous Chat 1</span></div>
-                <div class="history-item"><i class="fa-regular fa-clock"></i> <span>Yesterday</span></div>
-                <div class="history-item"><i class="fa-regular fa-clock"></i> <span>Last Week</span></div>
-            </div>
-            
-            <div class="sidebar-footer">
-                <div class="profile-btn"><i class="fa-regular fa-user"></i> <span>Profile</span></div>
-            </div>
-        </aside>
+<!-- ============================================================
+     APP SHELL
+============================================================ -->
+<div id="app" class="app-shell">
 
-        <!-- ================= MAIN CHAT AREA ================= -->
-        <main class="main-content">
-            <header class="chat-header">
-                <div class="header-left">
-                    <i class="fa-solid fa-bars sidebar-toggle"></i>
-                    <span class="model-name">ChatGPT 4o mini</span>
-                </div>
-                <div class="header-right">
-                    <i class="fa-solid fa-rotate"></i>
-                    <i class="fa-solid fa-ellipsis-vertical"></i>
-                </div>
-            </header>
+  <!-- ========================================================
+       LEFT SIDEBAR
+  ======================================================== -->
+  <aside id="sidebar" class="sidebar" role="complementary" aria-label="Chat history and navigation">
 
-            <div class="chat-area-wrapper" id="chatAreaWrapper">
-                <div class="chat-area" id="chatArea">
-                    
-                    <!-- EXACT WELCOME MESSAGE FROM IMAGE -->
-                    <div class="message ai-message" id="welcomeMessage">
-                        <div class="avatar"><i class="fa-solid fa-robot"></i></div>
-                        <div class="content">
-                            <h4 class="bot-name">Bloxy bot</h4>
-                            <p class="greeting">Hello! 👋</p>
-                            <p class="sub-greeting">How can I assist you today, buddy?</p>
-                            <p class="list-header">You can ask me anything about:</p>
-                            <ul class="capabilities-list">
-                                <li><i class="fa-solid fa-circle" style="color: #F59E0B; font-size: 8px;"></i> Current affairs</li>
-                                <li><i class="fa-solid fa-circle" style="color: #F59E0B; font-size: 8px;"></i> Entertainment</li>
-                                <li><i class="fa-solid fa-circle" style="color: #F59E0B; font-size: 8px;"></i> Science & technology</li>
-                                <li><i class="fa-solid fa-circle" style="color: #F59E0B; font-size: 8px;"></i> Sports</li>
-                                <li><i class="fa-solid fa-circle" style="color: #F59E0B; font-size: 8px;"></i> Health & lifestyle</li>
-                                <li><i class="fa-solid fa-circle" style="color: #F59E0B; font-size: 8px;"></i> Education & learning</li>
-                                <li><i class="fa-solid fa-circle" style="color: #F59E0B; font-size: 8px;"></i> Web search</li>
-                            </ul>
-                            <p class="footer-note">I will do my best to provide you with accurate and helpful information.</p>
-                            <p class="footer-note-2"><strong>Please feel free to ask.</strong></p>
-                        </div>
-                    </div>
-
-                    <!-- Dynamic Messages go here -->
-                    <div id="messageContainer"></div>
-                </div>
-            </div>
-
-            <!-- ================= INPUT AREA ================= -->
-            <div class="input-section">
-                <div class="input-wrapper">
-                    <button class="attachment-btn"><i class="fa-solid fa-paperclip"></i></button>
-                    <input type="text" id="userInput" placeholder="Message Bloxy bot..." autocomplete="off">
-                    <button class="send-btn" id="sendBtn"><i class="fa-solid fa-arrow-up"></i></button>
-                </div>
-                <p class="disclaimer">Bloxy bot can make mistakes. Consider checking important information.</p>
-            </div>
-
-            <!-- ================= ACTION CARDS (EXACT 8 FROM IMAGE) ================= -->
-            <div class="action-cards-container">
-                <div class="action-cards">
-                    <!-- Row 1 -->
-                    <div class="card">
-                        <div class="card-icon" style="color: #F59E0B;"><i class="fa-solid fa-music"></i></div>
-                        <div class="card-text">
-                            <span class="card-title">Make a song</span>
-                            <span class="card-sub">about dinosaurs</span>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-icon" style="color: #F59E0B;"><i class="fa-solid fa-image"></i></div>
-                        <div class="card-text">
-                            <span class="card-title">Generate image</span>
-                            <span class="card-sub">of a futuristic city</span>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-icon" style="color: #F59E0B;"><i class="fa-solid fa-code"></i></div>
-                        <div class="card-text">
-                            <span class="card-title">Write code</span>
-                            <span class="card-sub">in Python</span>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-icon" style="color: #F59E0B;"><i class="fa-solid fa-file-lines"></i></div>
-                        <div class="card-text">
-                            <span class="card-title">Summarize text</span>
-                            <span class="card-sub">for a presentation</span>
-                        </div>
-                    </div>
-                    <!-- Row 2 -->
-                    <div class="card">
-                        <div class="card-icon" style="color: #3B82F6;"><i class="fa-solid fa-brain"></i></div>
-                        <div class="card-text">
-                            <span class="card-title">Analyze data</span>
-                            <span class="card-sub">from a spreadsheet</span>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-icon" style="color: #8B5CF6;"><i class="fa-solid fa-language"></i></div>
-                        <div class="card-text">
-                            <span class="card-title">Translate text</span>
-                            <span class="card-sub">to Spanish</span>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-icon" style="color: #EC4899;"><i class="fa-solid fa-comments"></i></div>
-                        <div class="card-text">
-                            <span class="card-title">Chat with me</span>
-                            <span class="card-sub">about philosophy</span>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-icon" style="color: #10B981;"><i class="fa-solid fa-laptop"></i></div>
-                        <div class="card-text">
-                            <span class="card-title">Teach me</span>
-                            <span class="card-sub">history of AI</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-        </main>
+    <!-- Sidebar Top: Logo + New Chat -->
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <span class="logo-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" fill="#f97316" opacity="0.15"/>
+            <path d="M8 12.5C8 10.567 9.567 9 11.5 9H13C14.657 9 16 10.343 16 12C16 13.657 14.657 15 13 15H11L9 17V15H8V12.5Z" fill="#f97316"/>
+            <circle cx="11" cy="12" r="1" fill="#fff"/>
+            <circle cx="13.5" cy="12" r="1" fill="#fff"/>
+          </svg>
+        </span>
+        <span class="logo-text">Bloxy-bot <span class="logo-ai">AI</span></span>
+      </div>
+      <button id="new-chat-btn" class="new-chat-btn" aria-label="Start new chat" title="New chat (Ctrl+N)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 5v14M5 12h14"/>
+        </svg>
+      </button>
     </div>
-    
-    <script src="app.js"></script>
+
+    <!-- Sidebar Search -->
+    <div class="sidebar-search-wrap">
+      <div class="sidebar-search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input type="search" id="chat-search" placeholder="Search chats…" aria-label="Search chat history" autocomplete="off" spellcheck="false" />
+      </div>
+    </div>
+
+    <!-- Chat History List -->
+    <nav class="sidebar-nav" aria-label="Chat history">
+      <div class="chat-history" id="chat-history-list">
+
+        <!-- Today -->
+        <div class="history-group" data-group="today">
+          <span class="history-label">Today</span>
+          <ul class="history-list" role="list">
+            <li class="history-item active" data-chat-id="c1" role="listitem">
+              <button class="history-item-btn" aria-current="page">
+                <span class="history-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </span>
+                <span class="history-title">Getting started with AI</span>
+              </button>
+              <div class="history-item-actions">
+                <button class="history-action-btn" aria-label="Rename chat" title="Rename">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="history-action-btn danger" aria-label="Delete chat" title="Delete">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+            </li>
+            <li class="history-item" data-chat-id="c2" role="listitem">
+              <button class="history-item-btn">
+                <span class="history-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </span>
+                <span class="history-title">Python web scraper</span>
+              </button>
+              <div class="history-item-actions">
+                <button class="history-action-btn" aria-label="Rename chat" title="Rename">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="history-action-btn danger" aria-label="Delete chat" title="Delete">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+            </li>
+            <li class="history-item" data-chat-id="c3" role="listitem">
+              <button class="history-item-btn">
+                <span class="history-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </span>
+                <span class="history-title">React vs Vue comparison</span>
+              </button>
+              <div class="history-item-actions">
+                <button class="history-action-btn" aria-label="Rename chat" title="Rename">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="history-action-btn danger" aria-label="Delete chat" title="Delete">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Yesterday -->
+        <div class="history-group" data-group="yesterday">
+          <span class="history-label">Yesterday</span>
+          <ul class="history-list" role="list">
+            <li class="history-item" data-chat-id="c4" role="listitem">
+              <button class="history-item-btn">
+                <span class="history-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </span>
+                <span class="history-title">FastAPI authentication</span>
+              </button>
+              <div class="history-item-actions">
+                <button class="history-action-btn" aria-label="Rename chat" title="Rename">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="history-action-btn danger" aria-label="Delete chat" title="Delete">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+            </li>
+            <li class="history-item" data-chat-id="c5" role="listitem">
+              <button class="history-item-btn">
+                <span class="history-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </span>
+                <span class="history-title">SQL query optimization</span>
+              </button>
+              <div class="history-item-actions">
+                <button class="history-action-btn" aria-label="Rename chat" title="Rename">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="history-action-btn danger" aria-label="Delete chat" title="Delete">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Last 7 Days -->
+        <div class="history-group" data-group="week">
+          <span class="history-label">Last 7 days</span>
+          <ul class="history-list" role="list">
+            <li class="history-item" data-chat-id="c6" role="listitem">
+              <button class="history-item-btn">
+                <span class="history-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </span>
+                <span class="history-title">Machine learning basics</span>
+              </button>
+              <div class="history-item-actions">
+                <button class="history-action-btn" aria-label="Rename chat" title="Rename">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="history-action-btn danger" aria-label="Delete chat" title="Delete">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+            </li>
+            <li class="history-item" data-chat-id="c7" role="listitem">
+              <button class="history-item-btn">
+                <span class="history-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </span>
+                <span class="history-title">Docker deployment guide</span>
+              </button>
+              <div class="history-item-actions">
+                <button class="history-action-btn" aria-label="Rename chat" title="Rename">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="history-action-btn danger" aria-label="Delete chat" title="Delete">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+            </li>
+            <li class="history-item" data-chat-id="c8" role="listitem">
+              <button class="history-item-btn">
+                <span class="history-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </span>
+                <span class="history-title">CSS grid layouts explained</span>
+              </button>
+              <div class="history-item-actions">
+                <button class="history-action-btn" aria-label="Rename chat" title="Rename">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="history-action-btn danger" aria-label="Delete chat" title="Delete">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+      </div><!-- /chat-history -->
+    </nav>
+
+    <!-- Sidebar Footer: Nav Links + User Profile -->
+    <div class="sidebar-footer">
+      <ul class="sidebar-nav-links" role="list">
+        <li>
+          <button class="sidebar-nav-link" id="settings-btn" aria-label="Settings">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span>Settings</span>
+          </button>
+        </li>
+        <li>
+          <button class="sidebar-nav-link" id="help-btn" aria-label="Help">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>Help & FAQ</span>
+          </button>
+        </li>
+        <li>
+          <button class="sidebar-nav-link" id="export-btn" aria-label="Export chats">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Export chats</span>
+          </button>
+        </li>
+      </ul>
+
+      <!-- User Profile -->
+      <div class="sidebar-user" id="sidebar-user-btn" role="button" tabindex="0" aria-label="User profile and account options" aria-haspopup="true">
+        <div class="user-avatar" aria-hidden="true">
+          <span class="avatar-initials" id="user-initials">U</span>
+        </div>
+        <div class="user-info">
+          <span class="user-name" id="sidebar-username">Guest User</span>
+          <span class="user-plan" id="sidebar-user-plan">Free plan</span>
+        </div>
+        <svg class="user-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </div>
+
+  </aside>
+  <!-- /sidebar -->
+
+  <!-- ========================================================
+       MAIN CONTENT AREA
+  ======================================================== -->
+  <div class="main-content" id="main-content">
+
+    <!-- ======================================================
+         TOP NAVIGATION BAR
+    ====================================================== -->
+    <header class="topnav" role="banner">
+
+      <!-- Left: Mobile menu toggle + Model selector -->
+      <div class="topnav-left">
+        <!-- Mobile hamburger -->
+        <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Open sidebar" aria-expanded="false" aria-controls="sidebar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+
+        <!-- Model selector dropdown -->
+        <div class="model-selector" id="model-selector" role="combobox" aria-label="Select AI model" aria-haspopup="listbox" aria-expanded="false">
+          <button class="model-selector-btn" id="model-selector-btn" aria-label="Current model: GPT-4o">
+            <span class="model-dot" id="model-dot" aria-hidden="true"></span>
+            <span class="model-name" id="current-model-name">GPT-4o</span>
+            <svg class="model-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+
+          <!-- Model dropdown panel -->
+          <div class="model-dropdown" id="model-dropdown" role="listbox" aria-label="Available AI models">
+
+            <!-- OpenAI -->
+            <div class="model-group">
+              <span class="model-group-label">OpenAI</span>
+              <button class="model-option active" role="option" aria-selected="true" data-model="gpt-4o" data-provider="openai">
+                <span class="model-option-dot openai" aria-hidden="true"></span>
+                <div class="model-option-info">
+                  <span class="model-option-name">GPT-4o</span>
+                  <span class="model-option-desc">Most capable multimodal</span>
+                </div>
+                <svg class="model-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              </button>
+              <button class="model-option" role="option" aria-selected="false" data-model="gpt-4-turbo" data-provider="openai">
+                <span class="model-option-dot openai" aria-hidden="true"></span>
+                <div class="model-option-info">
+                  <span class="model-option-name">GPT-4 Turbo</span>
+                  <span class="model-option-desc">Fast & powerful</span>
+                </div>
+              </button>
+              <button class="model-option" role="option" aria-selected="false" data-model="gpt-3.5-turbo" data-provider="openai">
+                <span class="model-option-dot openai" aria-hidden="true"></span>
+                <div class="model-option-info">
+                  <span class="model-option-name">GPT-3.5 Turbo</span>
+                  <span class="model-option-desc">Fast & efficient</span>
+                </div>
+              </button>
+            </div>
+
+            <!-- OpenRouter -->
+            <div class="model-group">
+              <span class="model-group-label">OpenRouter</span>
+              <button class="model-option" role="option" aria-selected="false" data-model="anthropic/claude-3.5-sonnet" data-provider="openrouter">
+                <span class="model-option-dot openrouter" aria-hidden="true"></span>
+                <div class="model-option-info">
+                  <span class="model-option-name">Claude 3.5 Sonnet</span>
+                  <span class="model-option-desc">via OpenRouter</span>
+                </div>
+              </button>
+              <button class="model-option" role="option" aria-selected="false" data-model="google/gemini-pro-1.5" data-provider="openrouter">
+                <span class="model-option-dot openrouter" aria-hidden="true"></span>
+                <div class="model-option-info">
+                  <span class="model-option-name">Gemini Pro 1.5</span>
+                  <span class="model-option-desc">via OpenRouter</span>
+                </div>
+              </button>
+              <button class="model-option" role="option" aria-selected="false" data-model="meta-llama/llama-3.1-70b-instruct" data-provider="openrouter">
+                <span class="model-option-dot openrouter" aria-hidden="true"></span>
+                <div class="model-option-info">
+                  <span class="model-option-name">Llama 3.1 70B</span>
+                  <span class="model-option-desc">via OpenRouter</span>
+                </div>
+              </button>
+            </div>
+
+            <!-- Groq -->
+            <div class="model-group">
+              <span class="model-group-label">Groq</span>
+              <button class="model-option" role="option" aria-selected="false" data-model="llama-3.1-70b-versatile" data-provider="groq">
+                <span class="model-option-dot groq" aria-hidden="true"></span>
+                <div class="model-option-info">
+                  <span class="model-option-name">Llama 3.1 70B</span>
+                  <span class="model-option-desc">Ultra-fast inference</span>
+                </div>
+              </button>
+              <button class="model-option" role="option" aria-selected="false" data-model="mixtral-8x7b-32768" data-provider="groq">
+                <span class="model-option-dot groq" aria-hidden="true"></span>
+                <div class="model-option-info">
+                  <span class="model-option-name">Mixtral 8x7B</span>
+                  <span class="model-option-desc">MoE architecture</span>
+                </div>
+              </button>
+              <button class="model-option" role="option" aria-selected="false" data-model="gemma2-9b-it" data-provider="groq">
+                <span class="model-option-dot groq" aria-hidden="true"></span>
+                <div class="model-option-info">
+                  <span class="model-option-name">Gemma 2 9B</span>
+                  <span class="model-option-desc">Google's open model</span>
+                </div>
+              </button>
+            </div>
+
+            <!-- Kimi -->
+            <div class="model-group">
+              <span class="model-group-label">Kimi</span>
+              <button class="model-option" role="option" aria-selected="false" data-model="moonshot-v1-128k" data-provider="kimi">
+                <span class="model-option-dot kimi" aria-hidden="true"></span>
+                <div class="model-option-info">
+                  <span class="model-option-name">Moonshot v1 128K</span>
+                  <span class="model-option-desc">Long context reasoning</span>
+                </div>
+              </button>
+              <button class="model-option" role="option" aria-selected="false" data-model="moonshot-v1-32k" data-provider="kimi">
+                <span class="model-option-dot kimi" aria-hidden="true"></span>
+                <div class="model-option-info">
+                  <span class="model-option-name">Moonshot v1 32K</span>
+                  <span class="model-option-desc">Balanced performance</span>
+                </div>
+              </button>
+            </div>
+
+          </div><!-- /model-dropdown -->
+        </div><!-- /model-selector -->
+      </div>
+
+      <!-- Right: Action buttons -->
+      <div class="topnav-right">
+        <!-- Tools toggle -->
+        <button class="topnav-btn" id="tools-toggle-btn" aria-label="Toggle tools panel" title="Tools">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        </button>
+
+        <!-- Web search toggle -->
+        <button class="topnav-btn" id="web-search-toggle" aria-label="Toggle web search" title="Web Search" aria-pressed="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </button>
+
+        <!-- Import chats -->
+        <button class="topnav-btn" id="import-chat-btn" aria-label="Import chats" title="Import chats">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </button>
+
+        <!-- Keyboard shortcuts -->
+        <button class="topnav-btn" id="shortcuts-btn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>
+        </button>
+      </div>
+
+    </header>
+    <!-- /topnav -->
+
+    <!-- ======================================================
+         CHAT WINDOW
+    ====================================================== -->
+    <main class="chat-window" id="chat-window" role="main" aria-label="Chat conversation">
+
+      <!-- ====================================================
+           HERO SCREEN (shown when no messages)
+      ==================================================== -->
+      <div class="hero-screen" id="hero-screen" aria-live="polite">
+        <div class="hero-content">
+
+          <!-- Bot avatar -->
+          <div class="hero-avatar" aria-hidden="true">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" fill="#f97316" opacity="0.12"/>
+              <path d="M8 12.5C8 10.567 9.567 9 11.5 9H13C14.657 9 16 10.343 16 12C16 13.657 14.657 15 13 15H11L9 17V15H8V12.5Z" fill="#f97316"/>
+              <circle cx="11" cy="12" r="1.1" fill="#fff"/>
+              <circle cx="13.5" cy="12" r="1.1" fill="#fff"/>
+            </svg>
+          </div>
+
+          <h1 class="hero-title">Bloxy-bot AI</h1>
+          <p class="hero-subtitle">How can I help you today?</p>
+
+          <p class="hero-desc">I can help you with a wide range of things:</p>
+
+          <ul class="hero-capabilities" aria-label="Capabilities">
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              Answer questions with real-time web search
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              Write, debug, and explain code in any language
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              Summarize articles, PDFs, and web pages
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              Translate text across 100+ languages
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              Live weather, news, finance & sports data
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              Deep research across multiple sources
+            </li>
+          </ul>
+
+          <p class="hero-footer-note">Please share only what you're comfortable with ✦</p>
+
+        </div><!-- /hero-content -->
+
+        <!-- Suggested Prompts -->
+        <div class="suggested-prompts" id="suggested-prompts" aria-label="Suggested prompts">
+          <div class="prompts-grid">
+
+            <button class="prompt-card" data-prompt="What are the latest AI breakthroughs this week?" aria-label="Prompt: What are the latest AI breakthroughs this week?">
+              <span class="prompt-card-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              </span>
+              <div class="prompt-card-text">
+                <span class="prompt-card-title">Latest AI news</span>
+                <span class="prompt-card-desc">What are the biggest AI breakthroughs this week?</span>
+              </div>
+            </button>
+
+            <button class="prompt-card" data-prompt="Write a Python function to scrape a website and extract all links." aria-label="Prompt: Write a Python function to scrape a website">
+              <span class="prompt-card-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              </span>
+              <div class="prompt-card-text">
+                <span class="prompt-card-title">Code assistant</span>
+                <span class="prompt-card-desc">Write a Python web scraper with link extraction</span>
+              </div>
+            </button>
+
+            <button class="prompt-card" data-prompt="What is the current weather in Nairobi, Kenya?" aria-label="Prompt: Current weather in Nairobi">
+              <span class="prompt-card-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg>
+              </span>
+              <div class="prompt-card-text">
+                <span class="prompt-card-title">Live weather</span>
+                <span class="prompt-card-desc">What is the current weather in Nairobi, Kenya?</span>
+              </div>
+            </button>
+
+            <button class="prompt-card" data-prompt="Summarize the key concepts of machine learning in simple terms." aria-label="Prompt: Summarize machine learning concepts">
+              <span class="prompt-card-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              </span>
+              <div class="prompt-card-text">
+                <span class="prompt-card-title">Summarizer</span>
+                <span class="prompt-card-desc">Explain machine learning in simple terms</span>
+              </div>
+            </button>
+
+          </div><!-- /prompts-grid -->
+        </div><!-- /suggested-prompts -->
+
+      </div>
+      <!-- /hero-screen -->
+
+      <!-- ====================================================
+           MESSAGES CONTAINER (shown when chatting)
+      ==================================================== -->
+      <div class="messages-container" id="messages-container" aria-live="polite" aria-label="Chat messages" hidden>
+        <!-- Messages are injected here by app.js -->
+      </div>
+
+      <!-- Typing indicator -->
+      <div class="typing-indicator" id="typing-indicator" aria-live="polite" aria-label="Bloxy-bot AI is thinking" hidden>
+        <div class="typing-avatar" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" fill="#f97316" opacity="0.15"/>
+            <path d="M8 12.5C8 10.567 9.567 9 11.5 9H13C14.657 9 16 10.343 16 12C16 13.657 14.657 15 13 15H11L9 17V15H8V12.5Z" fill="#f97316"/>
+          </svg>
+        </div>
+        <div class="typing-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <span class="typing-text">Bloxy-bot AI is thinking…</span>
+      </div>
+
+    </main>
+    <!-- /chat-window -->
+
+    <!-- ======================================================
+         TOOLS PANEL (slides in from right or below topnav)
+    ====================================================== -->
+    <div class="tools-panel" id="tools-panel" role="region" aria-label="AI Tools" hidden>
+      <div class="tools-panel-header">
+        <span class="tools-panel-title">Tools</span>
+        <button class="tools-panel-close" id="tools-panel-close" aria-label="Close tools panel">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="tools-grid">
+
+        <button class="tool-card" data-tool="web_search" aria-label="Web Search tool">
+          <span class="tool-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          </span>
+          <span class="tool-card-name">Web Search</span>
+        </button>
+
+        <button class="tool-card" data-tool="deep_research" aria-label="Deep Research tool">
+          <span class="tool-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          </span>
+          <span class="tool-card-name">Deep Research</span>
+        </button>
+
+        <button class="tool-card" data-tool="translator" aria-label="Translator tool">
+          <span class="tool-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+          </span>
+          <span class="tool-card-name">Translator</span>
+        </button>
+
+        <button class="tool-card" data-tool="summarizer" aria-label="Summarizer tool">
+          <span class="tool-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="9" y2="18"/></svg>
+          </span>
+          <span class="tool-card-name">Summarizer</span>
+        </button>
+
+        <button class="tool-card" data-tool="rewrite" aria-label="Rewrite tool">
+          <span class="tool-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </span>
+          <span class="tool-card-name">Rewrite</span>
+        </button>
+
+        <button class="tool-card" data-tool="grammar" aria-label="Grammar Fixer tool">
+          <span class="tool-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+          <span class="tool-card-name">Grammar Fixer</span>
+        </button>
+
+        <button class="tool-card" data-tool="explain_code" aria-label="Explain Code tool">
+          <span class="tool-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </span>
+          <span class="tool-card-name">Explain Code</span>
+        </button>
+
+        <button class="tool-card" data-tool="code_assistant" aria-label="Code Assistant tool">
+          <span class="tool-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </span>
+          <span class="tool-card-name">Code Assistant</span>
+        </button>
+
+        <button class="tool-card" data-tool="math_solver" aria-label="Math Solver tool">
+          <span class="tool-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+          </span>
+          <span class="tool-card-name">Math Solver</span>
+        </button>
+
+        <button class="tool-card" data-tool="pdf_chat" aria-label="PDF Chat tool">
+          <span class="tool-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </span>
+          <span class="tool-card-name">PDF Chat</span>
+        </button>
+
+        <button class="tool-card" data-tool="url_reader" aria-label="URL Reader tool">
+          <span class="tool-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </span>
+          <span class="tool-card-name">URL Reader</span>
+        </button>
+
+        <button class="tool-card" data-tool="image_analysis" aria-label="Image Analysis tool">
+          <span class="tool-card-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </span>
+          <span class="tool-card-name">Image Analysis</span>
+        </button>
+
+      </div><!-- /tools-grid -->
+    </div><!-- /tools-panel -->
+
+    <!-- ======================================================
+         FIXED COMPOSER BAR
+    ====================================================== -->
+    <div class="composer-wrap" id="composer-wrap">
+
+      <!-- Active tool badge (shown when a tool is selected) -->
+      <div class="active-tool-badge" id="active-tool-badge" hidden>
+        <span class="active-tool-icon" id="active-tool-icon" aria-hidden="true"></span>
+        <span class="active-tool-name" id="active-tool-name">Web Search</span>
+        <button class="active-tool-remove" id="active-tool-remove" aria-label="Remove active tool">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- File preview strip (PDFs / images) -->
+      <div class="file-preview-strip" id="file-preview-strip" hidden></div>
+
+      <div class="composer" role="form" aria-label="Message composer">
+
+        <!-- Attachment button -->
+        <button class="composer-btn attach-btn" id="attach-btn" aria-label="Attach file" title="Attach file">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <input type="file" id="file-input" accept=".pdf,image/*" hidden aria-hidden="true" />
+
+        <!-- Textarea -->
+        <textarea
+          id="chat-input"
+          class="composer-input"
+          placeholder="Message Bloxy-bot AI…"
+          rows="1"
+          aria-label="Type your message"
+          aria-multiline="true"
+          autocomplete="off"
+          spellcheck="true"
+          maxlength="32000"
+        ></textarea>
+
+        <!-- Composer right actions -->
+        <div class="composer-right">
+
+          <!-- Stop generation (shown while streaming) -->
+          <button class="composer-btn stop-btn" id="stop-btn" aria-label="Stop generation" title="Stop (Esc)" hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+          </button>
+
+          <!-- Send button -->
+          <button class="composer-btn send-btn" id="send-btn" aria-label="Send message" title="Send (Enter)" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+
+        </div>
+      </div><!-- /composer -->
+
+      <p class="composer-disclaimer">Bloxy-bot AI can make mistakes. Verify important information.</p>
+
+    </div><!-- /composer-wrap -->
+
+  </div><!-- /main-content -->
+
+</div><!-- /app-shell -->
+
+<!-- ============================================================
+     USER PROFILE MENU (popup)
+============================================================ -->
+<div class="user-menu" id="user-menu" role="menu" aria-label="User account menu" hidden>
+  <div class="user-menu-header">
+    <div class="user-menu-avatar" id="user-menu-avatar" aria-hidden="true">
+      <span class="avatar-initials" id="user-menu-initials">U</span>
+    </div>
+    <div class="user-menu-info">
+      <span class="user-menu-name" id="user-menu-name">Guest User</span>
+      <span class="user-menu-email" id="user-menu-email">Not signed in</span>
+    </div>
+    <span class="verified-badge" id="admin-badge" aria-label="Verified admin" hidden>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="#f97316" aria-hidden="true"><path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
+    </span>
+  </div>
+  <div class="user-menu-divider" role="separator"></div>
+  <ul class="user-menu-list" role="none">
+    <li role="none">
+      <button class="user-menu-item" id="profile-btn" role="menuitem">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        My Profile
+      </button>
+    </li>
+    <li role="none" id="admin-panel-li" hidden>
+      <button class="user-menu-item admin-item" id="admin-panel-btn" role="menuitem">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Admin Panel
+        <span class="admin-badge-pill">Admin</span>
+      </button>
+    </li>
+    <li role="none">
+      <button class="user-menu-item" id="appearance-btn" role="menuitem">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        Appearance
+      </button>
+    </li>
+    <li role="none">
+      <button class="user-menu-item" id="api-keys-btn" role="menuitem">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        API Keys
+      </button>
+    </li>
+  </ul>
+  <div class="user-menu-divider" role="separator"></div>
+  <ul class="user-menu-list" role="none">
+    <li role="none" id="login-menu-li">
+      <button class="user-menu-item" id="login-menu-btn" role="menuitem">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Sign In
+      </button>
+    </li>
+    <li role="none" id="logout-menu-li" hidden>
+      <button class="user-menu-item danger" id="logout-btn" role="menuitem">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign Out
+      </button>
+    </li>
+  </ul>
+</div>
+
+<!-- ============================================================
+     AUTH MODAL
+============================================================ -->
+<div class="modal-overlay" id="auth-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" hidden>
+  <div class="modal auth-modal">
+    <button class="modal-close" id="auth-modal-close" aria-label="Close">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+
+    <!-- Auth tabs -->
+    <div class="auth-tabs" role="tablist" aria-label="Authentication options">
+      <button class="auth-tab active" id="tab-login" role="tab" aria-selected="true" aria-controls="panel-login">Sign In</button>
+      <button class="auth-tab" id="tab-register" role="tab" aria-selected="false" aria-controls="panel-register">Create Account</button>
+    </div>
+
+    <!-- Login Panel -->
+    <div class="auth-panel" id="panel-login" role="tabpanel" aria-labelledby="tab-login">
+      <div class="auth-header">
+        <div class="auth-logo" aria-hidden="true">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" fill="#f97316" opacity="0.12"/>
+            <path d="M8 12.5C8 10.567 9.567 9 11.5 9H13C14.657 9 16 10.343 16 12C16 13.657 14.657 15 13 15H11L9 17V15H8V12.5Z" fill="#f97316"/>
+            <circle cx="11" cy="12" r="1" fill="#fff"/>
+            <circle cx="13.5" cy="12" r="1" fill="#fff"/>
+          </svg>
+        </div>
+        <h2 id="auth-modal-title" class="auth-title">Welcome back</h2>
+        <p class="auth-subtitle">Sign in to Bloxy-bot AI</p>
+      </div>
+
+      <!-- Social logins -->
+      <div class="auth-social">
+        <button class="social-btn" id="google-login-btn" aria-label="Sign in with Google">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+          Continue with Google
+        </button>
+        <button class="social-btn" id="github-login-btn" aria-label="Sign in with GitHub">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          Continue with GitHub
+        </button>
+      </div>
+
+      <div class="auth-divider"><span>or sign in with email</span></div>
+
+      <form class="auth-form" id="login-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="login-email">Email address</label>
+          <input class="form-input" type="email" id="login-email" name="email" placeholder="you@example.com" autocomplete="email" required />
+          <span class="form-error" id="login-email-error" role="alert"></span>
+        </div>
+        <div class="form-group">
+          <div class="form-label-row">
+            <label class="form-label" for="login-password">Password</label>
+            <button type="button" class="form-link" id="forgot-password-btn">Forgot password?</button>
+          </div>
+          <div class="form-input-wrap">
+            <input class="form-input" type="password" id="login-password" name="password" placeholder="Enter your password" autocomplete="current-password" required />
+            <button type="button" class="form-input-toggle" id="toggle-login-password" aria-label="Toggle password visibility">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <span class="form-error" id="login-password-error" role="alert"></span>
+        </div>
+        <div class="form-group form-check-row">
+          <label class="form-check">
+            <input type="checkbox" id="remember-me" name="remember" />
+            <span class="form-check-label">Remember me for 30 days</span>
+          </label>
+        </div>
+        <div class="form-error form-error--global" id="login-global-error" role="alert"></div>
+        <button type="submit" class="btn-primary btn-full" id="login-submit-btn">
+          <span class="btn-text">Sign In</span>
+          <span class="btn-spinner" hidden aria-hidden="true"></span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Register Panel -->
+    <div class="auth-panel" id="panel-register" role="tabpanel" aria-labelledby="tab-register" hidden>
+      <div class="auth-header">
+        <div class="auth-logo" aria-hidden="true">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" fill="#f97316" opacity="0.12"/>
+            <path d="M8 12.5C8 10.567 9.567 9 11.5 9H13C14.657 9 16 10.343 16 12C16 13.657 14.657 15 13 15H11L9 17V15H8V12.5Z" fill="#f97316"/>
+            <circle cx="11" cy="12" r="1" fill="#fff"/>
+            <circle cx="13.5" cy="12" r="1" fill="#fff"/>
+          </svg>
+        </div>
+        <h2 class="auth-title">Create account</h2>
+        <p class="auth-subtitle">Join Bloxy-bot AI for free</p>
+      </div>
+
+      <div class="auth-social">
+        <button class="social-btn" id="google-register-btn" aria-label="Sign up with Google">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+          Sign up with Google
+        </button>
+        <button class="social-btn" id="github-register-btn" aria-label="Sign up with GitHub">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          Sign up with GitHub
+        </button>
+      </div>
+
+      <div class="auth-divider"><span>or create with email</span></div>
+
+      <form class="auth-form" id="register-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="register-name">Full name</label>
+          <input class="form-input" type="text" id="register-name" name="name" placeholder="Your name" autocomplete="name" required />
+          <span class="form-error" id="register-name-error" role="alert"></span>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="register-email">Email address</label>
+          <input class="form-input" type="email" id="register-email" name="email" placeholder="you@example.com" autocomplete="email" required />
+          <span class="form-error" id="register-email-error" role="alert"></span>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="register-password">Password</label>
+          <div class="form-input-wrap">
+            <input class="form-input" type="password" id="register-password" name="password" placeholder="Min. 8 characters" autocomplete="new-password" required minlength="8" />
+            <button type="button" class="form-input-toggle" id="toggle-register-password" aria-label="Toggle password visibility">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <span class="form-error" id="register-password-error" role="alert"></span>
+        </div>
+        <div class="form-error form-error--global" id="register-global-error" role="alert"></div>
+        <button type="submit" class="btn-primary btn-full" id="register-submit-btn">
+          <span class="btn-text">Create Account</span>
+          <span class="btn-spinner" hidden aria-hidden="true"></span>
+        </button>
+        <p class="auth-terms">By creating an account you agree to our <a href="#" class="form-link">Terms of Service</a> and <a href="#" class="form-link">Privacy Policy</a>.</p>
+      </form>
+    </div>
+
+    <!-- Forgot Password Panel -->
+    <div class="auth-panel" id="panel-forgot" role="tabpanel" hidden>
+      <div class="auth-header">
+        <h2 class="auth-title">Reset password</h2>
+        <p class="auth-subtitle">We'll send a reset link to your email</p>
+      </div>
+      <form class="auth-form" id="forgot-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="forgot-email">Email address</label>
+          <input class="form-input" type="email" id="forgot-email" name="email" placeholder="you@example.com" autocomplete="email" required />
+          <span class="form-error" id="forgot-email-error" role="alert"></span>
+        </div>
+        <div class="form-error form-error--global" id="forgot-global-error" role="alert"></div>
+        <button type="submit" class="btn-primary btn-full" id="forgot-submit-btn">
+          <span class="btn-text">Send Reset Link</span>
+          <span class="btn-spinner" hidden aria-hidden="true"></span>
+        </button>
+        <button type="button" class="btn-ghost btn-full" id="back-to-login-btn">Back to Sign In</button>
+      </form>
+    </div>
+
+  </div><!-- /auth-modal -->
+</div><!-- /auth-modal-overlay -->
+
+<!-- ============================================================
+     SETTINGS MODAL
+============================================================ -->
+<div class="modal-overlay" id="settings-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" hidden>
+  <div class="modal settings-modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="settings-modal-title">Settings</h2>
+      <button class="modal-close" id="settings-modal-close" aria-label="Close settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="settings-layout">
+      <!-- Settings sidebar tabs -->
+      <nav class="settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+        <button class="settings-tab active" role="tab" aria-selected="true" aria-controls="settings-general" data-tab="general">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          General
+        </button>
+        <button class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-models" data-tab="models">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          AI Models
+        </button>
+        <button class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-appearance" data-tab="appearance">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          Appearance
+        </button>
+        <button class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-integrations" data-tab="integrations">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          Integrations
+        </button>
+        <button class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-memory" data-tab="memory">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          Memory
+        </button>
+      </nav>
+
+      <!-- Settings panels -->
+      <div class="settings-content">
+
+        <!-- General -->
+        <div class="settings-panel active" id="settings-general" role="tabpanel">
+          <h3 class="settings-section-title">General</h3>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Streaming responses</span>
+              <span class="settings-row-desc">Show AI response as it generates</span>
+            </div>
+            <label class="toggle" aria-label="Toggle streaming responses">
+              <input type="checkbox" id="setting-streaming" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Auto-scroll</span>
+              <span class="settings-row-desc">Scroll to latest message automatically</span>
+            </div>
+            <label class="toggle" aria-label="Toggle auto-scroll">
+              <input type="checkbox" id="setting-autoscroll" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Send on Enter</span>
+              <span class="settings-row-desc">Press Enter to send (Shift+Enter for new line)</span>
+            </div>
+            <label class="toggle" aria-label="Toggle send on Enter">
+              <input type="checkbox" id="setting-enter-send" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Conversation memory</span>
+              <span class="settings-row-desc">Remember context across sessions</span>
+            </div>
+            <label class="toggle" aria-label="Toggle conversation memory">
+              <input type="checkbox" id="setting-memory" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Language</span>
+              <span class="settings-row-desc">Interface display language</span>
+            </div>
+            <select class="settings-select" id="setting-language" aria-label="Select language">
+              <option value="en">English</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+              <option value="de">Deutsch</option>
+              <option value="zh">中文</option>
+              <option value="ja">日本語</option>
+              <option value="ar">العربية</option>
+              <option value="sw">Kiswahili</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- AI Models -->
+        <div class="settings-panel" id="settings-models" role="tabpanel" hidden>
+          <h3 class="settings-section-title">AI Models</h3>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Default model</span>
+              <span class="settings-row-desc">Used when starting a new chat</span>
+            </div>
+            <select class="settings-select" id="setting-default-model" aria-label="Select default model">
+              <option value="gpt-4o">GPT-4o (OpenAI)</option>
+              <option value="gpt-4-turbo">GPT-4 Turbo (OpenAI)</option>
+              <option value="gpt-3.5-turbo">GPT-3.5 Turbo (OpenAI)</option>
+              <option value="llama-3.1-70b-versatile">Llama 3.1 70B (Groq)</option>
+              <option value="mixtral-8x7b-32768">Mixtral 8x7B (Groq)</option>
+              <option value="moonshot-v1-128k">Moonshot 128K (Kimi)</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Max tokens</span>
+              <span class="settings-row-desc">Maximum response length</span>
+            </div>
+            <select class="settings-select" id="setting-max-tokens" aria-label="Select max tokens">
+              <option value="1024">1,024</option>
+              <option value="2048">2,048</option>
+              <option value="4096" selected>4,096</option>
+              <option value="8192">8,192</option>
+              <option value="16384">16,384</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Temperature</span>
+              <span class="settings-row-desc">Creativity level (0 = precise, 1 = creative)</span>
+            </div>
+            <div class="settings-slider-wrap">
+              <input type="range" class="settings-slider" id="setting-temperature" min="0" max="1" step="0.1" value="0.7" aria-label="Temperature" />
+              <span class="settings-slider-value" id="temperature-value">0.7</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">System prompt</span>
+              <span class="settings-row-desc">Custom instructions for the AI</span>
+            </div>
+          </div>
+          <textarea class="settings-textarea" id="setting-system-prompt" placeholder="You are Bloxy-bot AI, a helpful and intelligent assistant…" aria-label="System prompt" rows="4"></textarea>
+        </div>
+
+        <!-- Appearance -->
+        <div class="settings-panel" id="settings-appearance" role="tabpanel" hidden>
+          <h3 class="settings-section-title">Appearance</h3>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Theme</span>
+              <span class="settings-row-desc">Choose your preferred color scheme</span>
+            </div>
+            <div class="theme-options" role="radiogroup" aria-label="Theme selection">
+              <label class="theme-option active" aria-label="Dark theme">
+                <input type="radio" name="theme" value="dark" checked />
+                <span class="theme-preview dark-preview" aria-hidden="true"></span>
+                <span>Dark</span>
+              </label>
+              <label class="theme-option" aria-label="Light theme">
+                <input type="radio" name="theme" value="light" />
+                <span class="theme-preview light-preview" aria-hidden="true"></span>
+                <span>Light</span>
+              </label>
+              <label class="theme-option" aria-label="System theme">
+                <input type="radio" name="theme" value="system" />
+                <span class="theme-preview system-preview" aria-hidden="true"></span>
+                <span>System</span>
+              </label>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Font size</span>
+              <span class="settings-row-desc">Chat message text size</span>
+            </div>
+            <select class="settings-select" id="setting-font-size" aria-label="Select font size">
+              <option value="sm">Small</option>
+              <option value="md" selected>Medium</option>
+              <option value="lg">Large</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Reduce animations</span>
+              <span class="settings-row-desc">Minimize motion effects</span>
+            </div>
+            <label class="toggle" aria-label="Toggle reduced animations">
+              <input type="checkbox" id="setting-reduce-motion" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Integrations -->
+        <div class="settings-panel" id="settings-integrations" role="tabpanel" hidden>
+          <h3 class="settings-section-title">Integrations</h3>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Tavily Web Search</span>
+              <span class="settings-row-desc">Real-time web search results</span>
+            </div>
+            <label class="toggle" aria-label="Toggle Tavily">
+              <input type="checkbox" id="integration-tavily" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Exa Semantic Search</span>
+              <span class="settings-row-desc">Neural search across the web</span>
+            </div>
+            <label class="toggle" aria-label="Toggle Exa">
+              <input type="checkbox" id="integration-exa" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Firecrawl URL Reader</span>
+              <span class="settings-row-desc">Extract content from any URL</span>
+            </div>
+            <label class="toggle" aria-label="Toggle Firecrawl">
+              <input type="checkbox" id="integration-firecrawl" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Wikipedia</span>
+              <span class="settings-row-desc">Access Wikipedia knowledge base</span>
+            </div>
+            <label class="toggle" aria-label="Toggle Wikipedia">
+              <input type="checkbox" id="integration-wikipedia" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Weather (OpenWeather)</span>
+              <span class="settings-row-desc">Live weather and forecasts</span>
+            </div>
+            <label class="toggle" aria-label="Toggle Weather">
+              <input type="checkbox" id="integration-weather" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Finance (Finnhub)</span>
+              <span class="settings-row-desc">Stock prices and market data</span>
+            </div>
+            <label class="toggle" aria-label="Toggle Finance">
+              <input type="checkbox" id="integration-finance" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">News (NewsAPI)</span>
+              <span class="settings-row-desc">Breaking news and headlines</span>
+            </div>
+            <label class="toggle" aria-label="Toggle News">
+              <input type="checkbox" id="integration-news" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Sports (Sportradar)</span>
+              <span class="settings-row-desc">Live scores and sports data</span>
+            </div>
+            <label class="toggle" aria-label="Toggle Sports">
+              <input type="checkbox" id="integration-sports" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Movies & TV (TMDB)</span>
+              <span class="settings-row-desc">Films, series, and entertainment</span>
+            </div>
+            <label class="toggle" aria-label="Toggle TMDB">
+              <input type="checkbox" id="integration-tmdb" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Memory -->
+        <div class="settings-panel" id="settings-memory" role="tabpanel" hidden>
+          <h3 class="settings-section-title">Memory</h3>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Enable memory</span>
+              <span class="settings-row-desc">Remember facts across conversations</span>
+            </div>
+            <label class="toggle" aria-label="Toggle memory">
+              <input type="checkbox" id="setting-memory-enabled" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Context window</span>
+              <span class="settings-row-desc">Number of past messages to include</span>
+            </div>
+            <select class="settings-select" id="setting-context-window" aria-label="Select context window">
+              <option value="10">Last 10 messages</option>
+              <option value="20" selected>Last 20 messages</option>
+              <option value="50">Last 50 messages</option>
+              <option value="0">All messages</option>
+            </select>
+          </div>
+          <div class="settings-memory-actions">
+            <button class="btn-danger-outline" id="clear-memory-btn">Clear All Memory</button>
+            <button class="btn-ghost" id="export-memory-btn">Export Memory</button>
+          </div>
+        </div>
+
+      </div><!-- /settings-content -->
+    </div><!-- /settings-layout -->
+
+    <div class="modal-footer">
+      <button class="btn-ghost" id="settings-cancel-btn">Cancel</button>
+      <button class="btn-primary" id="settings-save-btn">Save Changes</button>
+    </div>
+  </div><!-- /settings-modal -->
+</div><!-- /settings-modal-overlay -->
+
+<!-- ============================================================
+     KEYBOARD SHORTCUTS MODAL
+============================================================ -->
+<div class="modal-overlay" id="shortcuts-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="shortcuts-modal-title" hidden>
+  <div class="modal shortcuts-modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="shortcuts-modal-title">Keyboard Shortcuts</h2>
+      <button class="modal-close" id="shortcuts-modal-close" aria-label="Close shortcuts">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="shortcuts-grid">
+      <div class="shortcut-row"><kbd>Ctrl</kbd><kbd>N</kbd><span>New chat</span></div>
+      <div class="shortcut-row"><kbd>Ctrl</kbd><kbd>K</kbd><span>Search chats</span></div>
+      <div class="shortcut-row"><kbd>Ctrl</kbd><kbd>/</kbd><span>Show shortcuts</span></div>
+      <div class="shortcut-row"><kbd>Enter</kbd><span class="shortcut-spacer"></span><span>Send message</span></div>
+      <div class="shortcut-row"><kbd>Shift</kbd><kbd>Enter</kbd><span>New line</span></div>
+      <div class="shortcut-row"><kbd>Esc</kbd><span class="shortcut-spacer"></span><span>Stop generation</span></div>
+      <div class="shortcut-row"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>E</kbd><span>Export chat</span></div>
+      <div class="shortcut-row"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>S</kbd><span>Settings</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     HELP MODAL
+============================================================ -->
+<div class="modal-overlay" id="help-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+  <div class="modal help-modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="help-modal-title">Help & FAQ</h2>
+      <button class="modal-close" id="help-modal-close" aria-label="Close help">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="help-content">
+      <details class="faq-item" open>
+        <summary class="faq-question">How do I switch AI models?</summary>
+        <p class="faq-answer">Click the model selector in the top-left of the chat. Choose from OpenAI, Groq, OpenRouter, or Kimi models. Your selection applies to the current and future chats.</p>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-question">How do I use tools like Web Search?</summary>
+        <p class="faq-answer">Click the Tools button in the top navigation bar, then select a tool such as Web Search, Deep Research, or Translator. An active tool badge will appear above the composer.</p>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-question">Can I upload files or PDFs?</summary>
+        <p class="faq-answer">Yes — click the attachment icon in the composer to upload a PDF or image. Use the PDF Chat tool for document Q&A and Image Analysis for vision tasks (requires a vision-capable model).</p>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-question">How do I export my chats?</summary>
+        <p class="faq-answer">Click "Export chats" in the sidebar footer. You can export in JSON or Markdown format. Use the Import button in the top nav to restore a previous export.</p>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-question">What is Deep Research?</summary>
+        <p class="faq-answer">Deep Research uses Tavily and Exa to search multiple sources simultaneously and synthesize a comprehensive, cited report on your topic. It takes longer than a regular search but provides much more depth.</p>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-question">Is my data private?</summary>
+        <p class="faq-answer">Your conversations are stored locally in your browser and on our secure servers if you're signed in. We do not sell your data. API calls are made directly to the respective AI providers.</p>
+      </details>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     TOAST NOTIFICATIONS
+============================================================ -->
+<div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="false" role="region" aria-label="Notifications"></div>
+
+<!-- ============================================================
+     CONFIRM DELETE DIALOG
+============================================================ -->
+<div class="modal-overlay" id="confirm-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" hidden>
+  <div class="modal confirm-modal">
+    <div class="confirm-icon" aria-hidden="true">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <h2 class="modal-title" id="confirm-modal-title">Delete chat?</h2>
+    <p class="confirm-modal-desc" id="confirm-modal-desc">This action cannot be undone. The chat and all its messages will be permanently deleted.</p>
+    <div class="confirm-modal-actions">
+      <button class="btn-ghost" id="confirm-cancel-btn">Cancel</button>
+      <button class="btn-danger" id="confirm-ok-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     IMPORT CHATS MODAL
+============================================================ -->
+<div class="modal-overlay" id="import-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="import-modal-title" hidden>
+  <div class="modal import-modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="import-modal-title">Import Chats</h2>
+      <button class="modal-close" id="import-modal-close" aria-label="Close import modal">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="import-drop-zone" id="import-drop-zone" role="button" tabindex="0" aria-label="Drop JSON file here or click to browse">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p class="import-drop-text">Drop your JSON export file here</p>
+      <p class="import-drop-sub">or <button type="button" class="form-link" id="import-browse-btn">browse files</button></p>
+      <input type="file" id="import-file-input" accept=".json" hidden aria-hidden="true" />
+    </div>
+    <p class="import-note">Only Bloxy-bot AI export files (.json) are supported. Existing chats will not be overwritten.</p>
+    <div class="modal-footer">
+      <button class="btn-ghost" id="import-cancel-btn">Cancel</button>
+      <button class="btn-primary" id="import-confirm-btn" disabled>
+        <span class="btn-text">Import</span>
+        <span class="btn-spinner" hidden aria-hidden="true"></span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     ADMIN PANEL MODAL
+============================================================ -->
+<div class="modal-overlay admin-modal-overlay" id="admin-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title" hidden>
+  <div class="modal admin-modal">
+    <div class="modal-header">
+      <div class="admin-modal-title-wrap">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <h2 class="modal-title" id="admin-modal-title">Admin Panel</h2>
+        <span class="admin-badge-pill" aria-label="Admin access">Admin</span>
+      </div>
+      <button class="modal-close" id="admin-modal-close" aria-label="Close admin panel">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="admin-layout">
+      <nav class="admin-tabs" role="tablist" aria-label="Admin sections" aria-orientation="vertical">
+        <button class="admin-tab active" role="tab" aria-selected="true" aria-controls="admin-dashboard" data-admin-tab="dashboard">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </button>
+        <button class="admin-tab" role="tab" aria-selected="false" aria-controls="admin-users" data-admin-tab="users">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Users
+        </button>
+        <button class="admin-tab" role="tab" aria-selected="false" aria-controls="admin-analytics" data-admin-tab="analytics">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Analytics
+        </button>
+        <button class="admin-tab" role="tab" aria-selected="false" aria-controls="admin-chat-logs" data-admin-tab="chat-logs">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Chat Logs
+        </button>
+        <button class="admin-tab" role="tab" aria-selected="false" aria-controls="admin-api-usage" data-admin-tab="api-usage">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          API Usage
+        </button>
+        <button class="admin-tab" role="tab" aria-selected="false" aria-controls="admin-providers" data-admin-tab="providers">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          Providers
+        </button>
+        <button class="admin-tab" role="tab" aria-selected="false" aria-controls="admin-system-logs" data-admin-tab="system-logs">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          System Logs
+        </button>
+        <button class="admin-tab" role="tab" aria-selected="false" aria-controls="admin-error-logs" data-admin-tab="error-logs">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Error Logs
+        </button>
+      </nav>
+      <div class="admin-content">
+        <div class="admin-panel active" id="admin-dashboard" role="tabpanel">
+          <h3 class="admin-section-title">Dashboard Overview</h3>
+          <div class="admin-stats-grid">
+            <div class="admin-stat-card"><span class="admin-stat-label">Total Users</span><span class="admin-stat-value" id="stat-total-users">—</span><span class="admin-stat-change positive" id="stat-users-change">Loading…</span></div>
+            <div class="admin-stat-card"><span class="admin-stat-label">Total Chats</span><span class="admin-stat-value" id="stat-total-chats">—</span><span class="admin-stat-change positive" id="stat-chats-change">Loading…</span></div>
+            <div class="admin-stat-card"><span class="admin-stat-label">Messages Today</span><span class="admin-stat-value" id="stat-messages-today">—</span><span class="admin-stat-change" id="stat-messages-change">Loading…</span></div>
+            <div class="admin-stat-card"><span class="admin-stat-label">API Calls Today</span><span class="admin-stat-value" id="stat-api-calls">—</span><span class="admin-stat-change" id="stat-api-change">Loading…</span></div>
+            <div class="admin-stat-card"><span class="admin-stat-label">Active Sessions</span><span class="admin-stat-value" id="stat-active-sessions">—</span><span class="admin-stat-change positive" id="stat-sessions-change">Loading…</span></div>
+            <div class="admin-stat-card"><span class="admin-stat-label">Errors (24h)</span><span class="admin-stat-value" id="stat-errors">—</span><span class="admin-stat-change negative" id="stat-errors-change">Loading…</span></div>
+          </div>
+          <div class="admin-refresh-row">
+            <button class="btn-ghost btn-sm" id="admin-refresh-btn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              Refresh
+            </button>
+            <span class="admin-last-updated" id="admin-last-updated">Last updated: never</span>
+          </div>
+        </div>
+        <div class="admin-panel" id="admin-users" role="tabpanel" hidden>
+          <div class="admin-panel-toolbar">
+            <h3 class="admin-section-title">User Management</h3>
+            <div class="admin-search-wrap">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input type="search" class="admin-search" id="users-search" placeholder="Search users…" aria-label="Search users" />
+            </div>
+          </div>
+          <div class="admin-table-wrap">
+            <table class="admin-table" role="table" aria-label="Users table">
+              <thead><tr><th scope="col">User</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Joined</th><th scope="col">Chats</th><th scope="col">Actions</th></tr></thead>
+              <tbody id="users-table-body"><tr class="admin-table-loading"><td colspan="6"><span class="admin-loading-text">Loading users…</span></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="admin-panel" id="admin-analytics" role="tabpanel" hidden>
+          <h3 class="admin-section-title">Analytics</h3>
+          <div class="admin-analytics-grid">
+            <div class="admin-chart-card">
+              <h4 class="admin-chart-title">Messages per day (last 7 days)</h4>
+              <div class="admin-chart-placeholder" id="chart-messages" aria-label="Messages chart"><div class="chart-bar-group" id="messages-chart-bars"></div></div>
+            </div>
+            <div class="admin-chart-card">
+              <h4 class="admin-chart-title">Model usage breakdown</h4>
+              <div class="admin-model-usage" id="model-usage-list">
+                <div class="model-usage-row"><span class="model-usage-name">GPT-4o</span><div class="model-usage-bar-wrap"><div class="model-usage-bar" style="width:62%"></div></div><span class="model-usage-pct">62%</span></div>
+                <div class="model-usage-row"><span class="model-usage-name">Llama 3.1 70B</span><div class="model-usage-bar-wrap"><div class="model-usage-bar" style="width:21%"></div></div><span class="model-usage-pct">21%</span></div>
+                <div class="model-usage-row"><span class="model-usage-name">GPT-4 Turbo</span><div class="model-usage-bar-wrap"><div class="model-usage-bar" style="width:10%"></div></div><span class="model-usage-pct">10%</span></div>
+                <div class="model-usage-row"><span class="model-usage-name">Moonshot 128K</span><div class="model-usage-bar-wrap"><div class="model-usage-bar" style="width:7%"></div></div><span class="model-usage-pct">7%</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="admin-panel" id="admin-chat-logs" role="tabpanel" hidden>
+          <div class="admin-panel-toolbar">
+            <h3 class="admin-section-title">Chat Logs</h3>
+            <div class="admin-search-wrap">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input type="search" class="admin-search" id="chatlogs-search" placeholder="Search logs…" aria-label="Search chat logs" />
+            </div>
+          </div>
+          <div class="admin-table-wrap">
+            <table class="admin-table" role="table" aria-label="Chat logs table">
+              <thead><tr><th scope="col">User</th><th scope="col">Model</th><th scope="col">Messages</th><th scope="col">Tokens</th><th scope="col">Date</th><th scope="col">Actions</th></tr></thead>
+              <tbody id="chatlogs-table-body"><tr class="admin-table-loading"><td colspan="6"><span class="admin-loading-text">Loading chat logs…</span></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="admin-panel" id="admin-api-usage" role="tabpanel" hidden>
+          <h3 class="admin-section-title">API Usage</h3>
+          <div class="admin-api-grid">
+            <div class="admin-api-card"><div class="admin-api-header"><span class="admin-api-name">OpenAI</span><span class="admin-api-status online">Online</span></div><div class="admin-api-row"><span>Requests today</span><strong id="openai-reqs">—</strong></div><div class="admin-api-row"><span>Tokens used</span><strong id="openai-tokens">—</strong></div><div class="admin-api-row"><span>Avg latency</span><strong id="openai-latency">—</strong></div></div>
+            <div class="admin-api-card"><div class="admin-api-header"><span class="admin-api-name">Groq</span><span class="admin-api-status online">Online</span></div><div class="admin-api-row"><span>Requests today</span><strong id="groq-reqs">—</strong></div><div class="admin-api-row"><span>Tokens used</span><strong id="groq-tokens">—</strong></div><div class="admin-api-row"><span>Avg latency</span><strong id="groq-latency">—</strong></div></div>
+            <div class="admin-api-card"><div class="admin-api-header"><span class="admin-api-name">OpenRouter</span><span class="admin-api-status online">Online</span></div><div class="admin-api-row"><span>Requests today</span><strong id="openrouter-reqs">—</strong></div><div class="admin-api-row"><span>Tokens used</span><strong id="openrouter-tokens">—</strong></div><div class="admin-api-row"><span>Avg latency</span><strong id="openrouter-latency">—</strong></div></div>
+            <div class="admin-api-card"><div class="admin-api-header"><span class="admin-api-name">Kimi</span><span class="admin-api-status online">Online</span></div><div class="admin-api-row"><span>Requests today</span><strong id="kimi-reqs">—</strong></div><div class="admin-api-row"><span>Tokens used</span><strong id="kimi-tokens">—</strong></div><div class="admin-api-row"><span>Avg latency</span><strong id="kimi-latency">—</strong></div></div>
+            <div class="admin-api-card"><div class="admin-api-header"><span class="admin-api-name">Tavily</span><span class="admin-api-status online">Online</span></div><div class="admin-api-row"><span>Searches today</span><strong id="tavily-reqs">—</strong></div><div class="admin-api-row"><span>Credits used</span><strong id="tavily-credits">—</strong></div><div class="admin-api-row"><span>Avg latency</span><strong id="tavily-latency">—</strong></div></div>
+            <div class="admin-api-card"><div class="admin-api-header"><span class="admin-api-name">Firecrawl</span><span class="admin-api-status online">Online</span></div><div class="admin-api-row"><span>Crawls today</span><strong id="firecrawl-reqs">—</strong></div><div class="admin-api-row"><span>Pages crawled</span><strong id="firecrawl-pages">—</strong></div><div class="admin-api-row"><span>Avg latency</span><strong id="firecrawl-latency">—</strong></div></div>
+          </div>
+        </div>
+        <div class="admin-panel" id="admin-providers" role="tabpanel" hidden>
+          <h3 class="admin-section-title">Provider Status</h3>
+          <div class="provider-status-list" id="provider-status-list">
+            <div class="provider-status-row"><div class="provider-status-info"><span class="provider-status-dot online"></span><span class="provider-status-name">OpenAI API</span></div><span class="provider-status-badge online">Operational</span><span class="provider-status-latency" id="ps-openai">Checking…</span></div>
+            <div class="provider-status-row"><div class="provider-status-info"><span class="provider-status-dot online"></span><span class="provider-status-name">Groq API</span></div><span class="provider-status-badge online">Operational</span><span class="provider-status-latency" id="ps-groq">Checking…</span></div>
+            <div class="provider-status-row"><div class="provider-status-info"><span class="provider-status-dot online"></span><span class="provider-status-name">OpenRouter API</span></div><span class="provider-status-badge online">Operational</span><span class="provider-status-latency" id="ps-openrouter">Checking…</span></div>
+            <div class="provider-status-row"><div class="provider-status-info"><span class="provider-status-dot online"></span><span class="provider-status-name">Kimi API</span></div><span class="provider-status-badge online">Operational</span><span class="provider-status-latency" id="ps-kimi">Checking…</span></div>
+            <div class="provider-status-row"><div class="provider-status-info"><span class="provider-status-dot online"></span><span class="provider-status-name">Tavily Search</span></div><span class="provider-status-badge online">Operational</span><span class="provider-status-latency" id="ps-tavily">Checking…</span></div>
+            <div class="provider-status-row"><div class="provider-status-info"><span class="provider-status-dot online"></span><span class="provider-status-name">Exa Search</span></div><span class="provider-status-badge online">Operational</span><span class="provider-status-latency" id="ps-exa">Checking…</span></div>
+            <div class="provider-status-row"><div class="provider-status-info"><span class="provider-status-dot online"></span><span class="provider-status-name">Firecrawl</span></div><span class="provider-status-badge online">Operational</span><span class="provider-status-latency" id="ps-firecrawl">Checking…</span></div>
+            <div class="provider-status-row"><div class="provider-status-info"><span class="provider-status-dot online"></span><span class="provider-status-name">OpenWeather</span></div><span class="provider-status-badge online">Operational</span><span class="provider-status-latency" id="ps-weather">Checking…</span></div>
+            <div class="provider-status-row"><div class="provider-status-info"><span class="provider-status-dot online"></span><span class="provider-status-name">NewsAPI</span></div><span class="provider-status-badge online">Operational</span><span class="provider-status-latency" id="ps-news">Checking…</span></div>
+            <div class="provider-status-row"><div class="provider-status-info"><span class="provider-status-dot online"></span><span class="provider-status-name">Finnhub Finance</span></div><span class="provider-status-badge online">Operational</span><span class="provider-status-latency" id="ps-finnhub">Checking…</span></div>
+            <div class="provider-status-row"><div class="provider-status-info"><span class="provider-status-dot online"></span><span class="provider-status-name">Sportradar</span></div><span class="provider-status-badge online">Operational</span><span class="provider-status-latency" id="ps-sports">Checking…</span></div>
+            <div class="provider-status-row"><div class="provider-status-info"><span class="provider-status-dot online"></span><span class="provider-status-name">TMDB</span></div><span class="provider-status-badge online">Operational</span><span class="provider-status-latency" id="ps-tmdb">Checking…</span></div>
+          </div>
+          <button class="btn-ghost btn-sm" id="check-providers-btn" style="margin-top:16px">Check All Providers</button>
+        </div>
+        <div class="admin-panel" id="admin-system-logs" role="tabpanel" hidden>
+          <div class="admin-panel-toolbar"><h3 class="admin-section-title">System Logs</h3><button class="btn-ghost btn-sm" id="clear-system-logs-btn">Clear</button></div>
+          <div class="admin-log-viewer" id="system-log-viewer" role="log" aria-live="polite"><div class="log-line info"><span class="log-time">—</span><span class="log-level info">INFO</span><span class="log-msg">System log will appear here once loaded.</span></div></div>
+        </div>
+        <div class="admin-panel" id="admin-error-logs" role="tabpanel" hidden>
+          <div class="admin-panel-toolbar"><h3 class="admin-section-title">Error Logs</h3><button class="btn-ghost btn-sm" id="clear-error-logs-btn">Clear</button></div>
+          <div class="admin-log-viewer" id="error-log-viewer" role="log" aria-live="polite"><div class="log-line info"><span class="log-time">—</span><span class="log-level info">INFO</span><span class="log-msg">No errors logged yet.</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SCRIPTS
+============================================================ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js" defer></script>
+<script src="{{ url_for('static', path='app.js') }}" defer></script>
+
 </body>
 </html>
