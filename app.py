@@ -1,4 +1,4 @@
-cat > /mnt/user-data/outputs/Bloxy-bot/app.py << 'PYEOF'
+(cat > /mnt/user-data/outputs/Bloxy-bot/app.py << 'PYEOF')
 # =============================================================
 #  BLOXY-BOT AI — app.py
 #  Complete Production FastAPI Backend
