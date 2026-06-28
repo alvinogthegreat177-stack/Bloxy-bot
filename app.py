@@ -1114,12 +1114,11 @@ templates = Jinja2Templates(directory="templates")
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+  return templates.TemplateResponse(request=request, name="index.html")
 
 @app.get("/reset-password", response_class=HTMLResponse)
 async def reset_password_page(request: Request, token: str = ""):
-    return templates.TemplateResponse("index.html", {"request": request})
-
+   return templates.TemplateResponse(request=request, name="index.html")
 
 # =============================================================
 # AUTH ROUTES
@@ -1688,8 +1687,8 @@ async def health():
 async def not_found(request: Request, exc):
     if request.url.path.startswith("/api/"):
         return JSONResponse({"detail": "Endpoint not found."}, status_code=404)
-    return templates.TemplateResponse("index.html", {"request": request}, status_code=200)
-
+ return templates.TemplateResponse(request=request, name="index.html", status_code=200)
+ 
 @app.exception_handler(500)
 async def server_error(request: Request, exc):
     log_error(f"500 error on {request.url.path}: {str(exc)}", traceback.format_exc())
