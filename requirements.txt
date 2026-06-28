@@ -45,7 +45,7 @@ cohere==5.5.3
 # ── PDF Processing ────────────────────────────────────────────
 pdfplumber==0.11.0
 pypdf==4.2.0
-pdfminer.six==20221105
+pdfminer.six==20231228
 pymupdf==1.24.3
 
 # ── OCR ───────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ spacy==3.7.4
 nltk==3.8.1
 gensim==4.3.2
 scikit-learn==1.5.0
-onnxruntime==1.18.0
+onnxruntime==1.17.3
 
 # ── Math & Science ───────────────────────────────────────────
 numpy==1.26.4
