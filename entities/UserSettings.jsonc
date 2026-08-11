@@ -1,0 +1,112 @@
+{
+  "name": "UserSettings",
+  "type": "object",
+  "properties": {
+    "preferred_provider": {
+      "type": "string",
+      "default": "auto"
+    },
+    "preferred_model": {
+      "type": "string",
+      "default": ""
+    },
+    "theme": {
+      "type": "string",
+      "enum": [
+        "dark",
+        "light"
+      ],
+      "default": "dark"
+    },
+    "language": {
+      "type": "string",
+      "default": "en"
+    },
+    "send_on_enter": {
+      "type": "boolean",
+      "default": true
+    },
+    "show_token_count": {
+      "type": "boolean",
+      "default": false
+    },
+    "stream_responses": {
+      "type": "boolean",
+      "default": true
+    },
+    "avatar_url": {
+      "type": "string",
+      "default": ""
+    },
+    "nexus_mode": {
+      "type": "string",
+      "enum": [
+        "deep",
+        "save"
+      ],
+      "default": "deep"
+    },
+    "voice": {
+      "type": "string",
+      "enum": [
+        "river",
+        "honey",
+        "sunny",
+        "storm",
+        "spark"
+      ],
+      "default": "river"
+    },
+    "history_paused": {
+      "type": "boolean",
+      "default": false
+    },
+    "api_keys": {
+      "type": "object",
+      "default": {},
+      "properties": {}
+    }
+  },
+  "required": [],
+  "rls": {
+    "create": {
+      "created_by_id": "{{user.id}}"
+    },
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
