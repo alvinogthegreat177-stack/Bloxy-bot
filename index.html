@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      (function() {
+        try {
+          var raw = localStorage.getItem('bloxy_theme');
+          var theme = raw ? JSON.parse(raw) : 'dark';
+          if (theme !== 'light') document.documentElement.classList.add('dark');
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+    <link rel="icon" type="image/png" href="https://media.base44.com/images/public/6a415277171cff3034584f35/6f17cca71_image.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bloxy-bot AI — Your All-in-One AI Assistant</title>
+    <meta name="description" content="Bloxy-bot AI: A modern, all-in-one AI assistant with multiple providers, search, weather, finance, coding, and more." />
+    <meta property="og:title" content="Bloxy-bot AI" />
+    <meta property="og:description" content="Your all-in-one AI assistant platform" />
+    <meta property="og:image" content="https://media.base44.com/images/public/6a415277171cff3034584f35/6f17cca71_image.png" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
