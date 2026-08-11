@@ -2,24 +2,24 @@ import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
-import PageNotFound from './lib/PageNotFound';
-import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import UserNotRegisteredError from '@/components/UserNotRegisteredError';
-import ScrollToTop from './components/ScrollToTop';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import { LanguageProvider } from '@/lib/LanguageContext';
+import PageNotFound from './lib/PageNotFound.jsx';
+import { AuthProvider, useAuth } from '../lib/AuthContext.jsx';
+import UserNotRegisteredError from '../components/UserNotRegisteredError.jsx';
+import ScrollToTop from '../components/ScrollToTop.jsx';
+import ProtectedRoute from '../components/ProtectedRoute.jsx';
+import { LanguageProvider } from '../lib/LanguageContext.jsx';
 
-import Login from '@/pages/Login';
-import Register from '@/pages/Register';
-import ForgotPassword from '@/pages/ForgotPassword';
-import ResetPassword from '@/pages/ResetPassword';
-import Home from '@/pages/Home';
-import SearchPage from '@/pages/SearchPage';
-import KnowledgePage from '@/pages/KnowledgePage';
-import Dashboard from '@/pages/Dashboard';
-import SettingsPage from '@/pages/SettingsPage';
-import AdminPage from '@/pages/AdminPage';
-import LibraryPage from '@/pages/LibraryPage';
+import Login from '../pages/Login.jsx';
+import Register from '../pages/Register.jsx';
+import ForgotPassword from '../pages/ForgotPassword.jsx';
+import ResetPassword from '../pages/ResetPassword.jsx';
+import Home from '../pages/Home.jsx';
+import SearchPage from '../pages/SearchPage.jsx';
+import KnowledgePage from '../pages/KnowledgePage.jsx';
+import Dashboard from '../pages/Dashboard.jsx';
+import SettingsPage from '../pages/SettingsPage.jsx';
+import AdminPage from '../pages/AdminPage.jsx';
+import LibraryPage from '../pages/LibraryPage.jsx';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
