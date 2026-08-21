@@ -3,13 +3,31 @@ services:
     name: bloxy-nexus
     runtime: python
     plan: free
+    rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: FRONTEND_ORIGIN
+        value: https://bloxy-bot-ui.onrender.com
       - key: BASE44_ORIGIN
         sync: false
       - key: SECRET_KEY
         sync: false
+
+  - type: static_site
+    name: bloxy-bot-ui
+    buildCommand: >-
+      rm -rf .base44_extract build_source &&
+      mkdir -p .base44_extract build_source &&
+      unzip -q base44-ui-source.zip -d .base44_extract &&
+      project_dir=$(find .base44_extract -mindepth 1 -maxdepth 1 -type d | head -n 1) &&
+      cp -a "$project_dir/." build_source/ &&
+      cd build_source &&
+      npm install && npm run build
+    staticPublishPath: build_source/dist
+    envVars:
+      - key: VITE_BLOXY_NEXUS_URL
+        value: https://bloxy-nexus.onrender.com
