@@ -23,23 +23,15 @@ jobs:
           test -s Bloxy-bot-ai.zip
           unzip -q Bloxy-bot-ai.zip -d .base44_extract
           project_dir="$(find .base44_extract -mindepth 1 -maxdepth 1 -type d | head -n 1)"
-          if [ -z "$project_dir" ]; then
-            project_dir=.base44_extract
-          fi
-
-          # Preserve the existing Bloxy backend/setup files while materializing
-          # the Base44 application source around them.
+          if [ -z "$project_dir" ]; then project_dir=.base44_extract; fi
           for f in app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py requirements.txt render.yaml .env.example .gitignore; do
             if [ -f "$f" ]; then cp "$f" ".base44_extract/.$(basename "$f").preserve"; fi
           done
-
           cp -a "$project_dir/." .
-
           for f in app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py requirements.txt render.yaml .env.example .gitignore; do
             preserved=".base44_extract/.$(basename "$f").preserve"
             if [ -f "$preserved" ]; then cp "$preserved" "$f"; fi
           done
-
           rm -rf .base44_extract Bloxy-bot-ai.zip base44-ui-source.zip
 
       - name: Write Render Blueprint
@@ -64,7 +56,6 @@ jobs:
                   sync: false
                 - key: SECRET_KEY
                   sync: false
-
             - type: static_site
               name: bloxy-bot-ui
               buildCommand: npm install && npm run build
@@ -92,11 +83,11 @@ jobs:
           if compgen -G 'backend/*.py' > /dev/null; then python -m py_compile backend/*.py; fi
           python -m py_compile app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py
 
-      - name: Show final file count
+      - name: Validate materialized source count
         shell: bash
         run: |
-          COUNT=$(git ls-files | wc -l)
-          echo "Final repository file count: $COUNT"
+          COUNT=$(find . -type f -not -path './.git/*' | wc -l)
+          echo "Final working-tree file count: $COUNT"
           test "$COUNT" -ge 120
 
       - name: Commit materialized files
@@ -105,9 +96,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
+          if git diff --cached --quiet; then echo "No changes to commit"; exit 0; fi
           git commit -m "Materialize complete Base44 source and deployment setup"
           git push
