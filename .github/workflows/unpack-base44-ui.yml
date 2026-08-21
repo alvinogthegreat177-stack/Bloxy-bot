@@ -3,6 +3,7 @@ name: Materialize Base44 UI
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
