@@ -1,0 +1,85 @@
+name: Materialize Base44 UI
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unpack Base44 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .base44_extract
+          mkdir .base44_extract
+          unzip -q base44-ui-source.zip -d .base44_extract
+          project_dir="$(find .base44_extract -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          test -n "$project_dir"
+          cp -a "$project_dir/." .
+          rm -rf .base44_extract base44-ui-source.zip
+
+      - name: Write Render Blueprint
+        shell: bash
+        run: |
+          cat > render.yaml <<'YAML'
+          services:
+            - type: web
+              name: bloxy-nexus
+              runtime: python
+              plan: free
+              rootDir: backend
+              buildCommand: pip install -r requirements.txt
+              startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+              healthCheckPath: /health
+              envVars:
+                - key: PYTHON_VERSION
+                  value: 3.11.9
+                - key: FRONTEND_ORIGIN
+                  value: https://bloxy-bot-ui.onrender.com
+                - key: BASE44_ORIGIN
+                  sync: false
+                - key: SECRET_KEY
+                  sync: false
+
+            - type: static_site
+              name: bloxy-bot-ui
+              buildCommand: npm install && npm run build
+              staticPublishPath: dist
+              envVars:
+                - key: VITE_BLOXY_NEXUS_URL
+                  value: https://bloxy-nexus.onrender.com
+          YAML
+
+      - name: Make frontend bridge same-origin configurable
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/lib/bloxyEngine.js')
+          s = p.read_text()
+          s = s.replace("const DEFAULT_NEXUS_URL = 'https://bloxy-nexus.onrender.com';", "const DEFAULT_NEXUS_URL = '/';")
+          p.write_text(s)
+          PY
+
+      - name: Validate backend syntax
+        run: python -m py_compile backend/*.py
+
+      - name: Commit materialized files
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Materialize Base44 UI and Render deployment files"
+          git push
