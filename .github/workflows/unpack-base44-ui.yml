@@ -13,17 +13,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Unpack Base44 project
+      - name: Decode and unpack Base44 project
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf .base44_extract
+          rm -rf .base44_extract .base44.zip
           mkdir .base44_extract
-          unzip -q base44-ui-source.zip -d .base44_extract
+          base64 -d base44-ui-source.zip > .base44.zip
+          unzip -q .base44.zip -d .base44_extract
           project_dir="$(find .base44_extract -mindepth 1 -maxdepth 1 -type d | head -n 1)"
           test -n "$project_dir"
           cp -a "$project_dir/." .
-          rm -rf .base44_extract base44-ui-source.zip
+          rm -rf .base44_extract .base44.zip base44-ui-source.zip
 
       - name: Write Render Blueprint
         shell: bash
@@ -71,6 +72,12 @@ jobs:
       - name: Validate backend syntax
         run: python -m py_compile backend/*.py
 
+      - name: Show final file count
+        shell: bash
+        run: |
+          COUNT=$(git ls-files | wc -l)
+          echo "Final repository file count: $COUNT"
+
       - name: Commit materialized files
         shell: bash
         run: |
@@ -81,5 +88,5 @@ jobs:
             echo "No changes to commit"
             exit 0
           fi
-          git commit -m "Materialize Base44 UI and Render deployment files"
+          git commit -m "Materialize complete Base44 source and deployment setup"
           git push
