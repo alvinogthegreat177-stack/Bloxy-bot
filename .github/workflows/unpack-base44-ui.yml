@@ -14,18 +14,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Decode and unpack Base44 project
+      - name: Extract uploaded Base44 project
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf .base44_extract .base44.zip
+          rm -rf .base44_extract
           mkdir .base44_extract
-          base64 -d base44-ui-source.zip > .base44.zip
-          unzip -q .base44.zip -d .base44_extract
+          test -s Bloxy-bot-ai.zip
+          unzip -q Bloxy-bot-ai.zip -d .base44_extract
           project_dir="$(find .base44_extract -mindepth 1 -maxdepth 1 -type d | head -n 1)"
-          test -n "$project_dir"
+          if [ -z "$project_dir" ]; then
+            project_dir=.base44_extract
+          fi
+
+          # Preserve the existing Bloxy backend/setup files while materializing
+          # the Base44 application source around them.
+          for f in app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py requirements.txt render.yaml .env.example .gitignore; do
+            if [ -f "$f" ]; then cp "$f" ".base44_extract/.$(basename "$f").preserve"; fi
+          done
+
           cp -a "$project_dir/." .
-          rm -rf .base44_extract .base44.zip base44-ui-source.zip
+
+          for f in app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py requirements.txt render.yaml .env.example .gitignore; do
+            preserved=".base44_extract/.$(basename "$f").preserve"
+            if [ -f "$preserved" ]; then cp "$preserved" "$f"; fi
+          done
+
+          rm -rf .base44_extract Bloxy-bot-ai.zip base44-ui-source.zip
 
       - name: Write Render Blueprint
         shell: bash
@@ -62,22 +77,27 @@ jobs:
       - name: Make frontend bridge same-origin configurable
         shell: bash
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('src/lib/bloxyEngine.js')
-          s = p.read_text()
-          s = s.replace("const DEFAULT_NEXUS_URL = 'https://bloxy-nexus.onrender.com';", "const DEFAULT_NEXUS_URL = '/';")
-          p.write_text(s)
-          PY
+          if [ -f src/lib/bloxyEngine.js ]; then
+            python - <<'PY'
+            from pathlib import Path
+            p = Path('src/lib/bloxyEngine.js')
+            s = p.read_text()
+            s = s.replace("const DEFAULT_NEXUS_URL = 'https://bloxy-nexus.onrender.com';", "const DEFAULT_NEXUS_URL = '/';")
+            p.write_text(s)
+            PY
+          fi
 
       - name: Validate backend syntax
-        run: python -m py_compile backend/*.py
+        run: |
+          if compgen -G 'backend/*.py' > /dev/null; then python -m py_compile backend/*.py; fi
+          python -m py_compile app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py
 
       - name: Show final file count
         shell: bash
         run: |
           COUNT=$(git ls-files | wc -l)
           echo "Final repository file count: $COUNT"
+          test "$COUNT" -ge 120
 
       - name: Commit materialized files
         shell: bash
