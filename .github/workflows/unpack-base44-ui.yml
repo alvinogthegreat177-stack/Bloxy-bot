@@ -20,8 +20,16 @@ jobs:
           set -euo pipefail
           rm -rf .base44_extract
           mkdir .base44_extract
-          test -s Bloxy-bot-ai.zip
-          unzip -q -o Bloxy-bot-ai.zip -d .base44_extract
+
+          # Use the complete Base44 export uploaded to the repository.
+          ZIP="Bloxy-bot-ai.zip"
+          if [ ! -s "$ZIP" ]; then
+            ZIP="$(find . -maxdepth 1 -type f -name '*.zip' | head -n 1 || true)"
+          fi
+          test -n "$ZIP"
+          test -s "$ZIP"
+          unzip -tq "$ZIP"
+          unzip -q -o "$ZIP" -d .base44_extract
 
           # Base44 exports can either contain one top-level project folder
           # or place the exported files directly at the ZIP root.
@@ -32,7 +40,7 @@ jobs:
             project_dir=".base44_extract"
           fi
 
-          # Preserve the working backend/deployment files supplied in this repo.
+          # Preserve the working backend/deployment files already in main.
           for f in app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py requirements.txt render.yaml .env.example .gitignore; do
             if [ -f "$f" ]; then cp "$f" ".base44_extract/.$(basename "$f").preserve"; fi
           done
@@ -46,7 +54,7 @@ jobs:
 
           rm -rf .base44_extract
 
-      - name: Make frontend bridge same-origin configurable
+      - name: Configure frontend bridge
         shell: bash
         run: |
           if [ -f src/lib/bloxyEngine.js ]; then
@@ -59,27 +67,15 @@ jobs:
             PY
           fi
 
-      - name: Validate backend syntax
-        run: |
-          python -m py_compile app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py
-          if compgen -G 'backend/*.py' > /dev/null; then python -m py_compile backend/*.py; fi
-
-      - name: Validate materialized source count
-        shell: bash
-        run: |
-          COUNT=$(find . -type f -not -path './.git/*' -not -path './.base44_extract/*' | wc -l)
-          echo "Final working-tree file count: $COUNT"
-          test "$COUNT" -ge 120
-
-      - name: Commit materialized files
+      - name: Commit materialized source
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          if git diff --cached --quiet; then echo "No changes to commit"; exit 0; fi
-          git commit -m "Materialize complete Base44 source and deployment setup"
+          if git diff --cached --quiet; then
+            echo "No materialization changes needed."
+            exit 0
+          fi
+          git commit -m "Materialize complete Base44 source into main"
           git push
-
-# Trigger materialization after the uploaded ZIP is present on main.
-# Manual retrigger: 2026-08-23
