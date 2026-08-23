@@ -21,7 +21,6 @@ jobs:
           rm -rf .base44_extract
           mkdir .base44_extract
 
-          # Use the complete Base44 export uploaded to the repository.
           ZIP="Bloxy-bot-ai.zip"
           if [ ! -s "$ZIP" ]; then
             ZIP="$(find . -maxdepth 1 -type f -name '*.zip' | head -n 1 || true)"
@@ -31,8 +30,6 @@ jobs:
           unzip -tq "$ZIP"
           unzip -q -o "$ZIP" -d .base44_extract
 
-          # Base44 exports can either contain one top-level project folder
-          # or place the exported files directly at the ZIP root.
           mapfile -t dirs < <(find .base44_extract -mindepth 1 -maxdepth 1 -type d -print)
           if [ "${#dirs[@]}" -eq 1 ]; then
             project_dir="${dirs[0]}"
@@ -41,13 +38,15 @@ jobs:
           fi
 
           # Preserve the working backend/deployment files already in main.
-          for f in app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py requirements.txt render.yaml .env.example .gitignore; do
+          # package.json is intentionally preserved as a tiny Render backend
+          # build shim because Render is hosting FastAPI, not the Base44 UI.
+          for f in app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py requirements.txt render.yaml .env.example .gitignore package.json; do
             if [ -f "$f" ]; then cp "$f" ".base44_extract/.$(basename "$f").preserve"; fi
           done
 
           cp -a "$project_dir/." .
 
-          for f in app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py requirements.txt render.yaml .env.example .gitignore; do
+          for f in app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py requirements.txt render.yaml .env.example .gitignore package.json; do
             preserved=".base44_extract/.$(basename "$f").preserve"
             if [ -f "$preserved" ]; then cp "$preserved" "$f"; fi
           done
@@ -64,7 +63,18 @@ jobs:
             s = p.read_text()
             s = s.replace("const DEFAULT_NEXUS_URL = 'https://bloxy-nexus.onrender.com';", "const DEFAULT_NEXUS_URL = '/';")
             p.write_text(s)
-            PY
+          fi
+
+      - name: Fix materialized App import
+        shell: bash
+        run: |
+          if [ -f src/App.jsx ]; then
+            python - <<'PY'
+            from pathlib import Path
+            p = Path('src/App.jsx')
+            s = p.read_text()
+            s = s.replace("import PageNotFound from './lib/PageNotFound';", "import PageNotFound from '@/pages/PageNotFound';")
+            p.write_text(s)
           fi
 
       - name: Commit materialized source
