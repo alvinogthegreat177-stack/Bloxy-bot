@@ -111,3 +111,5 @@ jobs:
           if git diff --cached --quiet; then echo "No changes to commit"; exit 0; fi
           git commit -m "Materialize complete Base44 source and deployment setup"
           git push
+
+      # Triggered directly from main so the current uploaded ZIP is processed.
