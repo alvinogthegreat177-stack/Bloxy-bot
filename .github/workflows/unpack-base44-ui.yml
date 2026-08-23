@@ -21,18 +21,30 @@ jobs:
           rm -rf .base44_extract
           mkdir .base44_extract
           test -s Bloxy-bot-ai.zip
-          unzip -q Bloxy-bot-ai.zip -d .base44_extract
-          project_dir="$(find .base44_extract -mindepth 1 -maxdepth 1 -type d | head -n 1)"
-          if [ -z "$project_dir" ]; then project_dir=.base44_extract; fi
+          unzip -q -o Bloxy-bot-ai.zip -d .base44_extract
+
+          # The Base44 export may either contain one top-level project folder
+          # or place the exported files directly at the ZIP root.
+          mapfile -t dirs < <(find .base44_extract -mindepth 1 -maxdepth 1 -type d -print)
+          if [ "${#dirs[@]}" -eq 1 ]; then
+            project_dir="${dirs[0]}"
+          else
+            project_dir=".base44_extract"
+          fi
+
+          # Never allow the Base44 export to replace the working backend/deploy files.
           for f in app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py requirements.txt render.yaml .env.example .gitignore; do
             if [ -f "$f" ]; then cp "$f" ".base44_extract/.$(basename "$f").preserve"; fi
           done
+
           cp -a "$project_dir/." .
+
           for f in app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py requirements.txt render.yaml .env.example .gitignore; do
             preserved=".base44_extract/.$(basename "$f").preserve"
             if [ -f "$preserved" ]; then cp "$preserved" "$f"; fi
           done
-          rm -rf .base44_extract Bloxy-bot-ai.zip base44-ui-source.zip
+
+          rm -rf .base44_extract
 
       - name: Write Render Blueprint
         shell: bash
@@ -86,7 +98,7 @@ jobs:
       - name: Validate materialized source count
         shell: bash
         run: |
-          COUNT=$(find . -type f -not -path './.git/*' | wc -l)
+          COUNT=$(find . -type f -not -path './.git/*' -not -path './.base44_extract/*' | wc -l)
           echo "Final working-tree file count: $COUNT"
           test "$COUNT" -ge 120
 
