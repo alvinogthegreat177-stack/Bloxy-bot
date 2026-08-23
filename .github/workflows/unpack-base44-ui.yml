@@ -82,3 +82,4 @@ jobs:
           git push
 
 # Trigger materialization after the uploaded ZIP is present on main.
+# Manual retrigger: 2026-08-23
