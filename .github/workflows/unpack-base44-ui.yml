@@ -23,7 +23,7 @@ jobs:
           test -s Bloxy-bot-ai.zip
           unzip -q -o Bloxy-bot-ai.zip -d .base44_extract
 
-          # The Base44 export may either contain one top-level project folder
+          # Base44 exports can either contain one top-level project folder
           # or place the exported files directly at the ZIP root.
           mapfile -t dirs < <(find .base44_extract -mindepth 1 -maxdepth 1 -type d -print)
           if [ "${#dirs[@]}" -eq 1 ]; then
@@ -32,7 +32,7 @@ jobs:
             project_dir=".base44_extract"
           fi
 
-          # Never allow the Base44 export to replace the working backend/deploy files.
+          # Preserve the working backend/deployment files supplied in this repo.
           for f in app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py requirements.txt render.yaml .env.example .gitignore; do
             if [ -f "$f" ]; then cp "$f" ".base44_extract/.$(basename "$f").preserve"; fi
           done
@@ -45,37 +45,6 @@ jobs:
           done
 
           rm -rf .base44_extract
-
-      - name: Write Render Blueprint
-        shell: bash
-        run: |
-          cat > render.yaml <<'YAML'
-          services:
-            - type: web
-              name: bloxy-nexus
-              runtime: python
-              plan: free
-              rootDir: backend
-              buildCommand: pip install -r requirements.txt
-              startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
-              healthCheckPath: /health
-              envVars:
-                - key: PYTHON_VERSION
-                  value: 3.11.9
-                - key: FRONTEND_ORIGIN
-                  value: https://bloxy-bot-ui.onrender.com
-                - key: BASE44_ORIGIN
-                  sync: false
-                - key: SECRET_KEY
-                  sync: false
-            - type: static_site
-              name: bloxy-bot-ui
-              buildCommand: npm install && npm run build
-              staticPublishPath: dist
-              envVars:
-                - key: VITE_BLOXY_NEXUS_URL
-                  value: https://bloxy-nexus.onrender.com
-          YAML
 
       - name: Make frontend bridge same-origin configurable
         shell: bash
@@ -92,8 +61,8 @@ jobs:
 
       - name: Validate backend syntax
         run: |
-          if compgen -G 'backend/*.py' > /dev/null; then python -m py_compile backend/*.py; fi
           python -m py_compile app.py ai_engine.py nexus.py provider_health.py providers.py schemas.py utils.py
+          if compgen -G 'backend/*.py' > /dev/null; then python -m py_compile backend/*.py; fi
 
       - name: Validate materialized source count
         shell: bash
@@ -111,5 +80,3 @@ jobs:
           if git diff --cached --quiet; then echo "No changes to commit"; exit 0; fi
           git commit -m "Materialize complete Base44 source and deployment setup"
           git push
-
-      # Triggered directly from main so the current uploaded ZIP is processed.
