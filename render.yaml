@@ -9,6 +9,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: VITE_BLOXY_NEXUS_URL
+        value: https://bloxy-bot-1.onrender.com
       - key: BASE44_ORIGIN
         sync: false
       - key: SECRET_KEY
