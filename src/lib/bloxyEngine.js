@@ -1,9 +1,9 @@
 /** Direct client bridge from the Base44-derived UI to Bloxy Nexus. */
-const DEFAULT_NEXUS_URL = 'https://bloxy-nexus.onrender.com';
+const DEFAULT_NEXUS_URL = 'https://bloxy-bot-1.onrender.com';
 
 export const NEXUS_URL = String(import.meta.env.VITE_BLOXY_NEXUS_URL || DEFAULT_NEXUS_URL).replace(/\/+$/, '');
 
-export async function runBloxy({ messages = [], conversationId = null, signal } = {}) {
+export async function runBloxy({ messages = [], conversationId = null, signal, stream = false } = {}) {
   const history = messages
     .slice(-12)
     .map((message) => ({ role: message.role, content: String(message.content ?? '') }))
@@ -18,10 +18,20 @@ export async function runBloxy({ messages = [], conversationId = null, signal } 
     body: JSON.stringify({
       message: latestUser.content,
       conversation_id: conversationId,
-      stream: false,
+      stream: Boolean(stream),
     }),
     signal,
   });
+
+  if (stream) {
+    if (!response.ok) {
+      // Try to extract error body then throw
+      const text = await response.text().catch(() => `HTTP ${response.status}`);
+      throw new Error(`Bloxy Nexus error ${response.status}: ${text}`);
+    }
+    // Return the raw ReadableStream so callers can use getReader()
+    return response.body;
+  }
 
   let payload = null;
   try { payload = await response.json(); } catch { payload = null; }
